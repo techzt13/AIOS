@@ -1,8 +1,17 @@
 const providerSelect = document.getElementById('providerSelect');
 const modelSelect = document.getElementById('modelSelect');
 const customFields = document.getElementById('customFields');
+const customBaseUrlRow = document.getElementById('customBaseUrlRow');
 const customBaseUrlInput = document.getElementById('customBaseUrl');
+const customApiKeyRow = document.getElementById('customApiKeyRow');
 const customApiKeyInput = document.getElementById('customApiKey');
+const authSummary = document.getElementById('authSummary');
+const authDetail = document.getElementById('authDetail');
+const copilotAuth = document.getElementById('copilotAuth');
+const copilotStartButton = document.getElementById('copilotStartButton');
+const copilotPollButton = document.getElementById('copilotPollButton');
+const copilotCode = document.getElementById('copilotCode');
+const copilotLink = document.getElementById('copilotLink');
 const messagesEl = document.getElementById('messages');
 const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
@@ -15,6 +24,9 @@ const STORAGE_KEY = 'aios.settings';
 
 let providers = [];
 let chatHistory = [];
+let copilotStatus = { configured: false, login: null, connectedAt: null };
+let copilotDeviceFlow = null;
+let copilotPollTimer = null;
 
 function renderMessage(role, content) {
   const el = document.createElement('div');
@@ -39,6 +51,7 @@ function saveSettings() {
     JSON.stringify({
       providerId: providerSelect.value,
       model: modelSelect.value,
+      customBaseUrl: customBaseUrlInput.value
     })
   );
 }
@@ -64,25 +77,46 @@ function updateModelOptions() {
     modelSelect.value = current;
   }
 
-  const isCustom = provider?.id === 'custom-openai';
-  customFields.classList.toggle('hidden', !isCustom);
-  if (isCustom) {
-    customBaseUrlInput.value = provider.defaultBaseUrl || '';
+  const supportsCustomInputs = Boolean(provider?.allowUserBaseUrl || provider?.allowUserApiKey);
+  customFields.classList.toggle('hidden', !supportsCustomInputs);
+  customBaseUrlRow.classList.toggle('hidden', !provider?.allowUserBaseUrl);
+  customApiKeyRow.classList.toggle('hidden', !provider?.allowUserApiKey);
+
+  if (provider?.allowUserBaseUrl) {
+    const saved = getSavedSettings();
+    customBaseUrlInput.value = saved.customBaseUrl || provider.defaultBaseUrl || '';
+  } else {
+    customBaseUrlInput.value = provider?.defaultBaseUrl || '';
   }
+
+  renderAuthState(provider);
   saveSettings();
 }
 
 async function loadProviders() {
-  const response = await fetch('/api/providers');
-  const payload = await response.json();
+  const [providerResponse, copilotResponse] = await Promise.all([
+    fetch('/api/providers'),
+    fetch('/api/auth/github-copilot/status')
+  ]);
+  const payload = await providerResponse.json();
+  const copilotPayload = await copilotResponse.json();
   providers = payload.providers || [];
+  copilotStatus = copilotPayload.ok ? copilotPayload : { configured: false, login: null, connectedAt: null };
 
   providerSelect.innerHTML = '';
+  const groups = new Map();
   providers.forEach((provider) => {
+    if (!groups.has(provider.category)) {
+      const group = document.createElement('optgroup');
+      group.label = provider.category;
+      groups.set(provider.category, group);
+      providerSelect.appendChild(group);
+    }
+
     const option = document.createElement('option');
     option.value = provider.id;
     option.textContent = provider.name;
-    providerSelect.appendChild(option);
+    groups.get(provider.category).appendChild(option);
   });
 
   const saved = getSavedSettings();
@@ -94,6 +128,119 @@ async function loadProviders() {
   if (saved.model) {
     modelSelect.value = saved.model;
   }
+
+  renderAuthState(selectedProvider());
+}
+
+function stopCopilotPolling() {
+  if (copilotPollTimer) {
+    clearTimeout(copilotPollTimer);
+    copilotPollTimer = null;
+  }
+}
+
+function scheduleCopilotPoll(intervalSeconds) {
+  stopCopilotPolling();
+  copilotPollTimer = setTimeout(() => {
+    pollCopilotLogin().catch((error) => renderMessage('system', `GitHub Copilot sign-in error: ${error.message}`));
+  }, Math.max(1, Number(intervalSeconds) || 5) * 1000);
+}
+
+function renderAuthState(provider = selectedProvider()) {
+  const staticKeyConfigured = provider?.configured || (provider?.allowUserApiKey && customApiKeyInput.value.trim());
+  const isCopilot = provider?.authMethod === 'oauth-device';
+
+  copilotAuth.classList.toggle('hidden', !isCopilot);
+  copilotPollButton.disabled = !copilotDeviceFlow;
+  copilotCode.classList.toggle('hidden', !copilotDeviceFlow?.userCode);
+  copilotLink.classList.toggle('hidden', !copilotDeviceFlow?.verificationUri);
+
+  if (copilotDeviceFlow?.userCode) {
+    copilotCode.textContent = `Code: ${copilotDeviceFlow.userCode}`;
+  } else {
+    copilotCode.textContent = '';
+  }
+
+  if (copilotDeviceFlow?.verificationUri) {
+    copilotLink.href = copilotDeviceFlow.verificationUriComplete || copilotDeviceFlow.verificationUri;
+  } else {
+    copilotLink.removeAttribute('href');
+  }
+
+  if (!provider) {
+    authSummary.textContent = '';
+    authDetail.textContent = '';
+    return;
+  }
+
+  if (provider.authMethod === 'none') {
+    authSummary.textContent = 'No key needed';
+    authDetail.textContent = `${provider.name} runs locally. AIOS will call ${provider.defaultBaseUrl}.`;
+    return;
+  }
+
+  if (isCopilot) {
+    authSummary.textContent = copilotStatus.configured
+      ? `Connected${copilotStatus.login ? ` as @${copilotStatus.login}` : ''}`
+      : 'GitHub sign-in required';
+    authDetail.textContent = copilotStatus.configured
+      ? 'AIOS stores your OAuth token outside the repository, refreshes Copilot chat tokens automatically, and never sends raw tokens to the browser.'
+      : 'Opt-in only: sign in with your own GitHub OAuth app to use your Copilot subscription. This relies on undocumented GitHub behavior and may break if GitHub changes it.';
+    copilotStartButton.textContent = copilotStatus.configured ? 'Reconnect GitHub' : 'Sign in with GitHub';
+    return;
+  }
+
+  authSummary.textContent = staticKeyConfigured ? 'API key configured' : 'API key required';
+  authDetail.textContent = provider.allowUserApiKey
+    ? `Set ${provider.apiKeyEnv} in .env or paste a one-off key below.`
+    : `Set ${provider.apiKeyEnv}${provider.apiSecretEnv ? ` and ${provider.apiSecretEnv}` : ''} in .env.`;
+}
+
+async function startCopilotLogin() {
+  const response = await fetch('/api/auth/github-copilot/start', { method: 'POST' });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Sign-in failed (HTTP ${response.status}).`);
+  }
+
+  copilotDeviceFlow = payload;
+  renderAuthState();
+  renderMessage('system', `GitHub Copilot sign-in: open ${payload.verificationUriComplete || payload.verificationUri} and enter code ${payload.userCode}.`);
+  scheduleCopilotPoll(payload.interval);
+}
+
+async function pollCopilotLogin() {
+  if (!copilotDeviceFlow?.deviceCode) {
+    return;
+  }
+
+  const response = await fetch('/api/auth/github-copilot/poll', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deviceCode: copilotDeviceFlow.deviceCode })
+  });
+  const payload = await response.json();
+
+  if (response.status === 202 || payload.pending) {
+    renderAuthState();
+    scheduleCopilotPoll(payload.interval || copilotDeviceFlow.interval);
+    return;
+  }
+
+  if (!response.ok || !payload.ok) {
+    stopCopilotPolling();
+    throw new Error(payload.error || `Sign-in check failed (HTTP ${response.status}).`);
+  }
+
+  stopCopilotPolling();
+  copilotStatus = {
+    configured: true,
+    login: payload.login || null,
+    connectedAt: new Date().toISOString()
+  };
+  copilotDeviceFlow = null;
+  await loadProviders();
+  renderMessage('system', `GitHub Copilot connected${payload.login ? ` as @${payload.login}` : ''}.`);
 }
 
 async function callExec(command) {
@@ -187,6 +334,14 @@ async function handleSlashCommand(text) {
 
 providerSelect.addEventListener('change', updateModelOptions);
 modelSelect.addEventListener('change', saveSettings);
+customBaseUrlInput.addEventListener('change', saveSettings);
+customApiKeyInput.addEventListener('input', () => renderAuthState());
+copilotStartButton.addEventListener('click', () => {
+  startCopilotLogin().catch((error) => renderMessage('system', `GitHub Copilot sign-in error: ${error.message}`));
+});
+copilotPollButton.addEventListener('click', () => {
+  pollCopilotLogin().catch((error) => renderMessage('system', `GitHub Copilot sign-in error: ${error.message}`));
+});
 
 chatForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -214,7 +369,8 @@ chatForm.addEventListener('submit', async (event) => {
         providerId: provider.id,
         model: modelSelect.value,
         messages: chatHistory,
-        apiKey: customApiKeyInput.value
+        apiKey: customApiKeyInput.value,
+        baseUrl: customBaseUrlInput.value
       })
     });
 

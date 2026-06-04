@@ -50,26 +50,92 @@ You can install additional Linux apps in the desktop container with `apt-get`.
 
 The provider catalog is centrally defined in `server/providers.js` and surfaced by `GET /api/providers`.
 
-Included providers:
+Included providers are grouped in the UI and dispatched through adapter modules in `server/adapters/`:
 
-- OpenAI
-- Anthropic
-- Google Gemini
-- DeepSeek
-- xAI (Grok)
-- OpenRouter
-- Mistral
-- Moonshot / Kimi
-- MiniMax
-- Qwen / Alibaba
-- Hugging Face
-- Ollama (local)
-- LM Studio (local)
-- NVIDIA NIM
-- Nous Portal
-- Custom OpenAI-compatible endpoint
+### 1. Major cloud LLM providers
 
-Keep keys in environment variables (`.env`). Never hardcode secrets.
+| Provider | Adapter | Auth | Models |
+| --- | --- | --- | --- |
+| Anthropic Claude | `anthropic` | `static-key` | Claude 4.6 Opus/Sonnet, Claude 3.5 Sonnet/Haiku, Claude Haiku |
+| OpenAI GPT | `openai` | `static-key` | GPT-5.5, GPT-5.4, GPT-4o, ChatGPT Codex |
+| Google Gemini | `gemini-native` | `static-key` | Gemini 3 Pro, Gemini 3 Flash, Gemini 2.5 Pro/Flash |
+| DeepSeek | `openai` | `static-key` | DeepSeek V4 Flash, DeepSeek Reasoner, DeepSeek Chat |
+| xAI (Grok) | `openai` | `static-key` | Grok-4.3, Grok-4 |
+| Mistral AI | `openai` | `static-key` | Mistral Large, Mixtral 8x7B |
+
+### 2. Regional & emerging providers
+
+| Provider | Adapter | Auth | Models |
+| --- | --- | --- | --- |
+| Moonshot AI (Kimi) | `openai` | `static-key` | Kimi K2.5, K2-Thinking, K2-Turbo |
+| MiniMax | `openai` | `static-key` | MiniMax-M3, MiniMax-VL-01, MiniMax 2.7 |
+| Zhipu AI | `openai` | `static-key` | GLM-4.7-Flash, GLM-4.7, GLM-4 |
+| Volcano Engine / BytePlus | `openai` | `static-key` | Doubao Seed 1.8, Ark-Code Latest, Seed 1.8 |
+| Alibaba Cloud (Qwen) | `openai` | `static-key` | Qwen Portal Coder/Vision, plus fallback `qwen-plus` and `qwen-max` IDs |
+| Baidu Qianfan | `baidu` | `static-key` | ERNIE 4.5, ERNIE Speed |
+| Xiaomi MiMo | `openai` | `static-key` | MiMo-v2.5 Pro, MiMo-v2 Flash |
+
+### 3. Open-source / local runtimes
+
+| Provider | Adapter | Auth | Notes |
+| --- | --- | --- | --- |
+| Ollama | `openai` | `none` | Local weights such as Llama 3.3 70B, Qwen 2.5 32B, Gemma |
+| GitHub Copilot | `github-copilot` | `oauth-device` | Uses GitHub OAuth device login and short-lived Copilot chat tokens |
+| LM Studio | `openai` | `none` | Preserved local runtime |
+| Custom OpenAI-compatible endpoint | `openai` | `static-key` | User-set base URL and optional one-off API key in the UI |
+
+### 4. Aggregators
+
+| Provider | Adapter | Auth | Models |
+| --- | --- | --- | --- |
+| OpenRouter | `openai` | `static-key` | OpenAI, Anthropic, NVIDIA routed models |
+| Vercel AI Gateway | `openai` | `static-key` | `openai/gpt-4o`, `anthropic/claude-3.5-sonnet` |
+| NVIDIA NIM | `openai` | `static-key` | Preserved |
+| Nous Portal | `openai` | `static-key` | Preserved |
+| Hugging Face Router | `openai` | `static-key` | Preserved |
+
+Keep secrets in environment variables (`.env`). Never hardcode or commit them.
+
+### Static-key configuration
+
+Example environment variables:
+
+```bash
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+GEMINI_API_KEY=
+BAIDU_API_KEY=
+BAIDU_SECRET_KEY=
+OPENROUTER_API_KEY=
+CUSTOM_OPENAI_BASE_URL=https://your-gateway.example/v1
+CUSTOM_OPENAI_API_KEY=
+```
+
+Anthropic uses its native Messages API, Gemini uses the native Google Generative Language API shape, Baidu exchanges `BAIDU_API_KEY` + `BAIDU_SECRET_KEY` for an access token, and the rest of the compatible providers use `/chat/completions`.
+
+### GitHub Copilot device login
+
+AIOS can sign into GitHub Copilot with a GitHub OAuth app that has device flow enabled:
+
+```bash
+GITHUB_COPILOT_CLIENT_ID=your_oauth_app_client_id
+GITHUB_COPILOT_BASE_URL=https://api.githubcopilot.com
+GITHUB_COPILOT_OAUTH_SCOPE=read:user copilot
+AIOS_CONFIG_DIR=/absolute/path/outside/the/repo
+```
+
+When GitHub Copilot is selected in the UI, AIOS shows a **Sign in with GitHub** flow instead of an API-key field. The server:
+
+1. Starts GitHub device login with `POST /api/auth/github-copilot/start`
+2. Polls `POST /api/auth/github-copilot/poll`
+3. Stores the GitHub OAuth token and refreshed Copilot chat token metadata outside the git tree
+4. Never returns raw tokens to the browser; the frontend only gets connection status
+
+> Warning: this is an opt-in integration that depends on undocumented/private GitHub Copilot token exchange behavior. It is not officially sanctioned by GitHub, may break without notice, and you are responsible for complying with your Copilot plan's terms.
+
+### Custom OpenAI-compatible endpoints
+
+Choose **Custom OpenAI-compatible endpoint** in the provider selector to send chat traffic to a user-set base URL such as DeepInfra, Together AI, LiteLLM, or an internal gateway. AIOS sends the configured base URL and optional one-off API key only to the server; the adapter still uses the normal OpenAI-compatible `/chat/completions` shape.
 
 ## AI OS-control APIs and security model
 

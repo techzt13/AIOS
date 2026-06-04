@@ -23,12 +23,29 @@
         <select id="modelSelect"></select>
 
         <div id="customFields" class="custom-fields hidden">
-          <label for="customBaseUrl">Custom Base URL (from server .env)</label>
-          <input id="customBaseUrl" type="url" readonly />
+          <div id="customBaseUrlRow" class="field-row hidden">
+            <label for="customBaseUrl">Custom Base URL</label>
+            <input id="customBaseUrl" type="url" placeholder="https://your-gateway.example/v1" />
+          </div>
 
-          <label for="customApiKey">Custom API Key</label>
-          <input id="customApiKey" type="password" placeholder="sk-..." />
+          <div id="customApiKeyRow" class="field-row hidden">
+            <label for="customApiKey">Custom API Key</label>
+            <input id="customApiKey" type="password" placeholder="sk-..." />
+          </div>
         </div>
+
+        <section id="authCard" class="auth-card">
+          <p id="authSummary" class="auth-summary"></p>
+          <p id="authDetail" class="auth-detail"></p>
+          <div id="copilotAuth" class="hidden">
+            <div class="auth-actions">
+              <button id="copilotStartButton" type="button">Sign in with GitHub</button>
+              <button id="copilotPollButton" type="button" class="secondary" disabled>Check sign-in</button>
+            </div>
+            <p id="copilotCode" class="auth-code hidden"></p>
+            <a id="copilotLink" class="auth-link hidden" href="#" target="_blank" rel="noreferrer">Open GitHub device login</a>
+          </div>
+        </section>
 
         <label for="systemCommand">System action (Linux command)</label>
         <input id="systemCommand" type="text" placeholder="xfce4-terminal &" />
