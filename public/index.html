@@ -21,33 +21,35 @@
           <div id="providerSetupGroups" class="provider-setup-groups"></div>
         </section>
 
-        <label for="providerSelect">Provider</label>
-        <select id="providerSelect"></select>
+        <section class="control-group">
+          <label for="providerSelect">Provider</label>
+          <select id="providerSelect"></select>
 
-        <label for="modelSelect">Model</label>
-        <select id="modelSelect"></select>
+          <label for="modelSelect">Model</label>
+          <select id="modelSelect"></select>
 
-        <div id="providerSettingsFields" class="custom-fields">
-          <div id="providerBaseUrlRow" class="field-row">
-            <label for="providerBaseUrl">Base URL</label>
-            <input id="providerBaseUrl" type="url" placeholder="https://api.example.com/v1" />
+          <div id="providerSettingsFields" class="custom-fields">
+            <div id="providerBaseUrlRow" class="field-row">
+              <label for="providerBaseUrl">Base URL</label>
+              <input id="providerBaseUrl" type="url" placeholder="https://api.example.com/v1" />
+            </div>
+
+            <div id="providerApiKeyRow" class="field-row">
+              <label for="providerApiKey">API key</label>
+              <input id="providerApiKey" type="password" placeholder="sk-..." autocomplete="off" />
+            </div>
+
+            <div id="providerApiSecretRow" class="field-row hidden">
+              <label for="providerApiSecret">API secret</label>
+              <input id="providerApiSecret" type="password" placeholder="secret" autocomplete="off" />
+            </div>
+
+            <div class="auth-actions">
+              <button id="saveProviderSettingsButton" type="button">Save provider settings</button>
+              <button id="clearProviderSettingsButton" type="button" class="secondary">Clear stored settings</button>
+            </div>
           </div>
-
-          <div id="providerApiKeyRow" class="field-row">
-            <label for="providerApiKey">API key</label>
-            <input id="providerApiKey" type="password" placeholder="sk-..." autocomplete="off" />
-          </div>
-
-          <div id="providerApiSecretRow" class="field-row hidden">
-            <label for="providerApiSecret">API secret</label>
-            <input id="providerApiSecret" type="password" placeholder="secret" autocomplete="off" />
-          </div>
-
-          <div class="auth-actions">
-            <button id="saveProviderSettingsButton" type="button">Save provider settings</button>
-            <button id="clearProviderSettingsButton" type="button" class="secondary">Clear stored settings</button>
-          </div>
-        </div>
+        </section>
 
         <section id="authCard" class="auth-card">
           <p id="authSummary" class="auth-summary"></p>
@@ -62,11 +64,13 @@
           </div>
         </section>
 
-        <label for="systemCommand">System action (Linux command)</label>
-        <input id="systemCommand" type="text" placeholder="xfce4-terminal &" />
-        <button id="runSystemCommand" type="button">Run command in workspace</button>
-        <button id="listWorkspace" type="button">List workspace files</button>
-        <button id="writeTestFile" type="button">Write test file in sandbox</button>
+        <section class="control-group">
+          <label for="systemCommand">System action (Linux command)</label>
+          <input id="systemCommand" type="text" placeholder="xfce4-terminal &" />
+          <button id="runSystemCommand" type="button">Run command in workspace</button>
+          <button id="listWorkspace" type="button">List workspace files</button>
+          <button id="writeTestFile" type="button">Write test file in sandbox</button>
+        </section>
       </aside>
 
       <main class="chat-card">
