@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=AIOS Control Layer
+Comment=Open AIOS command palette UI
+Exec=xdg-open http://aios:8080
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;

@@ -1,9 +1,9 @@
 # AIOS
 Zack and Richard have made an operating system called AI OS. Built for AI users and nerds.
 
-AIOS is a containerized, web-based AI operating-system-style app. It provides a minimalist chat UI, multi-provider model routing, and a guarded file-system sandbox API.
+AIOS is now a browser-accessible Linux-based OS environment: a full Linux desktop streamed to your browser, with the AIOS Apple-style AI control layer available for provider-routed chat, guarded command execution, and sandboxed file operations.
 
-## Quick start (Docker)
+## Quick start (Docker / Codespaces)
 
 1. Copy environment defaults:
 
@@ -13,27 +13,40 @@ cp .env.example .env
 
 2. Add at least one provider API key in `.env` (for example `OPENAI_API_KEY=...`).
 
-3. Build and run:
+3. Build and run everything:
 
 ```bash
 docker compose up --build
 ```
 
-4. Open AIOS:
+4. Open:
 
-- http://localhost:8080
+- Linux desktop stream: `http://localhost:3000` (configurable via `DESKTOP_PORT`)
+- AIOS control layer: `http://localhost:8080` (configurable via `PORT`)
 
-The port is configurable through `PORT` in `.env`.
+In GitHub Codespaces, `.devcontainer/devcontainer.json` forwards both ports.
 
-## Configuration
+## Architecture
 
-AIOS uses environment variables for secrets and provider endpoints.
+AIOS uses companion services in `docker-compose.yml`:
 
-- Never hardcode API keys.
-- Use `.env` for local development.
-- `.env.example` documents all supported variables.
+- `desktop`: Linux XFCE desktop stream (webtop/noVNC style browser desktop)
+- `aios`: Node.js + Express AI layer (`public/` + `server/`)
 
-## Supported providers
+Inside the Linux desktop, a launcher (`AIOS Control Layer`) is placed on the desktop and opens `http://aios:8080`.
+
+## Linux apps included out-of-the-box
+
+The desktop image pre-installs and supports real Linux GUI apps including:
+
+- Terminal: `xfce4-terminal`
+- File manager: `thunar`
+- Text editor: `mousepad`
+- Web browser: `firefox`
+
+You can install additional Linux apps in the desktop container with `apt-get`.
+
+## AI provider selection
 
 The provider catalog is centrally defined in `server/providers.js` and surfaced by `GET /api/providers`.
 
@@ -56,20 +69,25 @@ Included providers:
 - Nous Portal
 - Custom OpenAI-compatible endpoint
 
-> Note: AIOS fully supports OpenAI-compatible chat routing. Providers that require non-compatible request formats are clearly reported with a TODO-style friendly error. For the custom OpenAI-compatible provider, set `CUSTOM_OPENAI_BASE_URL` in `.env` and optionally enter a runtime API key in the UI.
+Keep keys in environment variables (`.env`). Never hardcode secrets.
 
-## API overview
+## AI OS-control APIs and security model
 
-- `GET /api/providers` — returns provider metadata and model examples.
-- `POST /api/chat` — proxies chat requests through the selected provider.
-- `POST /api/fs/write` — writes `{ path, content }` only inside the sandbox directory.
+- `POST /api/exec` — guarded shell command execution in the workspace root.
+  - Disabled by default; enable with `ENABLE_EXEC_API=true` only in trusted dev environments.
+  - Uses timeout (`EXEC_TIMEOUT_MS`) and output cap (`EXEC_MAX_OUTPUT_BYTES`).
+- `POST /api/fs/write` — sandboxed file write under `WORKSPACE_ROOT`.
+- `POST /api/fs/read` — sandboxed file read (with size limit `FS_READ_MAX_BYTES`).
+- `POST /api/fs/list` — sandboxed directory listing.
 
-`/api/fs/write` returns Result-style JSON:
+Path traversal and absolute path escapes are rejected for all sandboxed FS routes.
 
-- Success: `{ ok: true, message }`
-- Failure: `{ ok: false, error }`
+In the UI, you can run:
 
-Path traversal and escaping the sandbox root are rejected.
+- system action button (visible command runner)
+- slash commands in chat: `/exec ...`, `/list [path]`, `/read <path>`
+
+Use these carefully: this is a power-user/dev tool and should not be exposed to untrusted networks.
 
 ## Project structure
 
@@ -78,7 +96,11 @@ Path traversal and escaping the sandbox root are rejected.
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
+├── desktop/
+│   ├── Dockerfile
+│   └── AIOS.desktop
 ├── server/
+│   ├── exec.js
 │   ├── index.js
 │   ├── providers.js
 │   └── sandbox.js
@@ -87,6 +109,7 @@ Path traversal and escaping the sandbox root are rejected.
 │   ├── styles.css
 │   └── app.js
 ├── test/
+│   ├── exec.test.js
 │   └── sandbox.test.js
 └── workspace/
 ```
@@ -103,3 +126,7 @@ Run tests:
 ```bash
 npm test
 ```
+
+## Build footprint notes
+
+Expect the desktop image to be significantly heavier than the original chat-only container (roughly 1–3 GB class depending on cache/base updates). First build may take several minutes in a fresh Codespace.

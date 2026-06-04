@@ -1,6 +1,8 @@
 const path = require('path');
 
-function resolveSandboxPath(sandboxRoot, requestedPath) {
+function resolveSandboxPath(sandboxRoot, requestedPath, options = {}) {
+  const allowRoot = options.allowRoot === true;
+
   if (!requestedPath || typeof requestedPath !== 'string') {
     return { ok: false, error: 'A non-empty file path is required.' };
   }
@@ -12,11 +14,11 @@ function resolveSandboxPath(sandboxRoot, requestedPath) {
   const resolvedSandboxRoot = path.resolve(sandboxRoot);
   const targetPath = path.resolve(resolvedSandboxRoot, requestedPath);
 
-  if (targetPath === resolvedSandboxRoot) {
+  if (targetPath === resolvedSandboxRoot && !allowRoot) {
     return { ok: false, error: 'Target path must point to a file inside the sandbox.' };
   }
 
-  if (!targetPath.startsWith(`${resolvedSandboxRoot}${path.sep}`)) {
+  if (!targetPath.startsWith(`${resolvedSandboxRoot}${path.sep}`) && targetPath !== resolvedSandboxRoot) {
     return { ok: false, error: 'Path escapes the sandbox root and is not allowed.' };
   }
 
