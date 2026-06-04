@@ -6,6 +6,9 @@ const customApiKeyInput = document.getElementById('customApiKey');
 const messagesEl = document.getElementById('messages');
 const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
+const systemCommandInput = document.getElementById('systemCommand');
+const runSystemCommandBtn = document.getElementById('runSystemCommand');
+const listWorkspaceBtn = document.getElementById('listWorkspace');
 const writeTestFileBtn = document.getElementById('writeTestFile');
 
 const STORAGE_KEY = 'aios.settings';
@@ -93,6 +96,95 @@ async function loadProviders() {
   }
 }
 
+async function callExec(command) {
+  const response = await fetch('/api/exec', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ command })
+  });
+
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    const err = payload.error || payload.stderr || `Command failed (HTTP ${response.status}).`;
+    throw new Error(err);
+  }
+
+  return payload;
+}
+
+async function listWorkspace(path = '.') {
+  const response = await fetch('/api/fs/list', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path })
+  });
+
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `List failed (HTTP ${response.status}).`);
+  }
+
+  return payload;
+}
+
+async function readWorkspaceFile(path) {
+  const response = await fetch('/api/fs/read', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path })
+  });
+
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Read failed (HTTP ${response.status}).`);
+  }
+
+  return payload;
+}
+
+function formatExecResult(result) {
+  const parts = [`Exit code: ${result.code}`];
+  if (result.stdout) {
+    parts.push(`stdout:\n${result.stdout}`);
+  }
+  if (result.stderr) {
+    parts.push(`stderr:\n${result.stderr}`);
+  }
+  if (result.timedOut) {
+    parts.push('Command timed out.');
+  }
+
+  return parts.join('\n\n');
+}
+
+async function handleSlashCommand(text) {
+  const trimmed = text.trim();
+
+  if (trimmed.startsWith('/exec ')) {
+    const command = trimmed.slice('/exec '.length).trim();
+    const result = await callExec(command);
+    renderMessage('system', formatExecResult(result));
+    return true;
+  }
+
+  if (trimmed === '/list' || trimmed.startsWith('/list ')) {
+    const target = trimmed === '/list' ? '.' : trimmed.slice('/list '.length).trim();
+    const result = await listWorkspace(target || '.');
+    const rows = result.entries.map((entry) => `${entry.type === 'directory' ? '📁' : '📄'} ${entry.name}`);
+    renderMessage('system', `Workspace listing (${result.path}):\n${rows.join('\n') || '(empty)'}`);
+    return true;
+  }
+
+  if (trimmed.startsWith('/read ')) {
+    const filePath = trimmed.slice('/read '.length).trim();
+    const result = await readWorkspaceFile(filePath);
+    renderMessage('system', `Read ${result.path}:\n${result.content || '(empty file)'}`);
+    return true;
+  }
+
+  return false;
+}
+
 providerSelect.addEventListener('change', updateModelOptions);
 modelSelect.addEventListener('change', saveSettings);
 
@@ -106,10 +198,15 @@ chatForm.addEventListener('submit', async (event) => {
   if (!provider) return;
 
   renderMessage('user', text);
-  chatHistory.push({ role: 'user', content: text });
   messageInput.value = '';
 
   try {
+    if (await handleSlashCommand(text)) {
+      return;
+    }
+
+    chatHistory.push({ role: 'user', content: text });
+
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -131,7 +228,30 @@ chatForm.addEventListener('submit', async (event) => {
     chatHistory.push({ role: 'assistant', content: assistantText });
     renderMessage('assistant', assistantText);
   } catch (error) {
-    renderMessage('system', `Network error: ${error.message}`);
+    renderMessage('system', `System error: ${error.message}`);
+  }
+});
+
+runSystemCommandBtn.addEventListener('click', async () => {
+  const command = systemCommandInput.value.trim();
+  if (!command) return;
+
+  renderMessage('user', `/exec ${command}`);
+  try {
+    const result = await callExec(command);
+    renderMessage('system', formatExecResult(result));
+  } catch (error) {
+    renderMessage('system', `Exec error: ${error.message}`);
+  }
+});
+
+listWorkspaceBtn.addEventListener('click', async () => {
+  try {
+    const result = await listWorkspace('.');
+    const rows = result.entries.map((entry) => `${entry.type === 'directory' ? '��' : '📄'} ${entry.name}`);
+    renderMessage('system', `Workspace listing (${result.path}):\n${rows.join('\n') || '(empty)'}`);
+  } catch (error) {
+    renderMessage('system', `List error: ${error.message}`);
   }
 });
 
@@ -157,5 +277,5 @@ writeTestFileBtn.addEventListener('click', async () => {
   }
 });
 
-renderMessage('system', 'Welcome to AIOS. Choose a provider and model to begin.');
+renderMessage('system', 'Welcome to AIOS. Use chat, /exec, /list, or /read to control the Linux workspace.');
 loadProviders().catch((error) => renderMessage('system', `Failed to load providers: ${error.message}`));
