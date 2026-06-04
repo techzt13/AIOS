@@ -16,23 +16,25 @@
       </header>
 
       <aside class="settings-card">
-        <label for="providerSelect">Provider</label>
-        <select id="providerSelect"></select>
+        <section class="control-group">
+          <label for="providerSelect">Provider</label>
+          <select id="providerSelect"></select>
 
-        <label for="modelSelect">Model</label>
-        <select id="modelSelect"></select>
+          <label for="modelSelect">Model</label>
+          <select id="modelSelect"></select>
 
-        <div id="customFields" class="custom-fields hidden">
-          <div id="customBaseUrlRow" class="field-row hidden">
-            <label for="customBaseUrl">Custom Base URL</label>
-            <input id="customBaseUrl" type="url" placeholder="https://your-gateway.example/v1" />
+          <div id="customFields" class="custom-fields hidden">
+            <div id="customBaseUrlRow" class="field-row hidden">
+              <label for="customBaseUrl">Custom Base URL</label>
+              <input id="customBaseUrl" type="url" placeholder="https://your-gateway.example/v1" />
+            </div>
+
+            <div id="customApiKeyRow" class="field-row hidden">
+              <label for="customApiKey">Custom API Key</label>
+              <input id="customApiKey" type="password" placeholder="sk-..." />
+            </div>
           </div>
-
-          <div id="customApiKeyRow" class="field-row hidden">
-            <label for="customApiKey">Custom API Key</label>
-            <input id="customApiKey" type="password" placeholder="sk-..." />
-          </div>
-        </div>
+        </section>
 
         <section id="authCard" class="auth-card">
           <p id="authSummary" class="auth-summary"></p>
@@ -47,11 +49,13 @@
           </div>
         </section>
 
-        <label for="systemCommand">System action (Linux command)</label>
-        <input id="systemCommand" type="text" placeholder="xfce4-terminal &" />
-        <button id="runSystemCommand" type="button">Run command in workspace</button>
-        <button id="listWorkspace" type="button">List workspace files</button>
-        <button id="writeTestFile" type="button">Write test file in sandbox</button>
+        <section class="control-group">
+          <label for="systemCommand">System action (Linux command)</label>
+          <input id="systemCommand" type="text" placeholder="xfce4-terminal &" />
+          <button id="runSystemCommand" type="button">Run command in workspace</button>
+          <button id="listWorkspace" type="button">List workspace files</button>
+          <button id="writeTestFile" type="button">Write test file in sandbox</button>
+        </section>
       </aside>
 
       <main class="chat-card">
