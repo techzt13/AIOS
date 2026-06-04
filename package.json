@@ -1,0 +1,27 @@
+{
+  "name": "aios",
+  "version": "1.0.0",
+  "description": "Zack and Richard have made an operating system called AI OS. Built for AI users and nerds.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/techzt13/AIOS.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/techzt13/AIOS/issues"
+  },
+  "homepage": "https://github.com/techzt13/AIOS#readme",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2"
+  }
+}

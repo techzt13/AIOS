@@ -1,0 +1,174 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --text: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --accent: #0071e3;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-shell {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 16px;
+}
+
+.topbar {
+  grid-column: 1 / -1;
+  padding: 8px 4px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.topbar p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.settings-card,
+.chat-card {
+  background: var(--card);
+  border-radius: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow);
+}
+
+.settings-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: fit-content;
+}
+
+label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+select,
+input,
+button {
+  font: inherit;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  transition: all 120ms ease;
+}
+
+select,
+input {
+  background: #fff;
+}
+
+input:focus,
+select:focus,
+button:focus {
+  outline: 2px solid rgba(0, 113, 227, 0.3);
+  border-color: var(--accent);
+}
+
+button {
+  background: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+.custom-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hidden {
+  display: none;
+}
+
+.chat-card {
+  min-height: 72vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.messages {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.message {
+  max-width: 85%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.message.user {
+  margin-left: auto;
+  background: #0071e3;
+  color: #fff;
+}
+
+.message.assistant {
+  background: #f2f2f4;
+}
+
+.message.system {
+  background: #fff6d6;
+  color: #5f4b00;
+}
+
+.composer {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+#messageInput {
+  flex: 1;
+}
+
+.composer button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-card {
+    min-height: 60vh;
+  }
+}
