@@ -1,17 +1,22 @@
 const fs = require('fs/promises');
-const os = require('os');
 const path = require('path');
 const { normalizeBaseUrl, parseProviderResponse } = require('../adapters/utils');
+const { getConfigDir } = require('../configDir');
 
-const CONFIG_DIR = process.env.AIOS_CONFIG_DIR || path.join(os.homedir(), '.config', 'aios');
-const TOKEN_PATH = path.join(CONFIG_DIR, 'github-copilot.json');
+const TOKEN_PATH = path.join(getConfigDir(), 'github-copilot.json');
 const DEFAULT_DEVICE_SCOPE = process.env.GITHUB_COPILOT_OAUTH_SCOPE || 'read:user copilot';
 // GitHub Copilot device-login support in AIOS is opt-in and uses undocumented/private
 // Copilot token exchange behavior. It may break if GitHub changes their APIs, and each
 // user remains responsible for making sure their Copilot plan allows this usage.
 
 async function ensureConfigDir() {
-  await fs.mkdir(CONFIG_DIR, { recursive: true });
+  const configDir = getConfigDir();
+  await fs.mkdir(configDir, { recursive: true, mode: 0o700 });
+  try {
+    await fs.chmod(configDir, 0o700);
+  } catch {
+    // Best effort. Some filesystems may not support chmod.
+  }
 }
 
 async function loadSession() {
@@ -212,7 +217,7 @@ async function getChatSession({ baseUrl, fetchImpl = fetch }) {
 }
 
 module.exports = {
-  CONFIG_DIR,
+  CONFIG_DIR: getConfigDir(),
   TOKEN_PATH,
   exchangeCopilotToken,
   getChatSession,

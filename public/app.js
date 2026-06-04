@@ -1,10 +1,15 @@
+const providerSetupGroups = document.getElementById('providerSetupGroups');
 const providerSelect = document.getElementById('providerSelect');
 const modelSelect = document.getElementById('modelSelect');
-const customFields = document.getElementById('customFields');
-const customBaseUrlRow = document.getElementById('customBaseUrlRow');
-const customBaseUrlInput = document.getElementById('customBaseUrl');
-const customApiKeyRow = document.getElementById('customApiKeyRow');
-const customApiKeyInput = document.getElementById('customApiKey');
+const providerSettingsFields = document.getElementById('providerSettingsFields');
+const providerBaseUrlRow = document.getElementById('providerBaseUrlRow');
+const providerBaseUrlInput = document.getElementById('providerBaseUrl');
+const providerApiKeyRow = document.getElementById('providerApiKeyRow');
+const providerApiKeyInput = document.getElementById('providerApiKey');
+const providerApiSecretRow = document.getElementById('providerApiSecretRow');
+const providerApiSecretInput = document.getElementById('providerApiSecret');
+const saveProviderSettingsButton = document.getElementById('saveProviderSettingsButton');
+const clearProviderSettingsButton = document.getElementById('clearProviderSettingsButton');
 const authSummary = document.getElementById('authSummary');
 const authDetail = document.getElementById('authDetail');
 const copilotAuth = document.getElementById('copilotAuth');
@@ -50,14 +55,78 @@ function saveSettings() {
     STORAGE_KEY,
     JSON.stringify({
       providerId: providerSelect.value,
-      model: modelSelect.value,
-      customBaseUrl: customBaseUrlInput.value
+      model: modelSelect.value
     })
   );
 }
 
 function selectedProvider() {
   return providers.find((provider) => provider.id === providerSelect.value);
+}
+
+function statusLabel(provider) {
+  if (provider.authMethod === 'none') {
+    return 'No key needed';
+  }
+
+  if (provider.authMethod === 'oauth-device') {
+    return provider.configured ? 'Connected' : 'Sign-in required';
+  }
+
+  if (provider.requiresApiKey === false) {
+    return provider.configured ? 'Configured' : 'Optional key';
+  }
+
+  return provider.configured ? 'Configured' : 'Needs setup';
+}
+
+function renderProviderSetupList() {
+  providerSetupGroups.innerHTML = '';
+  const groups = new Map();
+
+  providers.forEach((provider) => {
+    if (!groups.has(provider.category)) {
+      const section = document.createElement('section');
+      section.className = 'provider-setup-group';
+      const title = document.createElement('h3');
+      title.textContent = provider.category;
+      const items = document.createElement('div');
+      items.className = 'provider-setup-items';
+      section.appendChild(title);
+      section.appendChild(items);
+      groups.set(provider.category, items);
+      providerSetupGroups.appendChild(section);
+    }
+
+    const row = document.createElement('div');
+    row.className = 'provider-setup-item';
+
+    const left = document.createElement('div');
+    left.textContent = provider.name;
+
+    const right = document.createElement('div');
+    const status = document.createElement('span');
+    status.className = 'provider-status';
+    status.textContent = statusLabel(provider);
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Edit';
+    button.className = 'secondary';
+    button.addEventListener('click', () => {
+      providerSelect.value = provider.id;
+      updateModelOptions();
+      providerSelect.focus();
+    });
+
+    right.appendChild(status);
+    right.appendChild(document.createTextNode(' '));
+    right.appendChild(button);
+
+    row.appendChild(left);
+    row.appendChild(right);
+    groups.get(provider.category).appendChild(row);
+  });
 }
 
 function updateModelOptions() {
@@ -77,31 +146,26 @@ function updateModelOptions() {
     modelSelect.value = current;
   }
 
-  const supportsCustomInputs = Boolean(provider?.allowUserBaseUrl || provider?.allowUserApiKey);
-  customFields.classList.toggle('hidden', !supportsCustomInputs);
-  customBaseUrlRow.classList.toggle('hidden', !provider?.allowUserBaseUrl);
-  customApiKeyRow.classList.toggle('hidden', !provider?.allowUserApiKey);
-
-  if (provider?.allowUserBaseUrl) {
-    const saved = getSavedSettings();
-    customBaseUrlInput.value = saved.customBaseUrl || provider.defaultBaseUrl || '';
-  } else {
-    customBaseUrlInput.value = provider?.defaultBaseUrl || '';
-  }
+  providerBaseUrlInput.value = provider?.effectiveBaseUrl || '';
+  providerApiKeyInput.value = '';
+  providerApiSecretInput.value = '';
+  providerApiKeyInput.placeholder = provider?.hasStoredApiKey ? 'Stored key is configured' : 'sk-...';
+  providerApiSecretInput.placeholder = provider?.hasStoredApiSecret ? 'Stored secret is configured' : 'secret';
 
   renderAuthState(provider);
   saveSettings();
 }
 
 async function loadProviders() {
-  const [providerResponse, copilotResponse] = await Promise.all([
-    fetch('/api/providers'),
-    fetch('/api/auth/github-copilot/status')
-  ]);
-  const payload = await providerResponse.json();
-  const copilotPayload = await copilotResponse.json();
+  const response = await fetch('/api/settings/providers');
+  const payload = await response.json();
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Failed to load providers (HTTP ${response.status}).`);
+  }
+
   providers = payload.providers || [];
-  copilotStatus = copilotPayload.ok ? copilotPayload : { configured: false, login: null, connectedAt: null };
+  copilotStatus = payload.copilot || { configured: false, login: null, connectedAt: null };
 
   providerSelect.innerHTML = '';
   const groups = new Map();
@@ -123,12 +187,14 @@ async function loadProviders() {
   if (saved.providerId && providers.some((provider) => provider.id === saved.providerId)) {
     providerSelect.value = saved.providerId;
   }
+
   updateModelOptions();
 
   if (saved.model) {
     modelSelect.value = saved.model;
   }
 
+  renderProviderSetupList();
   renderAuthState(selectedProvider());
 }
 
@@ -147,10 +213,18 @@ function scheduleCopilotPoll(intervalSeconds) {
 }
 
 function renderAuthState(provider = selectedProvider()) {
-  const staticKeyConfigured = provider?.configured || (provider?.allowUserApiKey && customApiKeyInput.value.trim());
   const isCopilot = provider?.authMethod === 'oauth-device';
+  const isStatic = provider?.authMethod === 'static-key';
 
   copilotAuth.classList.toggle('hidden', !isCopilot);
+  providerSettingsFields.classList.toggle('hidden', !provider || isCopilot);
+  providerBaseUrlRow.classList.toggle('hidden', !provider || !provider.baseUrlEnv);
+  providerApiKeyRow.classList.toggle('hidden', !provider || !isStatic);
+  providerApiSecretRow.classList.toggle('hidden', !provider || !isStatic || !provider.apiSecretEnv);
+
+  saveProviderSettingsButton.disabled = !provider || isCopilot;
+  clearProviderSettingsButton.disabled = !provider || isCopilot;
+
   copilotPollButton.disabled = !copilotDeviceFlow;
   copilotCode.classList.toggle('hidden', !copilotDeviceFlow?.userCode);
   copilotLink.classList.toggle('hidden', !copilotDeviceFlow?.verificationUri);
@@ -175,7 +249,7 @@ function renderAuthState(provider = selectedProvider()) {
 
   if (provider.authMethod === 'none') {
     authSummary.textContent = 'No key needed';
-    authDetail.textContent = `${provider.name} runs locally. AIOS will call ${provider.defaultBaseUrl}.`;
+    authDetail.textContent = `${provider.name} can run without API credentials. You can optionally save a custom base URL.`;
     return;
   }
 
@@ -185,15 +259,82 @@ function renderAuthState(provider = selectedProvider()) {
       : 'GitHub sign-in required';
     authDetail.textContent = copilotStatus.configured
       ? 'AIOS stores your OAuth token outside the repository, refreshes Copilot chat tokens automatically, and never sends raw tokens to the browser.'
-      : 'Opt-in only: sign in with your own GitHub OAuth app to use your Copilot subscription. This relies on undocumented GitHub behavior and may break if GitHub changes it.';
+      : 'Sign in with your GitHub OAuth app to use your Copilot subscription.';
     copilotStartButton.textContent = copilotStatus.configured ? 'Reconnect GitHub' : 'Sign in with GitHub';
     return;
   }
 
-  authSummary.textContent = staticKeyConfigured ? 'API key configured' : 'API key required';
-  authDetail.textContent = provider.allowUserApiKey
-    ? `Set ${provider.apiKeyEnv} in .env or paste a one-off key below.`
-    : `Set ${provider.apiKeyEnv}${provider.apiSecretEnv ? ` and ${provider.apiSecretEnv}` : ''} in .env.`;
+  if (provider.requiresApiKey === false) {
+    authSummary.textContent = provider.configured ? 'Configured' : 'Optional API key';
+    authDetail.textContent = 'Save settings in AIOS. If no key is provided, AIOS can still call this endpoint without authorization headers.';
+    return;
+  }
+
+  authSummary.textContent = provider.configured ? 'API key configured' : 'API key required';
+  authDetail.textContent = provider.apiSecretEnv
+    ? `Configure ${provider.apiKeyEnv} and ${provider.apiSecretEnv} in AIOS settings (or use .env fallback).`
+    : `Configure ${provider.apiKeyEnv} in AIOS settings (or use .env fallback).`;
+}
+
+async function saveProviderSettings() {
+  const provider = selectedProvider();
+  if (!provider || provider.authMethod === 'oauth-device') {
+    return;
+  }
+
+  const body = {
+    baseUrl: providerBaseUrlInput.value.trim()
+  };
+
+  if (provider.authMethod === 'static-key') {
+    const apiKey = providerApiKeyInput.value.trim();
+    const apiSecret = providerApiSecretInput.value.trim();
+
+    if (apiKey) {
+      body.apiKey = apiKey;
+    }
+
+    if (provider.apiSecretEnv && apiSecret) {
+      body.apiSecret = apiSecret;
+    }
+  }
+
+  const response = await fetch(`/api/settings/providers/${encodeURIComponent(provider.id)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json();
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Failed to save provider settings (HTTP ${response.status}).`);
+  }
+
+  providerApiKeyInput.value = '';
+  providerApiSecretInput.value = '';
+  await loadProviders();
+  renderMessage('system', `${provider.name} settings saved.`);
+}
+
+async function clearProviderSettings() {
+  const provider = selectedProvider();
+  if (!provider || provider.authMethod === 'oauth-device') {
+    return;
+  }
+
+  const response = await fetch(`/api/settings/providers/${encodeURIComponent(provider.id)}`, {
+    method: 'DELETE'
+  });
+  const payload = await response.json();
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Failed to clear provider settings (HTTP ${response.status}).`);
+  }
+
+  providerApiKeyInput.value = '';
+  providerApiSecretInput.value = '';
+  await loadProviders();
+  renderMessage('system', `${provider.name} stored settings cleared.`);
 }
 
 async function startCopilotLogin() {
@@ -334,13 +475,17 @@ async function handleSlashCommand(text) {
 
 providerSelect.addEventListener('change', updateModelOptions);
 modelSelect.addEventListener('change', saveSettings);
-customBaseUrlInput.addEventListener('change', saveSettings);
-customApiKeyInput.addEventListener('input', () => renderAuthState());
 copilotStartButton.addEventListener('click', () => {
   startCopilotLogin().catch((error) => renderMessage('system', `GitHub Copilot sign-in error: ${error.message}`));
 });
 copilotPollButton.addEventListener('click', () => {
   pollCopilotLogin().catch((error) => renderMessage('system', `GitHub Copilot sign-in error: ${error.message}`));
+});
+saveProviderSettingsButton.addEventListener('click', () => {
+  saveProviderSettings().catch((error) => renderMessage('system', `Provider settings error: ${error.message}`));
+});
+clearProviderSettingsButton.addEventListener('click', () => {
+  clearProviderSettings().catch((error) => renderMessage('system', `Provider settings error: ${error.message}`));
 });
 
 chatForm.addEventListener('submit', async (event) => {
@@ -368,9 +513,7 @@ chatForm.addEventListener('submit', async (event) => {
       body: JSON.stringify({
         providerId: provider.id,
         model: modelSelect.value,
-        messages: chatHistory,
-        apiKey: customApiKeyInput.value,
-        baseUrl: customBaseUrlInput.value
+        messages: chatHistory
       })
     });
 
@@ -404,7 +547,7 @@ runSystemCommandBtn.addEventListener('click', async () => {
 listWorkspaceBtn.addEventListener('click', async () => {
   try {
     const result = await listWorkspace('.');
-    const rows = result.entries.map((entry) => `${entry.type === 'directory' ? '��' : '📄'} ${entry.name}`);
+    const rows = result.entries.map((entry) => `${entry.type === 'directory' ? '📁' : '📄'} ${entry.name}`);
     renderMessage('system', `Workspace listing (${result.path}):\n${rows.join('\n') || '(empty)'}`);
   } catch (error) {
     renderMessage('system', `List error: ${error.message}`);
