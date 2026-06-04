@@ -4,6 +4,14 @@ const express = require('express');
 const fs = require('fs/promises');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const { dispatchChat } = require('./adapters');
+const { normalizeBaseUrl } = require('./adapters/utils');
+const {
+  getChatSession,
+  getStatus: getGitHubCopilotStatus,
+  pollDeviceFlow,
+  startDeviceFlow
+} = require('./auth/githubCopilot');
 const { getProviders, getProviderById } = require('./providers');
 const { resolveSandboxPath } = require('./sandbox');
 const { validateExecCommand, runExecCommand } = require('./exec');
@@ -34,117 +42,127 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, app: 'AIOS' });
 });
 
-app.get('/api/providers', (_req, res) => {
-  res.json({ providers: getProviders() });
-});
-
-function normalizeBaseUrl(baseUrl) {
-  let normalized = String(baseUrl || '').trim();
-
-  while (normalized.endsWith('/')) {
-    normalized = normalized.slice(0, -1);
-  }
-
-  return normalized;
-}
-
-async function parseProviderResponse(response) {
-  const rawText = await response.text();
-
-  if (!rawText) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(rawText);
-  } catch {
-    return { error: { message: rawText } };
-  }
-}
-
-async function proxyOpenAICompatibleChat({ baseUrl, apiKey, model, messages, providerId }) {
-  const response = await fetch(`${normalizeBaseUrl(baseUrl)}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(apiKey ? { Authorization: 'Bearer ' + apiKey } : {}),
-      ...(providerId === 'openrouter'
-        ? {
-            'HTTP-Referer': process.env.OPENROUTER_REFERER || 'http://localhost',
-            'X-Title': process.env.OPENROUTER_TITLE || 'AIOS'
-          }
-        : {})
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      stream: false
+app.get('/api/providers', async (_req, res) => {
+  const copilotStatus = await getGitHubCopilotStatus();
+  res.json({
+    providers: getProviders({
+      configuredProviders: {
+        'github-copilot': copilotStatus.configured
+      }
     })
   });
+});
 
-  const data = await parseProviderResponse(response);
+app.get('/api/auth/github-copilot/status', async (_req, res) => {
+  res.json({ ok: true, ...(await getGitHubCopilotStatus()) });
+});
 
-  if (!response.ok) {
-    const message = data?.error?.message || `Provider request failed with status ${response.status}.`;
-    return { ok: false, status: response.status, error: message, raw: data };
+app.post('/api/auth/github-copilot/start', async (_req, res) => {
+  try {
+    const flow = await startDeviceFlow();
+    return res.json({
+      ok: true,
+      ...flow,
+      message: 'Open the GitHub verification URL, enter the code, then return to AIOS to finish sign-in.'
+    });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+app.post('/api/auth/github-copilot/poll', async (req, res) => {
+  try {
+    const deviceCode = String(req.body?.deviceCode || '').trim();
+    if (!deviceCode) {
+      return res.status(400).json({ ok: false, error: 'deviceCode is required.' });
+    }
+
+    const result = await pollDeviceFlow({ deviceCode });
+    return res.status(result.pending ? 202 : 200).json(result);
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+async function resolveProviderAuth({ provider, customApiKey, customBaseUrl }) {
+  const baseUrl = normalizeBaseUrl(
+    (provider.allowUserBaseUrl ? customBaseUrl : '')
+      || process.env[provider.baseUrlEnv]
+      || provider.defaultBaseUrl
+  );
+
+  if (!baseUrl) {
+    return {
+      ok: false,
+      error: `Missing base URL for ${provider.name}. Set ${provider.baseUrlEnv} in .env${provider.allowUserBaseUrl ? ' or supply it in the UI.' : '.'}`
+    };
   }
 
-  const assistantMessage = data?.choices?.[0]?.message?.content;
+  if (provider.authMethod === 'none') {
+    return { ok: true, auth: { baseUrl } };
+  }
 
-  return {
-    ok: true,
-    data,
-    message: assistantMessage || ''
-  };
+  if (provider.authMethod === 'oauth-device') {
+    try {
+      const session = await getChatSession({ baseUrl });
+      return {
+        ok: true,
+        auth: {
+          baseUrl,
+          accessToken: session.accessToken,
+          chatCompletionsUrl: session.chatCompletionsUrl
+        }
+      };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  }
+
+  const apiKey = provider.allowUserApiKey
+    ? String(customApiKey || process.env[provider.apiKeyEnv] || '').trim()
+    : String(process.env[provider.apiKeyEnv] || '').trim();
+  const apiSecret = provider.apiSecretEnv ? String(process.env[provider.apiSecretEnv] || '').trim() : '';
+
+  if (!apiKey) {
+    return {
+      ok: false,
+      error: `Missing API key for ${provider.name}. Set ${provider.apiKeyEnv} in .env${provider.allowUserApiKey ? ' or provide a key in the UI.' : '.'}`
+    };
+  }
+
+  if (provider.apiSecretEnv && !apiSecret) {
+    return {
+      ok: false,
+      error: `Missing secret for ${provider.name}. Set ${provider.apiSecretEnv} in .env.`
+    };
+  }
+
+  return { ok: true, auth: { baseUrl, apiKey, apiSecret } };
 }
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { providerId, model, messages, apiKey: customApiKey } = req.body || {};
+    const { providerId, model, messages, apiKey: customApiKey, baseUrl: customBaseUrl } = req.body || {};
 
     if (!providerId || !model || !Array.isArray(messages)) {
       return res.status(400).json({ ok: false, error: 'providerId, model, and messages[] are required.' });
     }
 
     const provider = getProviderById(providerId);
-
     if (!provider) {
       return res.status(400).json({ ok: false, error: `Unknown provider: ${providerId}` });
     }
 
-    if (!provider.openaiCompatible) {
-      return res.status(400).json({
-        ok: false,
-        error: `${provider.name} currently needs a bespoke adapter in AIOS. TODO: implement non-OpenAI request shape for this provider.`
-      });
+    const authResult = await resolveProviderAuth({ provider, customApiKey, customBaseUrl });
+    if (!authResult.ok) {
+      return res.status(400).json({ ok: false, error: authResult.error });
     }
 
-    const baseUrl = normalizeBaseUrl(process.env[provider.baseUrlEnv] || provider.defaultBaseUrl);
-
-    const apiKey = provider.id === 'custom-openai'
-      ? customApiKey || process.env[provider.apiKeyEnv]
-      : process.env[provider.apiKeyEnv];
-
-    if (provider.requiresApiKey && !apiKey) {
-      return res.status(400).json({
-        ok: false,
-        error: `Missing API key for ${provider.name}. Set ${provider.apiKeyEnv} in .env${provider.id === 'custom-openai' ? ' or provide a key in the UI.' : '.'}`
-      });
-    }
-
-    if (!baseUrl) {
-      return res.status(400).json({
-        ok: false,
-        error: `Missing base URL for ${provider.name}. Set ${provider.baseUrlEnv} in .env.`
-      });
-    }
-
-    const result = await proxyOpenAICompatibleChat({
-      baseUrl,
-      apiKey,
+    const result = await dispatchChat({
+      provider,
       model,
       messages,
-      providerId: provider.id
+      auth: authResult.auth
     });
 
     if (!result.ok) {
@@ -156,7 +174,7 @@ app.post('/api/chat', async (req, res) => {
       });
     }
 
-    return res.json({ ok: true, provider: provider.id, model, message: result.message, raw: result.data });
+    return res.json({ ok: true, provider: provider.id, model, message: result.message, raw: result.raw });
   } catch (error) {
     return res.status(500).json({ ok: false, error: `Chat request failed: ${error.message}` });
   }
