@@ -107,6 +107,50 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.54);
 }
 
+.provider-setup-card {
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8f8fb;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 6px;
+}
+
+.provider-setup-title {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.provider-setup-group + .provider-setup-group {
+  margin-top: 8px;
+}
+
+.provider-setup-group h3 {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.provider-setup-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.provider-setup-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.provider-status {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
 label {
   font-size: 0.75rem;
   font-weight: 590;

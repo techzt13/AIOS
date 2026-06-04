@@ -213,7 +213,7 @@ const providerCatalog = [
     defaultBaseUrl: 'https://api.openai.com/v1',
     baseUrlEnv: 'CUSTOM_OPENAI_BASE_URL',
     apiKeyEnv: 'CUSTOM_OPENAI_API_KEY',
-    requiresApiKey: true,
+    requiresApiKey: false,
     allowUserApiKey: true,
     allowUserBaseUrl: true,
     models: ['custom-model-1', 'custom-model-2']

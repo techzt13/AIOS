@@ -5,21 +5,21 @@ AIOS is now a browser-accessible Linux-based OS environment: a full Linux deskto
 
 ## Quick start (Docker / Codespaces)
 
-1. Copy environment defaults:
+1. (Optional) copy runtime defaults:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Add at least one provider API key in `.env` (for example `OPENAI_API_KEY=...`).
+> `.env` is now optional for provider secrets. AIOS can boot without it, and provider credentials can be configured in the UI.
 
-3. Build and run everything:
+2. Build and run everything:
 
 ```bash
 docker compose up --build
 ```
 
-4. Open:
+3. Open:
 
 - Linux desktop stream: `http://localhost:3000` (configurable via `DESKTOP_PORT`)
 - AIOS control layer: `http://localhost:8080` (configurable via `PORT`)
@@ -94,11 +94,21 @@ Included providers are grouped in the UI and dispatched through adapter modules 
 | Nous Portal | `openai` | `static-key` | Preserved |
 | Hugging Face Router | `openai` | `static-key` | Preserved |
 
-Keep secrets in environment variables (`.env`). Never hardcode or commit them.
+Provider settings are now primarily managed in the AIOS UI and stored outside the git tree.
 
 ### Static-key configuration
 
-Example environment variables:
+For static-key providers (OpenAI, Anthropic, Gemini, DeepSeek, MiniMax, OpenRouter, etc.), configure API keys and optional base URLs in the AIOS interface.
+
+AIOS persists provider settings in:
+
+- `AIOS_CONFIG_DIR` (if set), or
+- `~/.config/aios` by default
+
+Secrets are never returned raw to the frontend. The UI only receives safe status fields (configured true/false, auth source, and effective base URL).
+Because this is local file-based secret storage, secure the host machine/user account appropriately.
+
+`.env` still works as a fallback source for compatibility. Optional fallback examples:
 
 ```bash
 OPENAI_API_KEY=
@@ -110,6 +120,12 @@ OPENROUTER_API_KEY=
 CUSTOM_OPENAI_BASE_URL=https://your-gateway.example/v1
 CUSTOM_OPENAI_API_KEY=
 ```
+
+Chat auth resolution order is:
+
+1. persisted provider settings from the AIOS config store
+2. `.env` fallback values
+3. provider-specific no-auth / OAuth-device behavior
 
 Anthropic uses its native Messages API, Gemini uses the native Google Generative Language API shape, Baidu exchanges `BAIDU_API_KEY` + `BAIDU_SECRET_KEY` for an access token, and the rest of the compatible providers use `/chat/completions`.
 
@@ -128,14 +144,14 @@ When GitHub Copilot is selected in the UI, AIOS shows a **Sign in with GitHub** 
 
 1. Starts GitHub device login with `POST /api/auth/github-copilot/start`
 2. Polls `POST /api/auth/github-copilot/poll`
-3. Stores the GitHub OAuth token and refreshed Copilot chat token metadata outside the git tree
+3. Stores the GitHub OAuth token and refreshed Copilot chat token metadata in the same outside-git AIOS config directory
 4. Never returns raw tokens to the browser; the frontend only gets connection status
 
 > Warning: this is an opt-in integration that depends on undocumented/private GitHub Copilot token exchange behavior. It is not officially sanctioned by GitHub, may break without notice, and you are responsible for complying with your Copilot plan's terms.
 
 ### Custom OpenAI-compatible endpoints
 
-Choose **Custom OpenAI-compatible endpoint** in the provider selector to send chat traffic to a user-set base URL such as DeepInfra, Together AI, LiteLLM, or an internal gateway. AIOS sends the configured base URL and optional one-off API key only to the server; the adapter still uses the normal OpenAI-compatible `/chat/completions` shape.
+Choose **Custom OpenAI-compatible endpoint** in the provider selector to send chat traffic to a user-set base URL such as DeepInfra, Together AI, LiteLLM, or an internal gateway. You can store an optional API key and base URL in AIOS settings; the adapter still uses the normal OpenAI-compatible `/chat/completions` shape.
 
 ## AI OS-control APIs and security model
 
@@ -166,8 +182,11 @@ Use these carefully: this is a power-user/dev tool and should not be exposed to 
 │   ├── Dockerfile
 │   └── AIOS.desktop
 ├── server/
+│   ├── configDir.js
 │   ├── exec.js
 │   ├── index.js
+│   ├── providerSettings.js
+│   ├── providerSettingsStore.js
 │   ├── providers.js
 │   └── sandbox.js
 ├── public/
