@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIOS</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>AIOS</h1>
+          <p>Built for AI users and nerds · by Zack and Richard</p>
+        </div>
+      </header>
+
+      <aside class="settings-card">
+        <label for="providerSelect">Provider</label>
+        <select id="providerSelect"></select>
+
+        <label for="modelSelect">Model</label>
+        <select id="modelSelect"></select>
+
+        <div id="customFields" class="custom-fields hidden">
+          <label for="customBaseUrl">Custom Base URL (from server .env)</label>
+          <input id="customBaseUrl" type="url" readonly />
+
+          <label for="customApiKey">Custom API Key</label>
+          <input id="customApiKey" type="password" placeholder="sk-..." />
+        </div>
+
+        <button id="writeTestFile" type="button">Write test file in sandbox</button>
+      </aside>
+
+      <main class="chat-card">
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <form id="chatForm" class="composer">
+          <input id="messageInput" type="text" placeholder="Message AIOS..." required />
+          <button type="submit">Send</button>
+        </form>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
