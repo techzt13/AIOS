@@ -1,0 +1,3 @@
+mode=2
+digital-format=%a %H:%M
+tooltip-format=%A %d %B %Y

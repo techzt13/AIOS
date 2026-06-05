@@ -24,14 +24,45 @@ const systemCommandInput = document.getElementById('systemCommand');
 const runSystemCommandBtn = document.getElementById('runSystemCommand');
 const listWorkspaceBtn = document.getElementById('listWorkspace');
 const writeTestFileBtn = document.getElementById('writeTestFile');
+const runSetupAgainButton = document.getElementById('runSetupAgainButton');
+
+const setupWizard = document.getElementById('setupWizard');
+const wizardStepLabel = document.getElementById('wizardStepLabel');
+const wizardBackButton = document.getElementById('wizardBackButton');
+const wizardNextButton = document.getElementById('wizardNextButton');
+const wizardFinishButton = document.getElementById('wizardFinishButton');
+const wizardProviderSelect = document.getElementById('wizardProviderSelect');
+const wizardModelSelect = document.getElementById('wizardModelSelect');
+const wizardProviderGroups = document.getElementById('wizardProviderGroups');
+const wizardConnectSummary = document.getElementById('wizardConnectSummary');
+const wizardStaticAuthFields = document.getElementById('wizardStaticAuthFields');
+const wizardBaseUrl = document.getElementById('wizardBaseUrl');
+const wizardApiKeyRow = document.getElementById('wizardApiKeyRow');
+const wizardApiKey = document.getElementById('wizardApiKey');
+const wizardApiSecretRow = document.getElementById('wizardApiSecretRow');
+const wizardApiSecret = document.getElementById('wizardApiSecret');
+const wizardSaveConnectionButton = document.getElementById('wizardSaveConnectionButton');
+const wizardCopilotAuth = document.getElementById('wizardCopilotAuth');
+const wizardCopilotStartButton = document.getElementById('wizardCopilotStartButton');
+const wizardCopilotPollButton = document.getElementById('wizardCopilotPollButton');
+const wizardCopilotCode = document.getElementById('wizardCopilotCode');
+const wizardCopilotLink = document.getElementById('wizardCopilotLink');
+const wizardConnectStatus = document.getElementById('wizardConnectStatus');
+const wizardTestButton = document.getElementById('wizardTestButton');
+const wizardTestStatus = document.getElementById('wizardTestStatus');
+const wizardFinishStatus = document.getElementById('wizardFinishStatus');
 
 const STORAGE_KEY = 'aios.settings';
+const WIZARD_STEPS = ['welcome', 'provider', 'connect', 'test', 'finish'];
 
 let providers = [];
+let wizardProviders = [];
 let chatHistory = [];
 let copilotStatus = { configured: false, login: null, connectedAt: null };
 let copilotDeviceFlow = null;
 let copilotPollTimer = null;
+let currentWizardStep = 0;
+let wizardTestSucceeded = false;
 
 function renderMessage(role, content) {
   const el = document.createElement('div');
@@ -39,6 +70,14 @@ function renderMessage(role, content) {
   el.textContent = content;
   messagesEl.appendChild(el);
   messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function setFeedback(node, message = '', type = '') {
+  node.textContent = message;
+  node.classList.remove('success', 'error');
+  if (type) {
+    node.classList.add(type);
+  }
 }
 
 function getSavedSettings() {
@@ -62,6 +101,12 @@ function saveSettings() {
 
 function selectedProvider() {
   return providers.find((provider) => provider.id === providerSelect.value);
+}
+
+function selectedWizardProvider() {
+  return providers.find((provider) => provider.id === wizardProviderSelect.value)
+    || wizardProviders.find((provider) => provider.id === wizardProviderSelect.value)
+    || selectedProvider();
 }
 
 function statusLabel(provider) {
@@ -154,6 +199,163 @@ function updateModelOptions() {
 
   renderAuthState(provider);
   saveSettings();
+}
+
+function updateWizardModelOptions() {
+  const provider = selectedWizardProvider();
+  const models = provider?.models || [];
+  const current = wizardModelSelect.value;
+  wizardModelSelect.innerHTML = '';
+
+  models.forEach((model) => {
+    const option = document.createElement('option');
+    option.value = model;
+    option.textContent = model;
+    wizardModelSelect.appendChild(option);
+  });
+
+  if (models.includes(current)) {
+    wizardModelSelect.value = current;
+  }
+
+  if (!models.includes(current) && models.length > 0) {
+    wizardModelSelect.value = models[0];
+  }
+}
+
+function renderWizardProviderGroups() {
+  wizardProviderGroups.innerHTML = '';
+  const groups = new Map();
+
+  wizardProviders.forEach((provider) => {
+    if (!groups.has(provider.category)) {
+      const section = document.createElement('section');
+      section.className = 'provider-setup-group';
+      const title = document.createElement('h3');
+      title.textContent = provider.category;
+      const items = document.createElement('div');
+      items.className = 'provider-setup-items';
+      section.appendChild(title);
+      section.appendChild(items);
+      groups.set(provider.category, items);
+      wizardProviderGroups.appendChild(section);
+    }
+
+    const row = document.createElement('div');
+    row.className = 'provider-setup-item';
+    const left = document.createElement('div');
+    left.textContent = provider.name;
+
+    const right = document.createElement('span');
+    right.className = 'provider-status';
+    right.textContent = statusLabel(provider);
+
+    row.appendChild(left);
+    row.appendChild(right);
+    groups.get(provider.category).appendChild(row);
+  });
+}
+
+function renderWizardConnectState() {
+  const provider = selectedWizardProvider();
+  if (!provider) {
+    setFeedback(wizardConnectStatus, 'Pick a provider first.', 'error');
+    return;
+  }
+
+  wizardBaseUrl.value = provider.effectiveBaseUrl || provider.defaultBaseUrl || '';
+  wizardApiKey.value = '';
+  wizardApiSecret.value = '';
+  wizardApiSecretRow.classList.toggle('hidden', !provider.apiSecretEnv);
+
+  const isCopilot = provider.authMethod === 'oauth-device';
+  const isStatic = provider.authMethod === 'static-key';
+
+  wizardCopilotAuth.classList.toggle('hidden', !isCopilot);
+  wizardStaticAuthFields.classList.toggle('hidden', isCopilot);
+  wizardApiKeyRow.classList.toggle('hidden', !isStatic);
+
+  if (provider.authMethod === 'none') {
+    wizardConnectSummary.textContent = `${provider.name} can run without an API key. You can keep or update the base URL.`;
+  } else if (isCopilot) {
+    wizardConnectSummary.textContent = 'Use the GitHub device-login flow. AIOS stores tokens outside the repository and does not expose them to the browser.';
+  } else {
+    wizardConnectSummary.textContent = `Enter connection details for ${provider.name}. Secrets are stored server-side and never returned to the UI.`;
+  }
+
+  wizardCopilotPollButton.disabled = !copilotDeviceFlow;
+  wizardCopilotCode.classList.toggle('hidden', !copilotDeviceFlow?.userCode);
+  wizardCopilotLink.classList.toggle('hidden', !copilotDeviceFlow?.verificationUri);
+  if (copilotDeviceFlow?.userCode) {
+    wizardCopilotCode.textContent = `Code: ${copilotDeviceFlow.userCode}`;
+  }
+  if (copilotDeviceFlow?.verificationUri) {
+    wizardCopilotLink.href = copilotDeviceFlow.verificationUriComplete || copilotDeviceFlow.verificationUri;
+  }
+}
+
+function setWizardStep(index) {
+  currentWizardStep = Math.max(0, Math.min(index, WIZARD_STEPS.length - 1));
+  const stepKey = WIZARD_STEPS[currentWizardStep];
+
+  WIZARD_STEPS.forEach((name) => {
+    const section = document.getElementById(`wizardStep${name[0].toUpperCase()}${name.slice(1)}`);
+    section.classList.toggle('hidden', name !== stepKey);
+  });
+
+  wizardStepLabel.textContent = `Step ${currentWizardStep + 1} of ${WIZARD_STEPS.length}`;
+  wizardBackButton.disabled = currentWizardStep === 0;
+  wizardNextButton.classList.toggle('hidden', currentWizardStep === WIZARD_STEPS.length - 1);
+  wizardFinishButton.classList.toggle('hidden', currentWizardStep !== WIZARD_STEPS.length - 1);
+
+  if (stepKey === 'connect') {
+    renderWizardConnectState();
+  }
+}
+
+function openWizard() {
+  wizardTestSucceeded = false;
+  setFeedback(wizardConnectStatus);
+  setFeedback(wizardTestStatus);
+  setFeedback(wizardFinishStatus);
+  setupWizard.classList.remove('hidden');
+  setWizardStep(0);
+}
+
+function closeWizard() {
+  setupWizard.classList.add('hidden');
+}
+
+async function loadWizardProviders() {
+  const response = await fetch('/api/providers');
+  const payload = await response.json();
+  if (!response.ok || !Array.isArray(payload.providers)) {
+    throw new Error(`Failed to load provider catalog (HTTP ${response.status}).`);
+  }
+
+  wizardProviders = payload.providers;
+  wizardProviderSelect.innerHTML = '';
+  const groups = new Map();
+  wizardProviders.forEach((provider) => {
+    if (!groups.has(provider.category)) {
+      const group = document.createElement('optgroup');
+      group.label = provider.category;
+      groups.set(provider.category, group);
+      wizardProviderSelect.appendChild(group);
+    }
+
+    const option = document.createElement('option');
+    option.value = provider.id;
+    option.textContent = provider.name;
+    groups.get(provider.category).appendChild(option);
+  });
+
+  if (providerSelect.value && wizardProviders.some((provider) => provider.id === providerSelect.value)) {
+    wizardProviderSelect.value = providerSelect.value;
+  }
+
+  updateWizardModelOptions();
+  renderWizardProviderGroups();
 }
 
 async function loadProviders() {
@@ -276,30 +478,30 @@ function renderAuthState(provider = selectedProvider()) {
     : `Configure ${provider.apiKeyEnv} in AIOS settings (or use .env fallback).`;
 }
 
-async function saveProviderSettings() {
-  const provider = selectedProvider();
-  if (!provider || provider.authMethod === 'oauth-device') {
+async function saveProviderSettings({ provider, baseUrl, apiKey, apiSecret } = {}) {
+  const targetProvider = provider || selectedProvider();
+  if (!targetProvider || targetProvider.authMethod === 'oauth-device') {
     return;
   }
 
   const body = {
-    baseUrl: providerBaseUrlInput.value.trim()
+    baseUrl: typeof baseUrl === 'string' ? baseUrl.trim() : providerBaseUrlInput.value.trim()
   };
 
-  if (provider.authMethod === 'static-key') {
-    const apiKey = providerApiKeyInput.value.trim();
-    const apiSecret = providerApiSecretInput.value.trim();
+  if (targetProvider.authMethod === 'static-key') {
+    const resolvedApiKey = typeof apiKey === 'string' ? apiKey.trim() : providerApiKeyInput.value.trim();
+    const resolvedApiSecret = typeof apiSecret === 'string' ? apiSecret.trim() : providerApiSecretInput.value.trim();
 
-    if (apiKey) {
-      body.apiKey = apiKey;
+    if (resolvedApiKey) {
+      body.apiKey = resolvedApiKey;
     }
 
-    if (provider.apiSecretEnv && apiSecret) {
-      body.apiSecret = apiSecret;
+    if (targetProvider.apiSecretEnv && resolvedApiSecret) {
+      body.apiSecret = resolvedApiSecret;
     }
   }
 
-  const response = await fetch(`/api/settings/providers/${encodeURIComponent(provider.id)}`, {
+  const response = await fetch(`/api/settings/providers/${encodeURIComponent(targetProvider.id)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -313,7 +515,8 @@ async function saveProviderSettings() {
   providerApiKeyInput.value = '';
   providerApiSecretInput.value = '';
   await loadProviders();
-  renderMessage('system', `${provider.name} settings saved.`);
+  await loadWizardProviders();
+  renderMessage('system', `${targetProvider.name} settings saved.`);
 }
 
 async function clearProviderSettings() {
@@ -334,6 +537,7 @@ async function clearProviderSettings() {
   providerApiKeyInput.value = '';
   providerApiSecretInput.value = '';
   await loadProviders();
+  await loadWizardProviders();
   renderMessage('system', `${provider.name} stored settings cleared.`);
 }
 
@@ -346,6 +550,7 @@ async function startCopilotLogin() {
 
   copilotDeviceFlow = payload;
   renderAuthState();
+  renderWizardConnectState();
   renderMessage('system', `GitHub Copilot sign-in: open ${payload.verificationUriComplete || payload.verificationUri} and enter code ${payload.userCode}.`);
   scheduleCopilotPoll(payload.interval);
 }
@@ -364,6 +569,7 @@ async function pollCopilotLogin() {
 
   if (response.status === 202 || payload.pending) {
     renderAuthState();
+    renderWizardConnectState();
     scheduleCopilotPoll(payload.interval || copilotDeviceFlow.interval);
     return;
   }
@@ -381,7 +587,110 @@ async function pollCopilotLogin() {
   };
   copilotDeviceFlow = null;
   await loadProviders();
+  await loadWizardProviders();
+  renderWizardConnectState();
   renderMessage('system', `GitHub Copilot connected${payload.login ? ` as @${payload.login}` : ''}.`);
+}
+
+async function saveWizardConnection() {
+  const provider = selectedWizardProvider();
+  if (!provider) {
+    setFeedback(wizardConnectStatus, 'Pick a provider before saving connection details.', 'error');
+    return;
+  }
+
+  if (provider.authMethod === 'oauth-device') {
+    setFeedback(wizardConnectStatus, 'Use Sign in with GitHub for Copilot providers.', 'error');
+    return;
+  }
+
+  await saveProviderSettings({
+    provider,
+    baseUrl: wizardBaseUrl.value,
+    apiKey: wizardApiKey.value,
+    apiSecret: wizardApiSecret.value
+  });
+
+  wizardApiKey.value = '';
+  wizardApiSecret.value = '';
+  setFeedback(wizardConnectStatus, `${provider.name} settings saved.`, 'success');
+  wizardTestSucceeded = false;
+}
+
+async function runWizardConnectionTest() {
+  const provider = selectedWizardProvider();
+  if (!provider) {
+    setFeedback(wizardTestStatus, 'Pick a provider first.', 'error');
+    return;
+  }
+
+  setFeedback(wizardTestStatus, `Testing ${provider.name}...`);
+  const response = await fetch(`/api/settings/providers/${encodeURIComponent(provider.id)}/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: wizardModelSelect.value || provider.models?.[0] })
+  });
+  const payload = await response.json();
+
+  if (!response.ok || !payload.ok) {
+    wizardTestSucceeded = false;
+    setFeedback(wizardTestStatus, payload.error || `Connection test failed (HTTP ${response.status}).`, 'error');
+    return;
+  }
+
+  wizardTestSucceeded = true;
+  setFeedback(wizardTestStatus, `Success: ${payload.message || 'Provider connection is working.'}`, 'success');
+}
+
+async function finishWizard() {
+  const provider = selectedWizardProvider();
+  if (!provider) {
+    setFeedback(wizardFinishStatus, 'Pick a provider to finish setup.', 'error');
+    return;
+  }
+
+  const response = await fetch('/api/settings/first-run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ completed: true })
+  });
+  const payload = await response.json();
+
+  if (!response.ok || !payload.ok) {
+    setFeedback(wizardFinishStatus, payload.error || `Failed to finish setup (HTTP ${response.status}).`, 'error');
+    return;
+  }
+
+  providerSelect.value = provider.id;
+  updateModelOptions();
+  if (wizardModelSelect.value) {
+    modelSelect.value = wizardModelSelect.value;
+  }
+  saveSettings();
+  closeWizard();
+  renderMessage('system', `${provider.name} is ready. Welcome to AIOS.`);
+}
+
+async function checkFirstRun() {
+  const response = await fetch('/api/settings/first-run');
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Failed to load setup state (HTTP ${response.status}).`);
+  }
+
+  if (!payload.completed) {
+    openWizard();
+  }
+}
+
+async function resetFirstRunAndOpenWizard() {
+  const response = await fetch('/api/settings/first-run', { method: 'DELETE' });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Failed to reset first-run state (HTTP ${response.status}).`);
+  }
+
+  openWizard();
 }
 
 async function callExec(command) {
@@ -487,6 +796,50 @@ saveProviderSettingsButton.addEventListener('click', () => {
 clearProviderSettingsButton.addEventListener('click', () => {
   clearProviderSettings().catch((error) => renderMessage('system', `Provider settings error: ${error.message}`));
 });
+runSetupAgainButton.addEventListener('click', () => {
+  resetFirstRunAndOpenWizard().catch((error) => renderMessage('system', `Setup reset failed: ${error.message}`));
+});
+
+wizardProviderSelect.addEventListener('change', () => {
+  updateWizardModelOptions();
+  renderWizardConnectState();
+  wizardTestSucceeded = false;
+  setFeedback(wizardTestStatus);
+});
+wizardSaveConnectionButton.addEventListener('click', () => {
+  saveWizardConnection().catch((error) => setFeedback(wizardConnectStatus, error.message, 'error'));
+});
+wizardCopilotStartButton.addEventListener('click', () => {
+  startCopilotLogin().catch((error) => setFeedback(wizardConnectStatus, error.message, 'error'));
+});
+wizardCopilotPollButton.addEventListener('click', () => {
+  pollCopilotLogin().catch((error) => setFeedback(wizardConnectStatus, error.message, 'error'));
+});
+wizardTestButton.addEventListener('click', () => {
+  runWizardConnectionTest().catch((error) => setFeedback(wizardTestStatus, error.message, 'error'));
+});
+
+wizardBackButton.addEventListener('click', () => {
+  setWizardStep(currentWizardStep - 1);
+});
+
+wizardNextButton.addEventListener('click', () => {
+  if (WIZARD_STEPS[currentWizardStep] === 'provider' && !wizardProviderSelect.value) {
+    setFeedback(wizardConnectStatus, 'Choose a provider before continuing.', 'error');
+    return;
+  }
+
+  if (WIZARD_STEPS[currentWizardStep] === 'test' && !wizardTestSucceeded) {
+    setFeedback(wizardTestStatus, 'Run a successful connection test before finishing.', 'error');
+    return;
+  }
+
+  setWizardStep(currentWizardStep + 1);
+});
+
+wizardFinishButton.addEventListener('click', () => {
+  finishWizard().catch((error) => setFeedback(wizardFinishStatus, error.message, 'error'));
+});
 
 chatForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -577,4 +930,7 @@ writeTestFileBtn.addEventListener('click', async () => {
 });
 
 renderMessage('system', 'Welcome to AIOS. Use chat, /exec, /list, or /read to control the Linux workspace.');
-loadProviders().catch((error) => renderMessage('system', `Failed to load providers: ${error.message}`));
+
+Promise.all([loadProviders(), loadWizardProviders()])
+  .then(() => checkFirstRun())
+  .catch((error) => renderMessage('system', `Failed to load providers: ${error.message}`));
