@@ -13,7 +13,9 @@ const {
 } = require('./auth/githubCopilot');
 const { getConfigDir } = require('./configDir');
 const { resolveProviderAuth } = require('./chatAuth');
+const { loadFirstRunState, setFirstRunCompleted } = require('./firstRunStore');
 const { providerCatalog, getProviderById } = require('./providers');
+const { testProviderConnection } = require('./providerConnection');
 const { buildProviderSettingsResponse } = require('./providerSettings');
 const {
   clearProviderSettings,
@@ -39,6 +41,8 @@ function createApp(deps = {}) {
   const startDeviceFlowImpl = deps.startDeviceFlow || startDeviceFlow;
   const pollDeviceFlowImpl = deps.pollDeviceFlow || pollDeviceFlow;
   const getChatSessionImpl = deps.getChatSession || getChatSession;
+  const loadFirstRunStateImpl = deps.loadFirstRunState || loadFirstRunState;
+  const setFirstRunCompletedImpl = deps.setFirstRunCompleted || setFirstRunCompleted;
   const loadProviderSettingsImpl = deps.loadProviderSettings || loadProviderSettings;
   const upsertProviderSettingsImpl = deps.upsertProviderSettings || upsertProviderSettings;
   const clearProviderSettingsImpl = deps.clearProviderSettings || clearProviderSettings;
@@ -94,6 +98,25 @@ function createApp(deps = {}) {
     });
   });
 
+  app.get('/api/settings/first-run', async (_req, res) => {
+    const state = await loadFirstRunStateImpl();
+    res.json({ ok: true, completed: Boolean(state.firstRunCompleted) });
+  });
+
+  app.post('/api/settings/first-run', async (req, res) => {
+    if (typeof req.body?.completed !== 'boolean') {
+      return res.status(400).json({ ok: false, error: 'completed must be a boolean.' });
+    }
+
+    const state = await setFirstRunCompletedImpl(req.body.completed);
+    return res.json({ ok: true, completed: Boolean(state.firstRunCompleted) });
+  });
+
+  app.delete('/api/settings/first-run', async (_req, res) => {
+    const state = await setFirstRunCompletedImpl(false);
+    return res.json({ ok: true, completed: Boolean(state.firstRunCompleted) });
+  });
+
   app.post('/api/settings/providers/:providerId', async (req, res) => {
     try {
       const provider = getProviderById(req.params.providerId);
@@ -142,6 +165,28 @@ function createApp(deps = {}) {
       return res.json({ ok: true, provider: updated });
     } catch (error) {
       return res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post('/api/settings/providers/:providerId/test', async (req, res) => {
+    try {
+      const provider = getProviderById(req.params.providerId);
+      if (!provider) {
+        return res.status(404).json({ ok: false, error: `Unknown provider: ${req.params.providerId}` });
+      }
+
+      const providerSettings = await loadProviderSettingsImpl();
+      const result = await testProviderConnection({
+        provider,
+        model: req.body?.model,
+        providerSettings,
+        dispatchChat: dispatchChatImpl,
+        getGitHubCopilotChatSession: getChatSessionImpl
+      });
+
+      return res.status(result.ok ? 200 : (result.status || 400)).json(result);
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: `Connection test failed: ${error.message}` });
     }
   });
 
