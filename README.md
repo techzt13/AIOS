@@ -1,5 +1,5 @@
 # AIOS
-Zack and Richard have made an operating system called AI OS. Built for AI users and nerds.
+Zack and Richard have made an operating system called AIOS. Built for AI users and nerds.
 
 AIOS is now a browser-accessible Linux-based OS environment: a full Linux desktop streamed to your browser, with the AIOS Apple-style AI control layer available for provider-routed chat, guarded command execution, and sandboxed file operations.
 
@@ -45,6 +45,58 @@ The desktop image pre-installs and supports real Linux GUI apps including:
 - Web browser: `firefox`
 
 You can install additional Linux apps in the desktop container with `apt-get`.
+
+
+## macOS-inspired XFCE desktop (port 3000)
+
+AIOS uses XFCE as the desktop base and applies a lightweight **macOS-inspired** theme at startup (not macOS itself).
+
+What is applied by default:
+
+- WhiteSur GTK + xfwm4 theme (window controls on the left)
+- WhiteSur icon and cursor themes
+- Inter font (open substitute for proprietary San Francisco)
+- AIOS abstract gradient wallpaper
+- Top XFCE menu/status panel
+- Bottom Plank dock (Files, Terminal, Mousepad, Firefox, AIOS Control Layer)
+
+Theme sources and licenses:
+
+- WhiteSur GTK theme — <https://github.com/vinceliuice/WhiteSur-gtk-theme> (GPL-3.0)
+- WhiteSur icon theme — <https://github.com/vinceliuice/WhiteSur-icon-theme> (GPL-3.0)
+- WhiteSur cursors — <https://github.com/vinceliuice/WhiteSur-cursors> (GPL-3.0)
+- Inter font (`fonts-inter`) — SIL Open Font License
+- AIOS wallpaper (`desktop/assets/aios-wallpaper.svg`) — CC0-1.0
+
+> AIOS is macOS-inspired only and is not affiliated with Apple.
+
+Customize/disable:
+
+- Set `AIOS_THEME_DISABLE=1` in the desktop container environment to skip automatic theme application.
+- Edit `~/.config/xfce4/` and `~/.config/plank/` inside the desktop session for custom layouts.
+
+## First-run setup assistant (port 8080)
+
+On first launch, AIOS opens a guided setup flow in the web control layer:
+
+1. Welcome
+2. Provider selection (grouped catalog)
+3. Provider connection (API key, local no-key, or GitHub Copilot device login)
+4. Live provider connection test
+5. Finish into chat
+
+Used endpoints:
+
+- `GET/POST/DELETE /api/settings/first-run`
+- `GET /api/providers`
+- `POST /api/settings/providers/:providerId`
+- `POST /api/settings/providers/:providerId/test`
+- `POST /api/auth/github-copilot/start`
+- `POST /api/auth/github-copilot/poll`
+
+The settings panel includes **Run setup again** to reset first-run state and reopen the wizard.
+
+First-run state is stored outside git in `AIOS_CONFIG_DIR/setup.json` (or `~/.config/aios/setup.json`), and provider secrets stay in the same external config directory.
 
 ## AI provider selection
 

@@ -7,6 +7,85 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <div id="setupWizard" class="wizard-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
+      <div class="wizard-card">
+        <header class="wizard-header">
+          <p class="wizard-kicker">Welcome to AIOS</p>
+          <h2 id="wizardTitle">Setup Assistant</h2>
+          <p id="wizardStepLabel" class="wizard-step-label">Step 1 of 5</p>
+        </header>
+
+        <section id="wizardStepWelcome" class="wizard-step">
+          <h3>AIOS by Zack and Richard</h3>
+          <p>AIOS is an AI-driven, browser-accessible Linux environment with a themed desktop and control layer.</p>
+          <p>Choose your provider, connect it, run a real test, then jump straight into chat.</p>
+        </section>
+
+        <section id="wizardStepProvider" class="wizard-step hidden">
+          <h3>Choose a provider</h3>
+          <p class="wizard-copy">Providers are grouped by ecosystem. Your selection will be used for chat after setup.</p>
+          <label for="wizardProviderSelect">Provider</label>
+          <select id="wizardProviderSelect"></select>
+          <label for="wizardModelSelect">Default model</label>
+          <select id="wizardModelSelect"></select>
+          <div id="wizardProviderGroups" class="provider-setup-groups wizard-provider-groups"></div>
+        </section>
+
+        <section id="wizardStepConnect" class="wizard-step hidden">
+          <h3>Connect your provider</h3>
+          <p id="wizardConnectSummary" class="wizard-copy"></p>
+
+          <div id="wizardStaticAuthFields" class="custom-fields hidden">
+            <div class="field-row">
+              <label for="wizardBaseUrl">Base URL (optional for most providers)</label>
+              <input id="wizardBaseUrl" type="url" placeholder="https://api.example.com/v1" />
+            </div>
+            <div class="field-row" id="wizardApiKeyRow">
+              <label for="wizardApiKey">API key</label>
+              <input id="wizardApiKey" type="password" placeholder="sk-..." autocomplete="off" />
+            </div>
+            <div class="field-row hidden" id="wizardApiSecretRow">
+              <label for="wizardApiSecret">API secret</label>
+              <input id="wizardApiSecret" type="password" placeholder="secret" autocomplete="off" />
+            </div>
+            <button id="wizardSaveConnectionButton" type="button">Save connection</button>
+          </div>
+
+          <div id="wizardCopilotAuth" class="auth-card hidden">
+            <p class="auth-summary">GitHub Copilot device login</p>
+            <p class="auth-detail">Use your GitHub account to authorize AIOS.</p>
+            <div class="auth-actions">
+              <button id="wizardCopilotStartButton" type="button">Sign in with GitHub</button>
+              <button id="wizardCopilotPollButton" type="button" class="secondary" disabled>Check sign-in</button>
+            </div>
+            <p id="wizardCopilotCode" class="auth-code hidden"></p>
+            <a id="wizardCopilotLink" class="auth-link hidden" href="#" target="_blank" rel="noreferrer">Open GitHub device login</a>
+          </div>
+
+          <p id="wizardConnectStatus" class="wizard-feedback"></p>
+        </section>
+
+        <section id="wizardStepTest" class="wizard-step hidden">
+          <h3>Test connection</h3>
+          <p class="wizard-copy">Run a minimal chat round-trip before finishing setup.</p>
+          <button id="wizardTestButton" type="button">Test provider connection</button>
+          <p id="wizardTestStatus" class="wizard-feedback"></p>
+        </section>
+
+        <section id="wizardStepFinish" class="wizard-step hidden">
+          <h3>Finish setup</h3>
+          <p class="wizard-copy">You're ready to use AIOS chat with your chosen provider.</p>
+          <p id="wizardFinishStatus" class="wizard-feedback"></p>
+        </section>
+
+        <footer class="wizard-footer">
+          <button id="wizardBackButton" type="button" class="secondary">Back</button>
+          <button id="wizardNextButton" type="button">Next</button>
+          <button id="wizardFinishButton" type="button" class="hidden">Finish setup</button>
+        </footer>
+      </div>
+    </div>
+
     <div class="app-shell">
       <header class="topbar">
         <div>
@@ -19,6 +98,7 @@
         <section class="provider-setup-card">
           <p class="provider-setup-title">Provider setup</p>
           <div id="providerSetupGroups" class="provider-setup-groups"></div>
+          <button id="runSetupAgainButton" type="button" class="secondary">Run setup again</button>
         </section>
 
         <section class="control-group">
