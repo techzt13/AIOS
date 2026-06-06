@@ -1,9 +1,9 @@
 :root {
   --accent: #0a84ff;
   --liquid-glass-bg:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.2) 42%, rgba(255, 255, 255, 0.38)),
-    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.82), transparent 28%),
-    radial-gradient(circle at 90% 12%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 36%);
+    linear-gradient(145deg, rgba(255, 255, 255, 0.48), rgba(231, 239, 255, 0.18) 42%, rgba(255, 255, 255, 0.32)),
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.64), transparent 28%),
+    radial-gradient(circle at 90% 12%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 36%);
   --liquid-glass-border: rgba(255, 255, 255, 0.64);
   --liquid-glass-line: rgba(255, 255, 255, 0.34);
   --liquid-glass-shadow:
@@ -176,7 +176,8 @@ body {
 #windowSettings {
   left: 160px;
   top: 36px;
-  height: min(640px, calc(100vh - 190px));
+  width: min(1080px, calc(100vw - 32px));
+  height: min(700px, calc(100vh - 160px));
 }
 
 .app-window.focused {
@@ -194,6 +195,12 @@ body {
   gap: 10px;
   padding: 0 12px;
   cursor: move;
+}
+
+#windowSettings .window-titlebar {
+  background:
+    linear-gradient(180deg, rgba(245, 249, 255, 0.58), rgba(225, 235, 255, 0.2)),
+    rgba(16, 28, 52, 0.08);
 }
 
 .window-titlebar h2 {
@@ -485,27 +492,49 @@ button.secondary {
 
 .settings-window {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 10px;
+  grid-template-columns: minmax(300px, 1.1fr) minmax(260px, 0.95fr) minmax(280px, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .control-group {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  min-height: 0;
+  overflow: auto;
   background:
-    var(--liquid-glass-bg),
-    rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.52);
-  border-radius: 20px;
-  padding: 10px;
+    linear-gradient(150deg, rgba(255, 255, 255, 0.72), rgba(225, 236, 255, 0.32) 46%, rgba(255, 255, 255, 0.2)),
+    radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.72), transparent 30%),
+    rgba(218, 229, 248, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 26px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   box-shadow:
-    0 16px 34px rgba(28, 48, 82, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(22px) saturate(178%);
+    0 22px 48px rgba(8, 18, 38, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.26);
+  backdrop-filter: blur(30px) saturate(190%) brightness(1.04);
+}
+
+.control-group::-webkit-scrollbar,
+.messages::-webkit-scrollbar,
+.wizard-provider-cards::-webkit-scrollbar {
+  width: 9px;
+}
+
+.control-group::-webkit-scrollbar-thumb,
+.messages::-webkit-scrollbar-thumb,
+.wizard-provider-cards::-webkit-scrollbar-thumb {
+  background: rgba(82, 103, 133, 0.24);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
 }
 
 .control-group > * {
@@ -523,6 +552,8 @@ button.secondary {
 .group-title {
   margin: 0;
   font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
 }
 
 .provider-setup-group h3 {
@@ -533,27 +564,34 @@ button.secondary {
 
 .provider-setup-items {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 6px;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 .provider-setup-item {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
-  font-size: 0.84rem;
-  padding: 8px 9px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.46);
+  font-size: 0.88rem;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.52);
   background:
-    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.7), transparent 34%),
-    rgba(255, 255, 255, 0.54);
-  backdrop-filter: blur(14px) saturate(160%);
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.72), transparent 34%),
+    rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 10px 24px rgba(30, 48, 80, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  backdrop-filter: blur(18px) saturate(170%);
 }
 
 .provider-setup-name {
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .provider-setup-actions {
@@ -566,11 +604,14 @@ button.secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 3px 8px;
+  padding: 4px 9px;
   border-radius: 999px;
-  background: rgba(232, 239, 255, 0.9);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(224, 235, 255, 0.54));
   color: #4a5f83;
   font-size: 0.75rem;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
 
 .auth-card {
@@ -997,6 +1038,11 @@ button.secondary {
 
   .split-layout {
     grid-template-columns: 1fr;
+  }
+
+  .settings-window {
+    grid-template-columns: 1fr;
+    overflow: auto;
   }
 
   .model-picker-card {

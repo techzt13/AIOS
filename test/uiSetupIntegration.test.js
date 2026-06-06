@@ -86,5 +86,8 @@ test('setup wizard uses provider cards and device-login copy', async () => {
   assert.match(stylesCss, /--liquid-glass-bg/);
   assert.match(stylesCss, /--liquid-glass-shadow/);
   assert.match(stylesCss, /\.app-window::before/);
+  assert.match(stylesCss, /#windowSettings/);
+  assert.match(stylesCss, /\.settings-window/);
   assert.match(stylesCss, /backdrop-filter: blur\(30px\) saturate\(190%\) brightness\(1\.08\)/);
+  assert.match(stylesCss, /backdrop-filter: blur\(30px\) saturate\(190%\) brightness\(1\.04\)/);
 });
