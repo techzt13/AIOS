@@ -45,6 +45,12 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /Your provider login and saved API keys were not changed/);
   assert.match(appJs, /function renderMessageContent/);
   assert.match(appJs, /code-copy-button/);
+  assert.match(appJs, /function persistProviderChoice/);
+  assert.match(appJs, /function chooseDefaultProviderId/);
+  assert.match(appJs, /configuredCopilot/);
+  assert.match(appJs, /modelsByProvider/);
+  assert.match(appJs, /Setup Assistant reopened because no usable provider is selected/);
+  assert.match(appJs, /loadShellState\(\)\s*\.then\(\(\) => Promise\.all/);
   assert.match(appJs, /preferredModelForProvider/);
   assert.match(appJs, /github-copilot\/gpt-4o/);
   assert.match(appJs, /loadWizardProviders\(preferredProviderId = ''\)/);

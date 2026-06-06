@@ -224,12 +224,50 @@ function selectValidModel(selectEl, models, preferredModel = '') {
 
 function preferredModelForProvider(provider, currentModel = '') {
   if (!provider) return '';
+  const savedModel = shellState.preferences?.modelsByProvider?.[provider.id];
+  if (savedModel && provider.models?.includes(savedModel)) return savedModel;
   if (currentModel && provider.models?.includes(currentModel)) return currentModel;
   if (provider.defaultModel && provider.models?.includes(provider.defaultModel)) return provider.defaultModel;
   if (provider.id === 'github-copilot' && provider.models?.includes('github-copilot/gpt-4o')) {
     return 'github-copilot/gpt-4o';
   }
   return provider.models?.[0] || '';
+}
+
+function isProviderUsable(provider) {
+  return Boolean(provider && (provider.configured || provider.authMethod === 'none'));
+}
+
+function chooseDefaultProviderId(currentProviderId = '') {
+  const savedProviderId = shellState.preferences?.providerId;
+  if (savedProviderId && providers.some((provider) => provider.id === savedProviderId)) {
+    return savedProviderId;
+  }
+
+  if (currentProviderId && providers.some((provider) => provider.id === currentProviderId)) {
+    return currentProviderId;
+  }
+
+  const configuredCopilot = providers.find((provider) => provider.id === 'github-copilot' && isProviderUsable(provider));
+  if (configuredCopilot) return configuredCopilot.id;
+
+  const configuredProvider = providers.find(isProviderUsable);
+  if (configuredProvider) return configuredProvider.id;
+
+  const copilot = providers.find((provider) => provider.id === 'github-copilot');
+  if (copilot) return copilot.id;
+
+  return providers[0]?.id || '';
+}
+
+function persistProviderChoice(provider = selectedProvider(), model = modelSelect.value) {
+  if (!provider) return;
+  shellState.preferences.providerId = provider.id;
+  shellState.preferences.modelsByProvider = {
+    ...(shellState.preferences.modelsByProvider || {}),
+    [provider.id]: model || provider.defaultModel || provider.models?.[0] || ''
+  };
+  persistShellState();
 }
 
 function statusLabel(provider) {
@@ -444,7 +482,7 @@ function renderProviderSetupList() {
 function updateModelOptions() {
   const provider = selectedProvider();
   const models = provider?.models || [];
-  selectValidModel(modelSelect, models);
+  selectValidModel(modelSelect, models, preferredModelForProvider(provider, modelSelect.value));
 
   providerBaseUrlInput.value = provider?.effectiveBaseUrl || '';
   providerApiKeyInput.value = '';
@@ -454,6 +492,7 @@ function updateModelOptions() {
 
   renderAuthState(provider);
   providerStatusBadge.textContent = `Provider: ${provider?.name || 'not selected'}`;
+  persistProviderChoice(provider, modelSelect.value);
 }
 
 function updateWizardModelOptions() {
@@ -664,16 +703,14 @@ async function loadProviders() {
     groups.get(provider.category).appendChild(option);
   });
 
-  if (currentProvider && providers.some((provider) => provider.id === currentProvider)) {
-    providerSelect.value = currentProvider;
-  } else if (providers[0]) {
-    providerSelect.value = providers[0].id;
-  }
+  const nextProviderId = chooseDefaultProviderId(currentProvider);
+  if (nextProviderId) providerSelect.value = nextProviderId;
 
   const provider = selectedProvider();
   selectValidModel(modelSelect, provider?.models || [], preferredModelForProvider(provider, currentModel));
   renderAuthState(provider);
   providerStatusBadge.textContent = `Provider: ${provider?.name || 'not selected'}`;
+  persistProviderChoice(provider, modelSelect.value);
   renderProviderSetupList();
 }
 
@@ -947,6 +984,7 @@ async function finishWizard() {
   providerSelect.value = provider.id;
   const selected = selectedProvider();
   selectValidModel(modelSelect, selected?.models || [], preferredModelForProvider(selected, wizardModelSelect.value));
+  persistProviderChoice(selected, modelSelect.value);
   renderAuthState(selected);
 
   closeWizard();
@@ -961,8 +999,11 @@ async function checkFirstRun() {
     throw new Error(payload.error || `Failed to load setup state (HTTP ${response.status}).`);
   }
 
-  if (!payload.completed) {
+  if (!payload.completed || !isProviderUsable(selectedProvider())) {
     openWizard();
+    if (payload.completed) {
+      renderMessage('system', 'Setup Assistant reopened because no usable provider is selected. Your saved GitHub login/API keys were not cleared.');
+    }
   }
 }
 
@@ -1165,6 +1206,7 @@ function tickClock() {
 }
 
 providerSelect.addEventListener('change', updateModelOptions);
+modelSelect.addEventListener('change', () => persistProviderChoice(selectedProvider(), modelSelect.value));
 
 copilotStartButton.addEventListener('click', () => {
   startCopilotLogin().catch((error) => renderMessage('system', `GitHub Copilot sign-in error: ${error.message}`));
@@ -1358,14 +1400,14 @@ renderMessage('system', 'Welcome to AIOS web shell. Use dock apps for chat, file
 tickClock();
 setInterval(tickClock, 30000);
 
-Promise.all([
-  loadShellState(),
-  loadProviders(),
-  loadWizardProviders(),
-  loadDataDirInfo(),
-  loadImports(),
-  loadApiAudit()
-])
+loadShellState()
+  .then(() => Promise.all([
+    loadProviders(),
+    loadWizardProviders(),
+    loadDataDirInfo(),
+    loadImports(),
+    loadApiAudit()
+  ]))
   .then(() => {
     checkFirstRun();
     refreshFileList().catch(() => {});
