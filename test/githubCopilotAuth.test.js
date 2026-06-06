@@ -148,6 +148,31 @@ test('github copilot chat session works with env token even when client id is mi
   });
 });
 
+test('github copilot token exchange uses OpenClaw-compatible GET headers', async () => {
+  await withCopilotModule({
+    GH_TOKEN: 'gh-token',
+    GITHUB_COPILOT_CLIENT_ID: undefined
+  }, async ({ getChatSession }) => {
+    let request;
+    await getChatSession({
+      baseUrl: 'https://api.githubcopilot.com',
+      fetchImpl: async (url, options) => {
+        request = { url, options };
+        return jsonResponse(200, {
+          token: 'tid=1;exp=9999999999;proxy-ep=proxy.individual.githubcopilot.com;',
+          expires_at: Math.floor(Date.now() / 1000) + 1800
+        });
+      }
+    });
+
+    assert.equal(request.url, 'https://api.github.com/copilot_internal/v2/token');
+    assert.equal(request.options.method, 'GET');
+    assert.equal(request.options.headers.Authorization, 'Bearer gh-token');
+    assert.equal(request.options.headers['Copilot-Integration-Id'], 'vscode-chat');
+    assert.equal(request.options.headers['GitHub-Api-Version'], '2025-04-01');
+  });
+});
+
 test('github copilot model discovery uses token-derived API base URL', async () => {
   await withCopilotModule({
     GH_TOKEN: 'gh-token',

@@ -175,17 +175,18 @@ async function pollDeviceFlow({ deviceCode, fetchImpl = fetch }) {
 
 async function exchangeCopilotToken({ oauthToken, baseUrl, fetchImpl = fetch }) {
   const response = await fetchImpl(GITHUB_COPILOT_TOKEN_URL, {
-    method: 'POST',
+    method: 'GET',
     headers: {
       Accept: 'application/json',
       Authorization: 'Bearer ' + oauthToken,
-      ...buildCopilotHeaders()
+      ...buildCopilotHeaders({ includeApiVersion: true })
     }
   });
   const data = await parseProviderResponse(response);
 
   if (!response.ok) {
-    throw new Error(data?.error?.message || data?.message || 'Failed to exchange GitHub OAuth token for a Copilot token.');
+    const detail = data?.error?.message || data?.message || data?.error;
+    throw new Error(detail || `GitHub Copilot token exchange failed with HTTP ${response.status}. Reconnect GitHub Copilot and make sure the signed-in account has an active Copilot plan.`);
   }
 
   const accessToken = data?.token || data?.access_token;
@@ -266,13 +267,19 @@ function normalizeVerificationUri(raw) {
   return GITHUB_DEVICE_VERIFICATION_URL;
 }
 
-function buildCopilotHeaders() {
-  return {
+function buildCopilotHeaders({ includeApiVersion = false } = {}) {
+  const headers = {
     'User-Agent': process.env.AIOS_USER_AGENT || 'GitHubCopilotChat/0.35.0',
     'Editor-Version': process.env.AIOS_EDITOR_VERSION || 'vscode/1.107.0',
     'Editor-Plugin-Version': process.env.AIOS_EDITOR_PLUGIN_VERSION || 'copilot-chat/0.35.0',
     'Copilot-Integration-Id': process.env.AIOS_COPILOT_INTEGRATION_ID || 'vscode-chat'
   };
+
+  if (includeApiVersion) {
+    headers['GitHub-Api-Version'] = process.env.AIOS_COPILOT_GITHUB_API_VERSION || '2025-04-01';
+  }
+
+  return headers;
 }
 
 function getCopilotApiBaseUrlFromToken(token) {
