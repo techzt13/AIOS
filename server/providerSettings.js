@@ -1,5 +1,7 @@
 const { normalizeBaseUrl } = require('./adapters/utils');
 
+const COPILOT_TOKEN_ENV_VARS = ['COPILOT_GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'];
+
 function trimString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -30,13 +32,17 @@ function hasEnvCredential(env, key) {
   return key ? trimString(env[key]).length > 0 : false;
 }
 
+function hasCopilotEnvToken(env = process.env) {
+  return COPILOT_TOKEN_ENV_VARS.some((envKey) => trimString(env[envKey]).length > 0);
+}
+
 function isProviderConfigured({ provider, storedConfig = {}, copilotStatus = {}, env = process.env }) {
   if (provider.authMethod === 'none') {
     return true;
   }
 
   if (provider.authMethod === 'oauth-device') {
-    return Boolean(copilotStatus.configured);
+    return Boolean(copilotStatus.configured) || hasCopilotEnvToken(env);
   }
 
   const hasApiKey = hasStoredCredential(storedConfig, 'apiKey') || hasEnvCredential(env, provider.apiKeyEnv);
@@ -57,6 +63,10 @@ function getAuthSource({ provider, storedConfig = {}, copilotStatus = {}, env = 
   }
 
   if (provider.authMethod === 'oauth-device') {
+    if (hasCopilotEnvToken(env)) {
+      return 'env';
+    }
+
     return copilotStatus.configured ? 'oauth-device' : 'not-configured';
   }
 
