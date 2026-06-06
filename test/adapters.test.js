@@ -83,7 +83,7 @@ test('github copilot adapter uses bearer chat token and chat endpoint', async ()
   let request;
   const result = await copilotAdapter.sendChat({
     provider: { id: 'github-copilot', defaultBaseUrl: 'https://api.githubcopilot.com' },
-    model: 'gpt-4o',
+    model: 'github-copilot/gpt-4o',
     messages: [{ role: 'user', content: 'ping' }],
     auth: {
       accessToken: 'copilot-chat-token',
@@ -100,7 +100,28 @@ test('github copilot adapter uses bearer chat token and chat endpoint', async ()
   assert.equal(request.url, 'https://custom.copilot.test/chat/completions');
   assert.equal(request.options.headers.Authorization.startsWith('Bearer '), true);
   assert.equal(request.options.headers.Authorization.endsWith('copilot-chat-token'), true);
-  assert.equal(JSON.parse(request.options.body).stream, false);
+  assert.deepEqual(JSON.parse(request.options.body), {
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: 'ping' }],
+    stream: false
+  });
+});
+
+test('github copilot adapter reports model 404 as unavailable', async () => {
+  const result = await copilotAdapter.sendChat({
+    provider: { id: 'github-copilot', defaultBaseUrl: 'https://api.githubcopilot.com' },
+    model: 'github-copilot/claude-opus-4.7',
+    messages: [{ role: 'user', content: 'ping' }],
+    auth: {
+      accessToken: 'copilot-chat-token',
+      chatCompletionsUrl: 'https://custom.copilot.test/chat/completions'
+    },
+    fetchImpl: async () => jsonResponse(404, { error: { message: '404 page not found' } })
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 404);
+  assert.match(result.error, /unavailable/);
 });
 
 test('adapter registry dispatches through the configured adapter type', async () => {

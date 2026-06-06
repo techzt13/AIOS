@@ -98,6 +98,7 @@ function buildProviderSettingsResponse({ providers, providerSettings, copilotSta
       apiKeyEnv: provider.apiKeyEnv,
       apiSecretEnv: provider.apiSecretEnv,
       baseUrlEnv: provider.baseUrlEnv,
+      defaultModel: provider.defaultModel || provider.models?.[0] || '',
       models: provider.models,
       configured: isProviderConfigured({ provider, storedConfig, copilotStatus, env }),
       effectiveBaseUrl,

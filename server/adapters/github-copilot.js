@@ -1,9 +1,13 @@
 const crypto = require('crypto');
 const { normalizeBaseUrl, parseProviderResponse } = require('./utils');
 
+function normalizeCopilotApiModel(model) {
+  return String(model || '').trim().replace(/^github-copilot\//, '');
+}
+
 function buildRequest({ model, messages }) {
   return {
-    model,
+    model: normalizeCopilotApiModel(model),
     messages,
     stream: false
   };
@@ -17,6 +21,7 @@ function buildHeaders({ accessToken }) {
     'editor-plugin-version': process.env.AIOS_EDITOR_PLUGIN_VERSION || 'AIOS/1.0.0',
     'editor-version': process.env.AIOS_EDITOR_VERSION || 'AIOS/1.0.0',
     'user-agent': process.env.AIOS_USER_AGENT || 'AIOS/1.0.0',
+    'Copilot-Integration-Id': process.env.AIOS_COPILOT_INTEGRATION_ID || 'vscode-chat',
     'x-request-id': crypto.randomUUID()
   };
 }
@@ -31,16 +36,20 @@ function resolveChatUrl({ provider, auth }) {
 }
 
 async function sendChat({ provider, model, messages, auth, fetchImpl = fetch }) {
+  const apiModel = normalizeCopilotApiModel(model);
   const response = await fetchImpl(resolveChatUrl({ provider, auth }), {
     method: 'POST',
     headers: buildHeaders({ accessToken: auth.accessToken }),
-    body: JSON.stringify(buildRequest({ model, messages }))
+    body: JSON.stringify(buildRequest({ model: apiModel, messages }))
   });
 
   const data = await parseProviderResponse(response);
 
   if (!response.ok) {
-    const message = data?.error?.message || `GitHub Copilot request failed with status ${response.status}.`;
+    const providerMessage = data?.error?.message || data?.message || '';
+    const message = response.status === 404
+      ? `GitHub Copilot model "${model}" is unavailable for this account. Pick a model from the live Copilot model list or try github-copilot/gpt-4o.`
+      : (providerMessage || `GitHub Copilot request failed with status ${response.status}.`);
     return { ok: false, status: response.status, error: message, raw: data };
   }
 
@@ -51,4 +60,4 @@ async function sendChat({ provider, model, messages, auth, fetchImpl = fetch }) 
   };
 }
 
-module.exports = { buildHeaders, buildRequest, resolveChatUrl, sendChat };
+module.exports = { buildHeaders, buildRequest, normalizeCopilotApiModel, resolveChatUrl, sendChat };

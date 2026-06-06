@@ -193,23 +193,38 @@
     <div id="setupWizard" class="wizard-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
       <div class="wizard-card">
         <header class="wizard-header">
-          <p class="wizard-kicker">Welcome to AIOS</p>
-          <h2 id="wizardTitle">Setup Assistant</h2>
+          <div>
+            <p class="wizard-kicker">Welcome to AIOS</p>
+            <h2 id="wizardTitle">Setup Assistant</h2>
+          </div>
           <p id="wizardStepLabel" class="wizard-step-label">Step 1 of 5</p>
         </header>
+        <ol class="wizard-stepper" aria-label="Setup progress">
+          <li data-step-index="0">Start</li>
+          <li data-step-index="1">Provider</li>
+          <li data-step-index="2">Connect</li>
+          <li data-step-index="3">Test</li>
+          <li data-step-index="4">Finish</li>
+        </ol>
 
         <section id="wizardStepWelcome" class="wizard-step">
           <h3>AIOS by Zack and Richard</h3>
-          <p class="wizard-copy">This setup configures chat providers for your local AIOS web OS shell.</p>
+          <p class="wizard-copy">Configure one chat provider for the local web OS shell. GitHub Copilot can sign in through the normal GitHub device-code page.</p>
         </section>
 
         <section id="wizardStepProvider" class="wizard-step hidden">
           <h3>Choose a provider</h3>
-          <label for="wizardProviderSelect">Provider</label>
-          <select id="wizardProviderSelect"></select>
-          <label for="wizardModelSelect">Default model</label>
-          <select id="wizardModelSelect"></select>
-          <div id="wizardProviderGroups" class="provider-setup-groups wizard-provider-groups"></div>
+          <p class="wizard-copy">Pick a provider card, then choose the default model for AIOS chat.</p>
+          <label class="sr-only" for="wizardProviderSelect">Provider</label>
+          <select id="wizardProviderSelect" class="compact-select"></select>
+          <div id="wizardProviderGroups" class="wizard-provider-cards"></div>
+          <div class="model-picker-card">
+            <div>
+              <span class="field-label">Default model</span>
+              <p class="wizard-copy">Live Copilot models appear here after sign-in.</p>
+            </div>
+            <select id="wizardModelSelect"></select>
+          </div>
         </section>
 
         <section id="wizardStepConnect" class="wizard-step hidden">
@@ -234,6 +249,7 @@
 
           <div id="wizardCopilotAuth" class="auth-card hidden">
             <p class="auth-summary">GitHub Copilot device login</p>
+            <p class="auth-detail">AIOS will show a one-time code for <strong>github.com/login/device</strong>. Tokens are stored server-side only.</p>
             <div class="toolbar">
               <button id="wizardCopilotStartButton" type="button">Sign in with GitHub</button>
               <button id="wizardCopilotPollButton" type="button" class="secondary" disabled>Check sign-in</button>

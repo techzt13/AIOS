@@ -204,14 +204,15 @@ const providerCatalog = [
     defaultBaseUrl: 'https://api.githubcopilot.com',
     baseUrlEnv: 'GITHUB_COPILOT_BASE_URL',
     requiresApiKey: false,
+    defaultModel: 'github-copilot/gpt-4o',
     models: [
+      'github-copilot/gpt-4o',
       'github-copilot/claude-opus-4.7',
       'github-copilot/claude-sonnet-4.6',
       'github-copilot/claude-3.5-sonnet',
       'github-copilot/gpt-5.5',
       'github-copilot/gpt-5.4',
       'github-copilot/gpt-5.3-codex',
-      'github-copilot/gpt-4o',
       'github-copilot/o3-mini'
     ]
   },

@@ -4,17 +4,22 @@ const { normalizeBaseUrl, parseProviderResponse } = require('../adapters/utils')
 const { getConfigDir } = require('../configDir');
 
 const TOKEN_PATH = path.join(getConfigDir(), 'github-copilot.json');
-const DEFAULT_DEVICE_SCOPE = process.env.GITHUB_COPILOT_OAUTH_SCOPE || 'read:user copilot';
+const DEFAULT_COPILOT_CLIENT_ID = 'Iv1.b507a08c87ecfe98';
+const DEFAULT_DEVICE_SCOPE = process.env.GITHUB_COPILOT_OAUTH_SCOPE || 'read:user';
+const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code';
+const GITHUB_ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
+const GITHUB_DEVICE_VERIFICATION_URL = 'https://github.com/login/device';
+const GITHUB_COPILOT_TOKEN_URL = process.env.GITHUB_COPILOT_TOKEN_URL || 'https://api.github.com/copilot_internal/v2/token';
 const COPILOT_TOKEN_ENV_VARS = ['COPILOT_GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'];
-const COPILOT_SETUP_HINT = 'Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or configure GITHUB_COPILOT_CLIENT_ID to use device login.';
+const COPILOT_SETUP_HINT = 'Use Sign in with GitHub, or set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN in .env.';
 const FALLBACK_COPILOT_MODELS = [
+  'github-copilot/gpt-4o',
   'github-copilot/claude-opus-4.7',
   'github-copilot/claude-sonnet-4.6',
   'github-copilot/claude-3.5-sonnet',
   'github-copilot/gpt-5.5',
   'github-copilot/gpt-5.4',
   'github-copilot/gpt-5.3-codex',
-  'github-copilot/gpt-4o',
   'github-copilot/o3-mini'
 ];
 // GitHub Copilot device-login support in AIOS is opt-in and uses undocumented/private
@@ -53,13 +58,16 @@ async function saveSession(session) {
 function getSafeStatus(session) {
   const resolvedToken = resolveGitHubOAuthToken({ session });
   const configuredViaEnv = Boolean(resolveEnvGitHubToken());
+  const customClientId = Boolean(String(process.env.GITHUB_COPILOT_CLIENT_ID || '').trim());
 
   return {
     configured: Boolean(resolvedToken),
     login: session.login || null,
     connectedAt: session.connectedAt || null,
     authSource: configuredViaEnv ? 'env' : (session.oauthToken ? 'oauth-device' : 'not-configured'),
-    canDeviceLogin: Boolean(process.env.GITHUB_COPILOT_CLIENT_ID),
+    canDeviceLogin: true,
+    deviceLoginClient: customClientId ? 'custom' : 'bundled',
+    hasCustomClientId: customClientId,
     guidance: COPILOT_SETUP_HINT
   };
 }
@@ -69,12 +77,9 @@ async function getStatus() {
 }
 
 async function startDeviceFlow({ fetchImpl = fetch } = {}) {
-  const clientId = process.env.GITHUB_COPILOT_CLIENT_ID;
-  if (!clientId) {
-    throw new Error(COPILOT_SETUP_HINT);
-  }
+  const clientId = resolveDeviceClientId();
 
-  const response = await fetchImpl('https://github.com/login/device/code', {
+  const response = await fetchImpl(GITHUB_DEVICE_CODE_URL, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -96,7 +101,7 @@ async function startDeviceFlow({ fetchImpl = fetch } = {}) {
     expiresIn: data.expires_in,
     interval: data.interval,
     userCode: data.user_code,
-    verificationUri: data.verification_uri || data.verification_uri_complete || 'https://github.com/login/device',
+    verificationUri: normalizeVerificationUri(data.verification_uri || data.verification_uri_complete),
     verificationUriComplete: data.verification_uri_complete || null
   };
 }
@@ -119,12 +124,9 @@ async function fetchGitHubLogin(oauthToken, fetchImpl = fetch) {
 }
 
 async function pollDeviceFlow({ deviceCode, fetchImpl = fetch }) {
-  const clientId = process.env.GITHUB_COPILOT_CLIENT_ID;
-  if (!clientId) {
-    throw new Error(COPILOT_SETUP_HINT);
-  }
+  const clientId = resolveDeviceClientId();
 
-  const response = await fetchImpl('https://github.com/login/oauth/access_token', {
+  const response = await fetchImpl(GITHUB_ACCESS_TOKEN_URL, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -160,6 +162,7 @@ async function pollDeviceFlow({ deviceCode, fetchImpl = fetch }) {
     connectedAt: new Date().toISOString(),
     copilotToken: null,
     copilotTokenExpiresAt: null,
+    copilotApiBaseUrl: null,
     copilotChatUrl: null
   });
 
@@ -172,12 +175,12 @@ async function pollDeviceFlow({ deviceCode, fetchImpl = fetch }) {
 }
 
 async function exchangeCopilotToken({ oauthToken, baseUrl, fetchImpl = fetch }) {
-  const response = await fetchImpl(`${normalizeBaseUrl(baseUrl)}/copilot_internal/v2/token`, {
+  const response = await fetchImpl(GITHUB_COPILOT_TOKEN_URL, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
       Authorization: 'Bearer ' + oauthToken,
-      'User-Agent': 'AIOS'
+      ...buildCopilotHeaders()
     }
   });
   const data = await parseProviderResponse(response);
@@ -194,13 +197,19 @@ async function exchangeCopilotToken({ oauthToken, baseUrl, fetchImpl = fetch }) 
   const expiresAt = typeof data?.expires_at === 'number'
     ? new Date(data.expires_at * 1000).toISOString()
     : new Date(Date.now() + Number(data?.expires_in || 1500) * 1000).toISOString();
+  const apiBaseUrl = data?.base_url
+    || data?.endpoints?.api
+    || getCopilotApiBaseUrlFromToken(accessToken)
+    || normalizeBaseUrl(baseUrl)
+    || 'https://api.individual.githubcopilot.com';
   const chatUrl = data?.chat_completions_url
     || data?.chat_url
     || data?.endpoints?.chat_completions
-    || `${normalizeBaseUrl(baseUrl)}/chat/completions`;
+    || `${normalizeBaseUrl(apiBaseUrl)}/chat/completions`;
 
   return {
     accessToken,
+    apiBaseUrl: normalizeBaseUrl(apiBaseUrl),
     chatUrl,
     expiresAt
   };
@@ -217,6 +226,7 @@ async function getChatSession({ baseUrl, fetchImpl = fetch }) {
   if (session.copilotToken && expiresAt > Date.now() + 60_000) {
     return {
       accessToken: session.copilotToken,
+      apiBaseUrl: session.copilotApiBaseUrl || deriveApiBaseUrlFromChatUrl(session.copilotChatUrl) || normalizeBaseUrl(baseUrl),
       chatCompletionsUrl: session.copilotChatUrl || `${normalizeBaseUrl(baseUrl)}/chat/completions`
     };
   }
@@ -226,13 +236,67 @@ async function getChatSession({ baseUrl, fetchImpl = fetch }) {
     ...session,
     copilotToken: refreshed.accessToken,
     copilotTokenExpiresAt: refreshed.expiresAt,
+    copilotApiBaseUrl: refreshed.apiBaseUrl,
     copilotChatUrl: refreshed.chatUrl
   });
 
   return {
     accessToken: refreshed.accessToken,
+    apiBaseUrl: refreshed.apiBaseUrl,
     chatCompletionsUrl: refreshed.chatUrl
   };
+}
+
+function resolveDeviceClientId(env = process.env) {
+  return String(env.GITHUB_COPILOT_CLIENT_ID || '').trim() || DEFAULT_COPILOT_CLIENT_ID;
+}
+
+function normalizeVerificationUri(raw) {
+  const value = String(raw || GITHUB_DEVICE_VERIFICATION_URL).trim();
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return GITHUB_DEVICE_VERIFICATION_URL;
+  }
+
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com' || parsed.pathname !== '/login/device') {
+    return GITHUB_DEVICE_VERIFICATION_URL;
+  }
+
+  return GITHUB_DEVICE_VERIFICATION_URL;
+}
+
+function buildCopilotHeaders() {
+  return {
+    'User-Agent': process.env.AIOS_USER_AGENT || 'GitHubCopilotChat/0.35.0',
+    'Editor-Version': process.env.AIOS_EDITOR_VERSION || 'vscode/1.107.0',
+    'Editor-Plugin-Version': process.env.AIOS_EDITOR_PLUGIN_VERSION || 'copilot-chat/0.35.0',
+    'Copilot-Integration-Id': process.env.AIOS_COPILOT_INTEGRATION_ID || 'vscode-chat'
+  };
+}
+
+function getCopilotApiBaseUrlFromToken(token) {
+  const match = String(token || '').match(/(?:^|;)proxy-ep=([^;]+)/);
+  if (!match) {
+    return null;
+  }
+
+  const apiHost = match[1].trim().replace(/^proxy\./, 'api.');
+  return apiHost ? `https://${apiHost}` : null;
+}
+
+function deriveApiBaseUrlFromChatUrl(chatUrl) {
+  if (!chatUrl) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(chatUrl);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return '';
+  }
 }
 
 function resolveEnvGitHubToken(env = process.env) {
@@ -271,11 +335,14 @@ function dedupeModels(models = []) {
 
 async function discoverModels({ baseUrl, fetchImpl = fetch }) {
   const chatSession = await getChatSession({ baseUrl, fetchImpl });
-  const response = await fetchImpl(`${normalizeBaseUrl(baseUrl)}/models`, {
+  const apiBaseUrl = chatSession.apiBaseUrl
+    || deriveApiBaseUrlFromChatUrl(chatSession.chatCompletionsUrl)
+    || normalizeBaseUrl(baseUrl);
+  const response = await fetchImpl(`${normalizeBaseUrl(apiBaseUrl)}/models`, {
     headers: {
       Accept: 'application/json',
       Authorization: 'Bearer ' + chatSession.accessToken,
-      'User-Agent': 'AIOS'
+      ...buildCopilotHeaders()
     }
   });
 
@@ -311,6 +378,7 @@ module.exports = {
   TOKEN_PATH,
   discoverModels,
   exchangeCopilotToken,
+  getCopilotApiBaseUrlFromToken,
   getCopilotModels,
   getChatSession,
   getStatus,
@@ -318,6 +386,7 @@ module.exports = {
   pollDeviceFlow,
   resolveEnvGitHubToken,
   resolveGitHubOAuthToken,
+  resolveDeviceClientId,
   saveSession,
   startDeviceFlow
 };

@@ -93,6 +93,9 @@ function createApp(deps = {}) {
         return {
           ...provider,
           models: copilotModels.models,
+          defaultModel: copilotModels.models.includes(provider.defaultModel)
+            ? provider.defaultModel
+            : (copilotModels.models[0] || provider.defaultModel),
           modelSource: copilotModels.source
         };
       });

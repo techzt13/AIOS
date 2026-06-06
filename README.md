@@ -27,7 +27,7 @@ Open: <http://localhost:8080>
 - Desktop wallpaper + top menu bar + dock
 - Windowed apps: **AI Chat**, **Files**, **Terminal**, **Settings**, **Setup Assistant**
 - First-run setup flow (provider select/connect/test/finish)
-- Provider status and GitHub Copilot integration (env token or optional device login)
+- Provider status and GitHub Copilot integration (browser device login or env token)
 
 ## Local data model
 
@@ -87,11 +87,11 @@ AIOS supports OpenClaw-style token detection before OAuth device login:
 3. `GITHUB_TOKEN`
 
 If one of these is set, Copilot is treated as configured and AIOS can exchange it for a Copilot chat token.
-`GITHUB_COPILOT_CLIENT_ID` is optional and only required for in-app GitHub device login.
+AIOS includes the same public GitHub OAuth device-flow client ID pattern used by OpenClaw, so the setup UI can start the normal `https://github.com/login/device` flow without asking you to paste a token. Set `GITHUB_COPILOT_CLIENT_ID` only if you want to use your own GitHub OAuth app.
 
-When no token or device-login client ID is available, AIOS shows this guidance:
+Device login shows a one-time code in the browser, polls GitHub until authorization completes, then stores the GitHub OAuth token and short-lived Copilot chat token server-side in `AIOS_CONFIG_DIR`/`~/.config/aios`. Raw tokens are never returned to the frontend.
 
-> Set `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN`, or configure `GITHUB_COPILOT_CLIENT_ID` to use device login.
+If you prefer environment tokens, set `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` before starting AIOS.
 
 ## AI OS-control APIs and safety
 

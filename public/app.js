@@ -149,6 +149,16 @@ function selectValidModel(selectEl, models, preferredModel = '') {
   }
 }
 
+function preferredModelForProvider(provider, currentModel = '') {
+  if (!provider) return '';
+  if (currentModel && provider.models?.includes(currentModel)) return currentModel;
+  if (provider.defaultModel && provider.models?.includes(provider.defaultModel)) return provider.defaultModel;
+  if (provider.id === 'github-copilot' && provider.models?.includes('github-copilot/gpt-4o')) {
+    return 'github-copilot/gpt-4o';
+  }
+  return provider.models?.[0] || '';
+}
+
 function statusLabel(provider) {
   if (provider.authMethod === 'none') return 'No key needed';
   if (provider.authMethod === 'oauth-device') return provider.configured ? 'Connected' : 'Sign-in required';
@@ -365,31 +375,49 @@ function updateModelOptions() {
 
 function updateWizardModelOptions() {
   const provider = selectedWizardProvider();
-  selectValidModel(wizardModelSelect, provider?.models || []);
+  selectValidModel(wizardModelSelect, provider?.models || [], preferredModelForProvider(provider, wizardModelSelect.value));
 }
 
 function renderWizardProviderGroups() {
   wizardProviderGroups.innerHTML = '';
-  const groups = new Map();
 
   wizardProviders.forEach((provider) => {
-    if (!groups.has(provider.category)) {
-      const section = document.createElement('section');
-      section.className = 'provider-setup-group';
-      const title = document.createElement('h3');
-      title.textContent = provider.category;
-      const items = document.createElement('div');
-      items.className = 'provider-setup-items';
-      section.appendChild(title);
-      section.appendChild(items);
-      groups.set(provider.category, items);
-      wizardProviderGroups.appendChild(section);
-    }
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'provider-card';
+    card.dataset.providerId = provider.id;
+    card.setAttribute('aria-pressed', String(provider.id === wizardProviderSelect.value));
 
-    const row = document.createElement('div');
-    row.className = 'provider-setup-item';
-    row.innerHTML = `<span class="provider-setup-name">${provider.name}</span><span class="provider-status">${statusLabel(provider)}</span>`;
-    groups.get(provider.category).appendChild(row);
+    const eyebrow = document.createElement('span');
+    eyebrow.className = 'provider-card-eyebrow';
+    eyebrow.textContent = provider.id === 'github-copilot' ? 'Recommended' : provider.category;
+
+    const name = document.createElement('strong');
+    name.textContent = provider.name;
+
+    const meta = document.createElement('span');
+    meta.className = 'provider-card-meta';
+    meta.textContent = provider.id === 'github-copilot'
+      ? 'Browser device login with github.com/login/device'
+      : statusLabel(provider);
+
+    const badge = document.createElement('span');
+    badge.className = 'provider-status';
+    badge.textContent = statusLabel(provider);
+
+    card.appendChild(eyebrow);
+    card.appendChild(name);
+    card.appendChild(meta);
+    card.appendChild(badge);
+    card.addEventListener('click', () => {
+      wizardProviderSelect.value = provider.id;
+      updateWizardModelOptions();
+      renderWizardProviderGroups();
+      renderWizardConnectState();
+      wizardTestSucceeded = false;
+      setFeedback(wizardTestStatus);
+    });
+    wizardProviderGroups.appendChild(card);
   });
 }
 
@@ -416,9 +444,9 @@ function renderWizardConnectState() {
     wizardConnectSummary.textContent = `${provider.name} can run without an API key. You can keep or update the base URL.`;
   } else if (isCopilot) {
     wizardConnectSummary.textContent = provider.configured
-      ? 'GitHub Copilot is ready. AIOS can use COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN, or an existing Copilot session.'
+      ? `GitHub Copilot is ready${copilotStatus.login ? ` as @${copilotStatus.login}` : ''}. Tokens stay server-side.`
       : (copilotStatus.canDeviceLogin
-          ? 'Use GitHub device login, or set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN.'
+          ? 'Use GitHub device login. AIOS will show a code for github.com/login/device and poll until authorization completes.'
           : (copilotStatus.guidance || 'Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or configure GITHUB_COPILOT_CLIENT_ID to use device login.'));
   } else {
     wizardConnectSummary.textContent = `Enter ${provider.name} connection details. Secrets stay server-side.`;
@@ -426,11 +454,12 @@ function renderWizardConnectState() {
 
   wizardCopilotPollButton.disabled = !copilotDeviceFlow;
   wizardCopilotStartButton.disabled = !copilotStatus.canDeviceLogin;
+  wizardTestButton.disabled = isCopilot && !provider.configured;
   wizardCopilotCode.classList.toggle('hidden', !copilotDeviceFlow?.userCode);
   wizardCopilotLink.classList.toggle('hidden', !copilotDeviceFlow?.verificationUri);
 
   if (copilotDeviceFlow?.userCode) {
-    wizardCopilotCode.textContent = `Code: ${copilotDeviceFlow.userCode}`;
+    wizardCopilotCode.textContent = `Enter code ${copilotDeviceFlow.userCode} at github.com/login/device.`;
   }
   if (copilotDeviceFlow?.verificationUri) {
     wizardCopilotLink.href = copilotDeviceFlow.verificationUriComplete || copilotDeviceFlow.verificationUri;
@@ -447,6 +476,11 @@ function setWizardStep(index) {
   });
 
   wizardStepLabel.textContent = `Step ${currentWizardStep + 1} of ${WIZARD_STEPS.length}`;
+  document.querySelectorAll('.wizard-stepper [data-step-index]').forEach((node) => {
+    const stepIndex = Number(node.dataset.stepIndex);
+    node.classList.toggle('active', stepIndex === currentWizardStep);
+    node.classList.toggle('complete', stepIndex < currentWizardStep);
+  });
   wizardBackButton.disabled = currentWizardStep === 0;
   wizardNextButton.classList.toggle('hidden', currentWizardStep === WIZARD_STEPS.length - 1);
   wizardFinishButton.classList.toggle('hidden', currentWizardStep !== WIZARD_STEPS.length - 1);
@@ -503,7 +537,7 @@ async function loadWizardProviders() {
   }
 
   const provider = selectedWizardProvider();
-  selectValidModel(wizardModelSelect, provider?.models || [], currentModel);
+  selectValidModel(wizardModelSelect, provider?.models || [], preferredModelForProvider(provider, currentModel));
   renderWizardProviderGroups();
 }
 
@@ -549,7 +583,7 @@ async function loadProviders() {
   }
 
   const provider = selectedProvider();
-  selectValidModel(modelSelect, provider?.models || [], currentModel);
+  selectValidModel(modelSelect, provider?.models || [], preferredModelForProvider(provider, currentModel));
   renderAuthState(provider);
   providerStatusBadge.textContent = `Provider: ${provider?.name || 'not selected'}`;
   renderProviderSetupList();
@@ -587,7 +621,7 @@ function renderAuthState(provider = selectedProvider()) {
   copilotLink.classList.toggle('hidden', !copilotDeviceFlow?.verificationUri);
 
   if (copilotDeviceFlow?.userCode) {
-    copilotCode.textContent = `Code: ${copilotDeviceFlow.userCode}`;
+    copilotCode.textContent = `Enter code ${copilotDeviceFlow.userCode} at github.com/login/device.`;
   }
   if (copilotDeviceFlow?.verificationUri) {
     copilotLink.href = copilotDeviceFlow.verificationUriComplete || copilotDeviceFlow.verificationUri;
@@ -614,7 +648,7 @@ function renderAuthState(provider = selectedProvider()) {
           ? 'Using GitHub token from environment variables. Secrets are never sent back to the browser.'
           : 'OAuth token and Copilot session are stored outside the repository.')
       : (copilotStatus.canDeviceLogin
-          ? 'Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or use Sign in with GitHub.'
+          ? 'Click Sign in with GitHub to get a one-time code for github.com/login/device.'
           : (copilotStatus.guidance || 'Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or configure GITHUB_COPILOT_CLIENT_ID to use device login.'));
     copilotStartButton.textContent = provider.configured ? 'Reconnect GitHub' : 'Sign in with GitHub';
     copilotStartButton.disabled = !copilotStatus.canDeviceLogin;
@@ -695,6 +729,9 @@ async function startCopilotLogin() {
   }
 
   copilotDeviceFlow = payload;
+  const url = payload.verificationUri || 'https://github.com/login/device';
+  const code = payload.userCode ? ` Code: ${payload.userCode}` : '';
+  setFeedback(wizardConnectStatus, `Open ${url}.${code}`, 'success');
   renderAuthState();
   renderWizardConnectState();
   scheduleCopilotPoll(payload.interval);
@@ -711,6 +748,7 @@ async function pollCopilotLogin() {
   const payload = await response.json();
 
   if (response.status === 202 || payload.pending) {
+    setFeedback(wizardConnectStatus, payload.message || 'Waiting for GitHub authorization...');
     renderAuthState();
     renderWizardConnectState();
     scheduleCopilotPoll(payload.interval || copilotDeviceFlow.interval);
@@ -733,6 +771,7 @@ async function pollCopilotLogin() {
   copilotDeviceFlow = null;
   await loadProviders();
   await loadWizardProviders();
+  setFeedback(wizardConnectStatus, `Connected${payload.login ? ` as @${payload.login}` : ''}.`, 'success');
   renderWizardConnectState();
 }
 
@@ -770,6 +809,11 @@ async function runWizardConnectionTest() {
   const provider = selectedWizardProvider();
   if (!provider) {
     setFeedback(wizardTestStatus, 'Pick a provider first.', 'error');
+    return;
+  }
+
+  if (provider.authMethod === 'oauth-device' && !provider.configured) {
+    setFeedback(wizardTestStatus, 'Sign in with GitHub before testing Copilot.', 'error');
     return;
   }
 
@@ -813,7 +857,7 @@ async function finishWizard() {
 
   providerSelect.value = provider.id;
   const selected = selectedProvider();
-  selectValidModel(modelSelect, selected?.models || [], wizardModelSelect.value);
+  selectValidModel(modelSelect, selected?.models || [], preferredModelForProvider(selected, wizardModelSelect.value));
   renderAuthState(selected);
 
   closeWizard();
@@ -1073,6 +1117,14 @@ wizardNextButton.addEventListener('click', () => {
   if (WIZARD_STEPS[currentWizardStep] === 'provider' && !wizardProviderSelect.value) {
     setFeedback(wizardConnectStatus, 'Choose a provider before continuing.', 'error');
     return;
+  }
+
+  if (WIZARD_STEPS[currentWizardStep] === 'connect') {
+    const provider = selectedWizardProvider();
+    if (provider?.authMethod === 'oauth-device' && !provider.configured) {
+      setFeedback(wizardConnectStatus, 'Sign in with GitHub before continuing.', 'error');
+      return;
+    }
   }
 
   if (WIZARD_STEPS[currentWizardStep] === 'test' && !wizardTestSucceeded) {
