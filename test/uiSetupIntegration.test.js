@@ -83,4 +83,8 @@ test('setup wizard uses provider cards and device-login copy', async () => {
   assert.match(stylesCss, /\.model-picker-card/);
   assert.match(stylesCss, /\.titlebar-button/);
   assert.match(stylesCss, /\.code-block/);
+  assert.match(stylesCss, /--liquid-glass-bg/);
+  assert.match(stylesCss, /--liquid-glass-shadow/);
+  assert.match(stylesCss, /\.app-window::before/);
+  assert.match(stylesCss, /backdrop-filter: blur\(30px\) saturate\(190%\) brightness\(1\.08\)/);
 });
