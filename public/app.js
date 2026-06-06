@@ -1,3 +1,5 @@
+const root = document.documentElement;
+
 const providerSetupGroups = document.getElementById('providerSetupGroups');
 const providerSelect = document.getElementById('providerSelect');
 const modelSelect = document.getElementById('modelSelect');
@@ -17,14 +19,34 @@ const copilotStartButton = document.getElementById('copilotStartButton');
 const copilotPollButton = document.getElementById('copilotPollButton');
 const copilotCode = document.getElementById('copilotCode');
 const copilotLink = document.getElementById('copilotLink');
+const runSetupAgainButton = document.getElementById('runSetupAgainButton');
+
 const messagesEl = document.getElementById('messages');
 const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
-const systemCommandInput = document.getElementById('systemCommand');
-const runSystemCommandBtn = document.getElementById('runSystemCommand');
-const listWorkspaceBtn = document.getElementById('listWorkspace');
-const writeTestFileBtn = document.getElementById('writeTestFile');
-const runSetupAgainButton = document.getElementById('runSetupAgainButton');
+
+const filesPathInput = document.getElementById('filesPathInput');
+const filesUpButton = document.getElementById('filesUpButton');
+const filesRefreshButton = document.getElementById('filesRefreshButton');
+const filesEntries = document.getElementById('filesEntries');
+const fileEditorPath = document.getElementById('fileEditorPath');
+const fileEditorContent = document.getElementById('fileEditorContent');
+const fileSaveButton = document.getElementById('fileSaveButton');
+const fileReadStatus = document.getElementById('fileReadStatus');
+
+const terminalCommandInput = document.getElementById('terminalCommandInput');
+const terminalRunButton = document.getElementById('terminalRunButton');
+const terminalOutput = document.getElementById('terminalOutput');
+
+const accentSelect = document.getElementById('accentSelect');
+const wallpaperSelect = document.getElementById('wallpaperSelect');
+const dataDirValue = document.getElementById('dataDirValue');
+const importTypeSelect = document.getElementById('importTypeSelect');
+const importFileInput = document.getElementById('importFileInput');
+const importButton = document.getElementById('importButton');
+const importStatus = document.getElementById('importStatus');
+const importList = document.getElementById('importList');
+const apiAuditList = document.getElementById('apiAuditList');
 
 const setupWizard = document.getElementById('setupWizard');
 const wizardStepLabel = document.getElementById('wizardStepLabel');
@@ -51,9 +73,19 @@ const wizardConnectStatus = document.getElementById('wizardConnectStatus');
 const wizardTestButton = document.getElementById('wizardTestButton');
 const wizardTestStatus = document.getElementById('wizardTestStatus');
 const wizardFinishStatus = document.getElementById('wizardFinishStatus');
+const openSetupAssistant = document.getElementById('openSetupAssistant');
 
-const STORAGE_KEY = 'aios.settings';
+const activeWindowTitle = document.getElementById('activeWindowTitle');
+const providerStatusBadge = document.getElementById('providerStatusBadge');
+const clockLabel = document.getElementById('clockLabel');
+
 const WIZARD_STEPS = ['welcome', 'provider', 'connect', 'test', 'finish'];
+const WINDOW_IDS = {
+  chat: 'windowChat',
+  files: 'windowFiles',
+  terminal: 'windowTerminal',
+  settings: 'windowSettings'
+};
 
 let providers = [];
 let wizardProviders = [];
@@ -63,6 +95,8 @@ let copilotDeviceFlow = null;
 let copilotPollTimer = null;
 let currentWizardStep = 0;
 let wizardTestSucceeded = false;
+let shellState = { windows: {}, preferences: {} };
+let zCounter = 10;
 
 function renderMessage(role, content) {
   const el = document.createElement('div');
@@ -75,28 +109,7 @@ function renderMessage(role, content) {
 function setFeedback(node, message = '', type = '') {
   node.textContent = message;
   node.classList.remove('success', 'error');
-  if (type) {
-    node.classList.add(type);
-  }
-}
-
-function getSavedSettings() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveSettings() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      providerId: providerSelect.value,
-      model: modelSelect.value
-    })
-  );
+  if (type) node.classList.add(type);
 }
 
 function selectedProvider() {
@@ -110,19 +123,152 @@ function selectedWizardProvider() {
 }
 
 function statusLabel(provider) {
-  if (provider.authMethod === 'none') {
-    return 'No key needed';
-  }
-
-  if (provider.authMethod === 'oauth-device') {
-    return provider.configured ? 'Connected' : 'Sign-in required';
-  }
-
-  if (provider.requiresApiKey === false) {
-    return provider.configured ? 'Configured' : 'Optional key';
-  }
-
+  if (provider.authMethod === 'none') return 'No key needed';
+  if (provider.authMethod === 'oauth-device') return provider.configured ? 'Connected' : 'Sign-in required';
+  if (provider.requiresApiKey === false) return provider.configured ? 'Configured' : 'Optional key';
   return provider.configured ? 'Configured' : 'Needs setup';
+}
+
+function formatPathUp(pathValue) {
+  if (!pathValue || pathValue === '.') return '.';
+  const parts = pathValue.split('/').filter(Boolean);
+  if (parts.length <= 1) return '.';
+  return parts.slice(0, -1).join('/');
+}
+
+function setDockState(app) {
+  document.querySelectorAll('.dock-item[data-open-app]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.openApp === app);
+  });
+}
+
+function recordWindowState(app, update = {}) {
+  shellState.windows[app] = {
+    ...(shellState.windows[app] || {}),
+    ...update
+  };
+  persistShellState();
+}
+
+let persistTimer = null;
+function persistShellState() {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(async () => {
+    try {
+      await fetch('/api/local-data/shell-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: shellState })
+      });
+    } catch {
+      // Best effort local persistence.
+    }
+  }, 250);
+}
+
+function focusWindow(app) {
+  const windowEl = document.getElementById(WINDOW_IDS[app]);
+  if (!windowEl) return;
+  zCounter += 1;
+  windowEl.style.zIndex = String(zCounter);
+  document.querySelectorAll('.app-window').forEach((node) => node.classList.remove('focused'));
+  windowEl.classList.add('focused');
+  activeWindowTitle.textContent = windowEl.dataset.title || 'Desktop';
+  setDockState(app);
+}
+
+function openWindow(app) {
+  const windowEl = document.getElementById(WINDOW_IDS[app]);
+  if (!windowEl) return;
+  windowEl.classList.remove('hidden');
+  focusWindow(app);
+  recordWindowState(app, { open: true, minimized: false });
+}
+
+function closeWindow(app) {
+  const windowEl = document.getElementById(WINDOW_IDS[app]);
+  if (!windowEl) return;
+  windowEl.classList.add('hidden');
+  recordWindowState(app, { open: false, minimized: true });
+  activeWindowTitle.textContent = 'Desktop';
+}
+
+function applyPreferences() {
+  const accent = shellState.preferences.accent || 'blue';
+  const wallpaper = shellState.preferences.wallpaper || 'aurora';
+  root.dataset.accent = accent;
+  root.dataset.wallpaper = wallpaper;
+  accentSelect.value = accent;
+  wallpaperSelect.value = wallpaper;
+}
+
+function initWindowDrag(windowEl) {
+  const titlebar = windowEl.querySelector('.window-titlebar');
+  if (!titlebar) return;
+
+  let startX = 0;
+  let startY = 0;
+  let originX = 0;
+  let originY = 0;
+  let dragging = false;
+
+  titlebar.addEventListener('mousedown', (event) => {
+    if (event.target.closest('[data-window-action]')) return;
+    dragging = true;
+    focusWindow(windowEl.dataset.app);
+    startX = event.clientX;
+    startY = event.clientY;
+    const rect = windowEl.getBoundingClientRect();
+    originX = rect.left;
+    originY = rect.top;
+    event.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (event) => {
+    if (!dragging) return;
+    const nextX = Math.max(6, originX + (event.clientX - startX));
+    const nextY = Math.max(52, originY + (event.clientY - startY));
+    windowEl.style.left = `${nextX}px`;
+    windowEl.style.top = `${nextY}px`;
+    recordWindowState(windowEl.dataset.app, { left: nextX, top: nextY });
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragging = false;
+  });
+}
+
+async function loadShellState() {
+  try {
+    const response = await fetch('/api/local-data/shell-state');
+    const payload = await response.json();
+    if (response.ok && payload.ok) {
+      shellState = {
+        windows: payload.state.windows || {},
+        preferences: payload.state.preferences || {}
+      };
+    }
+  } catch {
+    shellState = { windows: {}, preferences: {} };
+  }
+
+  applyPreferences();
+
+  Object.entries(WINDOW_IDS).forEach(([app, id]) => {
+    const windowEl = document.getElementById(id);
+    const state = shellState.windows?.[app] || {};
+    if (typeof state.left === 'number') windowEl.style.left = `${state.left}px`;
+    if (typeof state.top === 'number') windowEl.style.top = `${state.top}px`;
+    if (state.open === false || state.minimized) {
+      windowEl.classList.add('hidden');
+    }
+  });
+
+  if (![...document.querySelectorAll('.app-window')].some((node) => !node.classList.contains('hidden'))) {
+    openWindow('chat');
+  } else {
+    focusWindow('chat');
+  }
 }
 
 function renderProviderSetupList() {
@@ -156,18 +302,17 @@ function renderProviderSetupList() {
 
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = 'Edit';
     button.className = 'secondary';
+    button.textContent = 'Edit';
     button.addEventListener('click', () => {
+      openWindow('settings');
       providerSelect.value = provider.id;
       updateModelOptions();
-      providerSelect.focus();
     });
 
     right.appendChild(status);
     right.appendChild(document.createTextNode(' '));
     right.appendChild(button);
-
     row.appendChild(left);
     row.appendChild(right);
     groups.get(provider.category).appendChild(row);
@@ -198,7 +343,7 @@ function updateModelOptions() {
   providerApiSecretInput.placeholder = provider?.hasStoredApiSecret ? 'Stored secret is configured' : 'secret';
 
   renderAuthState(provider);
-  saveSettings();
+  providerStatusBadge.textContent = `Provider: ${provider?.name || 'not selected'}`;
 }
 
 function updateWizardModelOptions() {
@@ -216,9 +361,7 @@ function updateWizardModelOptions() {
 
   if (models.includes(current)) {
     wizardModelSelect.value = current;
-  }
-
-  if (!models.includes(current) && models.length > 0) {
+  } else if (models.length > 0) {
     wizardModelSelect.value = models[0];
   }
 }
@@ -243,15 +386,7 @@ function renderWizardProviderGroups() {
 
     const row = document.createElement('div');
     row.className = 'provider-setup-item';
-    const left = document.createElement('div');
-    left.textContent = provider.name;
-
-    const right = document.createElement('span');
-    right.className = 'provider-status';
-    right.textContent = statusLabel(provider);
-
-    row.appendChild(left);
-    row.appendChild(right);
+    row.innerHTML = `<span>${provider.name}</span><span class="provider-status">${statusLabel(provider)}</span>`;
     groups.get(provider.category).appendChild(row);
   });
 }
@@ -278,14 +413,15 @@ function renderWizardConnectState() {
   if (provider.authMethod === 'none') {
     wizardConnectSummary.textContent = `${provider.name} can run without an API key. You can keep or update the base URL.`;
   } else if (isCopilot) {
-    wizardConnectSummary.textContent = 'Use the GitHub device-login flow. AIOS stores tokens outside the repository and does not expose them to the browser.';
+    wizardConnectSummary.textContent = 'Use GitHub device login. Tokens are stored server-side and not returned to the browser.';
   } else {
-    wizardConnectSummary.textContent = `Enter connection details for ${provider.name}. Secrets are stored server-side and never returned to the UI.`;
+    wizardConnectSummary.textContent = `Enter ${provider.name} connection details. Secrets stay server-side.`;
   }
 
   wizardCopilotPollButton.disabled = !copilotDeviceFlow;
   wizardCopilotCode.classList.toggle('hidden', !copilotDeviceFlow?.userCode);
   wizardCopilotLink.classList.toggle('hidden', !copilotDeviceFlow?.verificationUri);
+
   if (copilotDeviceFlow?.userCode) {
     wizardCopilotCode.textContent = `Code: ${copilotDeviceFlow.userCode}`;
   }
@@ -308,9 +444,7 @@ function setWizardStep(index) {
   wizardNextButton.classList.toggle('hidden', currentWizardStep === WIZARD_STEPS.length - 1);
   wizardFinishButton.classList.toggle('hidden', currentWizardStep !== WIZARD_STEPS.length - 1);
 
-  if (stepKey === 'connect') {
-    renderWizardConnectState();
-  }
+  if (stepKey === 'connect') renderWizardConnectState();
 }
 
 function openWizard() {
@@ -335,6 +469,7 @@ async function loadWizardProviders() {
 
   wizardProviders = payload.providers;
   wizardProviderSelect.innerHTML = '';
+
   const groups = new Map();
   wizardProviders.forEach((provider) => {
     if (!groups.has(provider.category)) {
@@ -385,19 +520,8 @@ async function loadProviders() {
     groups.get(provider.category).appendChild(option);
   });
 
-  const saved = getSavedSettings();
-  if (saved.providerId && providers.some((provider) => provider.id === saved.providerId)) {
-    providerSelect.value = saved.providerId;
-  }
-
   updateModelOptions();
-
-  if (saved.model) {
-    modelSelect.value = saved.model;
-  }
-
   renderProviderSetupList();
-  renderAuthState(selectedProvider());
 }
 
 function stopCopilotPolling() {
@@ -433,14 +557,9 @@ function renderAuthState(provider = selectedProvider()) {
 
   if (copilotDeviceFlow?.userCode) {
     copilotCode.textContent = `Code: ${copilotDeviceFlow.userCode}`;
-  } else {
-    copilotCode.textContent = '';
   }
-
   if (copilotDeviceFlow?.verificationUri) {
     copilotLink.href = copilotDeviceFlow.verificationUriComplete || copilotDeviceFlow.verificationUri;
-  } else {
-    copilotLink.removeAttribute('href');
   }
 
   if (!provider) {
@@ -451,7 +570,7 @@ function renderAuthState(provider = selectedProvider()) {
 
   if (provider.authMethod === 'none') {
     authSummary.textContent = 'No key needed';
-    authDetail.textContent = `${provider.name} can run without API credentials. You can optionally save a custom base URL.`;
+    authDetail.textContent = `${provider.name} can run without API credentials.`;
     return;
   }
 
@@ -460,29 +579,27 @@ function renderAuthState(provider = selectedProvider()) {
       ? `Connected${copilotStatus.login ? ` as @${copilotStatus.login}` : ''}`
       : 'GitHub sign-in required';
     authDetail.textContent = copilotStatus.configured
-      ? 'AIOS stores your OAuth token outside the repository, refreshes Copilot chat tokens automatically, and never sends raw tokens to the browser.'
-      : 'Sign in with your GitHub OAuth app to use your Copilot subscription.';
+      ? 'OAuth token and Copilot session are stored outside the repository.'
+      : 'Sign in with GitHub to use Copilot routing.';
     copilotStartButton.textContent = copilotStatus.configured ? 'Reconnect GitHub' : 'Sign in with GitHub';
     return;
   }
 
   if (provider.requiresApiKey === false) {
     authSummary.textContent = provider.configured ? 'Configured' : 'Optional API key';
-    authDetail.textContent = 'Save settings in AIOS. If no key is provided, AIOS can still call this endpoint without authorization headers.';
+    authDetail.textContent = 'Save optional key/base URL in AIOS settings.';
     return;
   }
 
   authSummary.textContent = provider.configured ? 'API key configured' : 'API key required';
   authDetail.textContent = provider.apiSecretEnv
-    ? `Configure ${provider.apiKeyEnv} and ${provider.apiSecretEnv} in AIOS settings (or use .env fallback).`
-    : `Configure ${provider.apiKeyEnv} in AIOS settings (or use .env fallback).`;
+    ? `Configure ${provider.apiKeyEnv} and ${provider.apiSecretEnv} in AIOS settings.`
+    : `Configure ${provider.apiKeyEnv} in AIOS settings.`;
 }
 
 async function saveProviderSettings({ provider, baseUrl, apiKey, apiSecret } = {}) {
   const targetProvider = provider || selectedProvider();
-  if (!targetProvider || targetProvider.authMethod === 'oauth-device') {
-    return;
-  }
+  if (!targetProvider || targetProvider.authMethod === 'oauth-device') return;
 
   const body = {
     baseUrl: typeof baseUrl === 'string' ? baseUrl.trim() : providerBaseUrlInput.value.trim()
@@ -492,13 +609,8 @@ async function saveProviderSettings({ provider, baseUrl, apiKey, apiSecret } = {
     const resolvedApiKey = typeof apiKey === 'string' ? apiKey.trim() : providerApiKeyInput.value.trim();
     const resolvedApiSecret = typeof apiSecret === 'string' ? apiSecret.trim() : providerApiSecretInput.value.trim();
 
-    if (resolvedApiKey) {
-      body.apiKey = resolvedApiKey;
-    }
-
-    if (targetProvider.apiSecretEnv && resolvedApiSecret) {
-      body.apiSecret = resolvedApiSecret;
-    }
+    if (resolvedApiKey) body.apiKey = resolvedApiKey;
+    if (targetProvider.apiSecretEnv && resolvedApiSecret) body.apiSecret = resolvedApiSecret;
   }
 
   const response = await fetch(`/api/settings/providers/${encodeURIComponent(targetProvider.id)}`, {
@@ -516,18 +628,15 @@ async function saveProviderSettings({ provider, baseUrl, apiKey, apiSecret } = {
   providerApiSecretInput.value = '';
   await loadProviders();
   await loadWizardProviders();
+  await loadApiAudit();
   renderMessage('system', `${targetProvider.name} settings saved.`);
 }
 
 async function clearProviderSettings() {
   const provider = selectedProvider();
-  if (!provider || provider.authMethod === 'oauth-device') {
-    return;
-  }
+  if (!provider || provider.authMethod === 'oauth-device') return;
 
-  const response = await fetch(`/api/settings/providers/${encodeURIComponent(provider.id)}`, {
-    method: 'DELETE'
-  });
+  const response = await fetch(`/api/settings/providers/${encodeURIComponent(provider.id)}`, { method: 'DELETE' });
   const payload = await response.json();
 
   if (!response.ok || !payload.ok) {
@@ -538,6 +647,7 @@ async function clearProviderSettings() {
   providerApiSecretInput.value = '';
   await loadProviders();
   await loadWizardProviders();
+  await loadApiAudit();
   renderMessage('system', `${provider.name} stored settings cleared.`);
 }
 
@@ -551,14 +661,11 @@ async function startCopilotLogin() {
   copilotDeviceFlow = payload;
   renderAuthState();
   renderWizardConnectState();
-  renderMessage('system', `GitHub Copilot sign-in: open ${payload.verificationUriComplete || payload.verificationUri} and enter code ${payload.userCode}.`);
   scheduleCopilotPoll(payload.interval);
 }
 
 async function pollCopilotLogin() {
-  if (!copilotDeviceFlow?.deviceCode) {
-    return;
-  }
+  if (!copilotDeviceFlow?.deviceCode) return;
 
   const response = await fetch('/api/auth/github-copilot/poll', {
     method: 'POST',
@@ -589,7 +696,6 @@ async function pollCopilotLogin() {
   await loadProviders();
   await loadWizardProviders();
   renderWizardConnectState();
-  renderMessage('system', `GitHub Copilot connected${payload.login ? ` as @${payload.login}` : ''}.`);
 }
 
 async function saveWizardConnection() {
@@ -640,6 +746,7 @@ async function runWizardConnectionTest() {
 
   wizardTestSucceeded = true;
   setFeedback(wizardTestStatus, `Success: ${payload.message || 'Provider connection is working.'}`, 'success');
+  await loadApiAudit();
 }
 
 async function finishWizard() {
@@ -666,8 +773,9 @@ async function finishWizard() {
   if (wizardModelSelect.value) {
     modelSelect.value = wizardModelSelect.value;
   }
-  saveSettings();
+
   closeWizard();
+  openWindow('chat');
   renderMessage('system', `${provider.name} is ready. Welcome to AIOS.`);
 }
 
@@ -702,11 +810,18 @@ async function callExec(command) {
 
   const payload = await response.json();
   if (!response.ok || !payload.ok) {
-    const err = payload.error || payload.stderr || `Command failed (HTTP ${response.status}).`;
-    throw new Error(err);
+    throw new Error(payload.error || payload.stderr || `Command failed (HTTP ${response.status}).`);
   }
 
   return payload;
+}
+
+function formatExecResult(result) {
+  const parts = [`Exit code: ${result.code}`];
+  if (result.stdout) parts.push(`stdout:\n${result.stdout}`);
+  if (result.stderr) parts.push(`stderr:\n${result.stderr}`);
+  if (result.timedOut) parts.push('Command timed out.');
+  return parts.join('\n\n');
 }
 
 async function listWorkspace(path = '.') {
@@ -724,11 +839,11 @@ async function listWorkspace(path = '.') {
   return payload;
 }
 
-async function readWorkspaceFile(path) {
+async function readWorkspaceFile(pathValue) {
   const response = await fetch('/api/fs/read', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path })
+    body: JSON.stringify({ path: pathValue })
   });
 
   const payload = await response.json();
@@ -739,51 +854,143 @@ async function readWorkspaceFile(path) {
   return payload;
 }
 
-function formatExecResult(result) {
-  const parts = [`Exit code: ${result.code}`];
-  if (result.stdout) {
-    parts.push(`stdout:\n${result.stdout}`);
+async function writeWorkspaceFile(pathValue, content) {
+  const response = await fetch('/api/fs/write', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: pathValue, content })
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Write failed (HTTP ${response.status}).`);
   }
-  if (result.stderr) {
-    parts.push(`stderr:\n${result.stderr}`);
-  }
-  if (result.timedOut) {
-    parts.push('Command timed out.');
-  }
-
-  return parts.join('\n\n');
+  return payload;
 }
 
-async function handleSlashCommand(text) {
-  const trimmed = text.trim();
+async function refreshFileList(pathValue = filesPathInput.value || '.') {
+  try {
+    const result = await listWorkspace(pathValue);
+    filesPathInput.value = result.path || '.';
+    filesEntries.innerHTML = '';
+    result.entries.forEach((entry) => {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'file-entry';
+      button.textContent = `${entry.type === 'directory' ? '📁' : '📄'} ${entry.name}`;
+      button.addEventListener('click', async () => {
+        const prefix = result.path === '.' ? '' : `${result.path}/`;
+        const nextPath = `${prefix}${entry.name}`;
+        if (entry.type === 'directory') {
+          await refreshFileList(nextPath);
+          return;
+        }
 
-  if (trimmed.startsWith('/exec ')) {
-    const command = trimmed.slice('/exec '.length).trim();
-    const result = await callExec(command);
-    renderMessage('system', formatExecResult(result));
-    return true;
+        try {
+          const file = await readWorkspaceFile(nextPath);
+          fileEditorPath.textContent = file.path;
+          fileEditorContent.value = file.content;
+          setFeedback(fileReadStatus, `Opened ${file.path}`);
+        } catch (error) {
+          setFeedback(fileReadStatus, error.message, 'error');
+        }
+      });
+      item.appendChild(button);
+      filesEntries.appendChild(item);
+    });
+    setFeedback(fileReadStatus, `Listed ${result.path}`);
+  } catch (error) {
+    setFeedback(fileReadStatus, error.message, 'error');
+  }
+}
+
+async function loadDataDirInfo() {
+  try {
+    const response = await fetch('/api/local-data/info');
+    const payload = await response.json();
+    if (response.ok && payload.ok) {
+      dataDirValue.textContent = payload.dataDir;
+    }
+  } catch {
+    dataDirValue.textContent = 'unavailable';
+  }
+}
+
+async function loadImports() {
+  const response = await fetch('/api/local-data/imports');
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to load imports.');
   }
 
-  if (trimmed === '/list' || trimmed.startsWith('/list ')) {
-    const target = trimmed === '/list' ? '.' : trimmed.slice('/list '.length).trim();
-    const result = await listWorkspace(target || '.');
-    const rows = result.entries.map((entry) => `${entry.type === 'directory' ? '📁' : '📄'} ${entry.name}`);
-    renderMessage('system', `Workspace listing (${result.path}):\n${rows.join('\n') || '(empty)'}`);
-    return true;
+  importList.innerHTML = '';
+  payload.imports.forEach((item) => {
+    const li = document.createElement('li');
+    li.textContent = `${item.type} • ${item.name} • ${item.recordCount} records${item.containsSensitiveData ? ' • sensitive' : ''}`;
+    importList.appendChild(li);
+  });
+}
+
+async function importLocalJson() {
+  const file = importFileInput.files?.[0];
+  if (!file) {
+    importStatus.textContent = 'Choose a JSON file first.';
+    return;
   }
 
-  if (trimmed.startsWith('/read ')) {
-    const filePath = trimmed.slice('/read '.length).trim();
-    const result = await readWorkspaceFile(filePath);
-    renderMessage('system', `Read ${result.path}:\n${result.content || '(empty file)'}`);
-    return true;
+  const raw = await file.text();
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    throw new Error('Selected file is not valid JSON.');
   }
 
-  return false;
+  const response = await fetch('/api/local-data/imports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: importTypeSelect.value,
+      name: file.name,
+      payload
+    })
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || 'Import failed.');
+  }
+
+  importStatus.textContent = `${file.name} imported locally.`;
+  await loadImports();
+}
+
+async function loadApiAudit() {
+  const response = await fetch('/api/settings/provider-audit');
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to load provider audit events.');
+  }
+
+  apiAuditList.innerHTML = '';
+  payload.events.slice(0, 20).forEach((event) => {
+    const li = document.createElement('li');
+    const mask = event.maskedKey ? `${event.maskedKey.fingerprint} • ****${event.maskedKey.last4}` : 'no key material';
+    li.textContent = `${event.timestamp} • ${event.providerId} • ${event.action} • ${mask}`;
+    apiAuditList.appendChild(li);
+  });
+}
+
+function tickClock() {
+  clockLabel.textContent = new Date().toLocaleString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    day: 'numeric'
+  });
 }
 
 providerSelect.addEventListener('change', updateModelOptions);
-modelSelect.addEventListener('change', saveSettings);
+
 copilotStartButton.addEventListener('click', () => {
   startCopilotLogin().catch((error) => renderMessage('system', `GitHub Copilot sign-in error: ${error.message}`));
 });
@@ -799,6 +1006,7 @@ clearProviderSettingsButton.addEventListener('click', () => {
 runSetupAgainButton.addEventListener('click', () => {
   resetFirstRunAndOpenWizard().catch((error) => renderMessage('system', `Setup reset failed: ${error.message}`));
 });
+openSetupAssistant.addEventListener('click', openWizard);
 
 wizardProviderSelect.addEventListener('change', () => {
   updateWizardModelOptions();
@@ -818,11 +1026,7 @@ wizardCopilotPollButton.addEventListener('click', () => {
 wizardTestButton.addEventListener('click', () => {
   runWizardConnectionTest().catch((error) => setFeedback(wizardTestStatus, error.message, 'error'));
 });
-
-wizardBackButton.addEventListener('click', () => {
-  setWizardStep(currentWizardStep - 1);
-});
-
+wizardBackButton.addEventListener('click', () => setWizardStep(currentWizardStep - 1));
 wizardNextButton.addEventListener('click', () => {
   if (WIZARD_STEPS[currentWizardStep] === 'provider' && !wizardProviderSelect.value) {
     setFeedback(wizardConnectStatus, 'Choose a provider before continuing.', 'error');
@@ -836,14 +1040,12 @@ wizardNextButton.addEventListener('click', () => {
 
   setWizardStep(currentWizardStep + 1);
 });
-
 wizardFinishButton.addEventListener('click', () => {
   finishWizard().catch((error) => setFeedback(wizardFinishStatus, error.message, 'error'));
 });
 
 chatForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-
   const text = messageInput.value.trim();
   if (!text) return;
 
@@ -854,10 +1056,6 @@ chatForm.addEventListener('submit', async (event) => {
   messageInput.value = '';
 
   try {
-    if (await handleSlashCommand(text)) {
-      return;
-    }
-
     chatHistory.push({ role: 'user', content: text });
 
     const response = await fetch('/api/chat', {
@@ -884,53 +1082,100 @@ chatForm.addEventListener('submit', async (event) => {
   }
 });
 
-runSystemCommandBtn.addEventListener('click', async () => {
-  const command = systemCommandInput.value.trim();
+terminalRunButton.addEventListener('click', async () => {
+  const command = terminalCommandInput.value.trim();
   if (!command) return;
 
-  renderMessage('user', `/exec ${command}`);
+  terminalOutput.textContent += `\n$ ${command}\n`;
   try {
     const result = await callExec(command);
-    renderMessage('system', formatExecResult(result));
+    terminalOutput.textContent += `${formatExecResult(result)}\n`;
   } catch (error) {
-    renderMessage('system', `Exec error: ${error.message}`);
+    terminalOutput.textContent += `Error: ${error.message}\n`;
+  }
+  terminalOutput.scrollTop = terminalOutput.scrollHeight;
+});
+
+filesRefreshButton.addEventListener('click', () => refreshFileList(filesPathInput.value || '.'));
+filesUpButton.addEventListener('click', () => refreshFileList(formatPathUp(filesPathInput.value)));
+fileSaveButton.addEventListener('click', async () => {
+  const targetPath = fileEditorPath.textContent;
+  if (!targetPath || targetPath === 'No file selected') {
+    setFeedback(fileReadStatus, 'Select a file before saving.', 'error');
+    return;
+  }
+
+  try {
+    await writeWorkspaceFile(targetPath, fileEditorContent.value);
+    setFeedback(fileReadStatus, `Saved ${targetPath}`, 'success');
+  } catch (error) {
+    setFeedback(fileReadStatus, error.message, 'error');
   }
 });
 
-listWorkspaceBtn.addEventListener('click', async () => {
-  try {
-    const result = await listWorkspace('.');
-    const rows = result.entries.map((entry) => `${entry.type === 'directory' ? '📁' : '📄'} ${entry.name}`);
-    renderMessage('system', `Workspace listing (${result.path}):\n${rows.join('\n') || '(empty)'}`);
-  } catch (error) {
-    renderMessage('system', `List error: ${error.message}`);
-  }
+importButton.addEventListener('click', () => {
+  importLocalJson().catch((error) => {
+    importStatus.textContent = error.message;
+  });
 });
 
-writeTestFileBtn.addEventListener('click', async () => {
-  try {
-    const response = await fetch('/api/fs/write', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        path: 'test-output/aios-sandbox-test.txt',
-        content: `[AIOS] FS Sandbox write test at ${new Date().toISOString()}`
-      })
-    });
+accentSelect.addEventListener('change', () => {
+  shellState.preferences.accent = accentSelect.value;
+  applyPreferences();
+  persistShellState();
+});
 
-    const payload = await response.json();
-    if (payload.ok) {
-      renderMessage('system', payload.message);
-    } else {
-      renderMessage('system', payload.error || 'Sandbox write failed.');
+wallpaperSelect.addEventListener('change', () => {
+  shellState.preferences.wallpaper = wallpaperSelect.value;
+  applyPreferences();
+  persistShellState();
+});
+
+document.querySelectorAll('.dock-item[data-open-app]').forEach((button) => {
+  button.addEventListener('click', () => {
+    if (button.dataset.openApp === 'apps') {
+      openWindow('settings');
+      return;
     }
-  } catch (error) {
-    renderMessage('system', `Sandbox write error: ${error.message}`);
-  }
+    openWindow(button.dataset.openApp);
+    if (button.dataset.openApp === 'files') {
+      refreshFileList().catch((error) => setFeedback(fileReadStatus, error.message, 'error'));
+    }
+  });
 });
 
-renderMessage('system', 'Welcome to AIOS. Use chat, /exec, /list, or /read to control the Linux workspace.');
+document.querySelectorAll('[data-window-action]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const app = button.dataset.app;
+    const action = button.dataset.windowAction;
+    if (action === 'zoom') {
+      focusWindow(app);
+      return;
+    }
+    closeWindow(app);
+  });
+});
 
-Promise.all([loadProviders(), loadWizardProviders()])
-  .then(() => checkFirstRun())
-  .catch((error) => renderMessage('system', `Failed to load providers: ${error.message}`));
+document.querySelectorAll('.app-window').forEach((windowEl) => {
+  initWindowDrag(windowEl);
+  windowEl.addEventListener('mousedown', () => focusWindow(windowEl.dataset.app));
+});
+
+renderMessage('system', 'Welcome to AIOS web shell. Use dock apps for chat, files, terminal, and setup.');
+
+tickClock();
+setInterval(tickClock, 30000);
+
+Promise.all([
+  loadShellState(),
+  loadProviders(),
+  loadWizardProviders(),
+  loadDataDirInfo(),
+  loadImports(),
+  loadApiAudit()
+])
+  .then(() => {
+    checkFirstRun();
+    refreshFileList().catch(() => {});
+  })
+  .catch((error) => renderMessage('system', `Failed to load AIOS: ${error.message}`));

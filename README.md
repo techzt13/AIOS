@@ -1,227 +1,101 @@
 # AIOS
 Zack and Richard have made an operating system called AIOS. Built for AI users and nerds.
 
-AIOS is now a browser-accessible Linux-based OS environment: a full Linux desktop streamed to your browser, with the AIOS Apple-style AI control layer available for provider-routed chat, guarded command execution, and sandboxed file operations.
+AIOS now runs as a macOS-inspired **web OS shell** served directly by the AIOS app on port `8080`.
 
-## Quick start (Docker / Codespaces)
+## Quick start
 
-1. (Optional) copy runtime defaults:
+### Local (recommended)
 
 ```bash
-cp .env.example .env
+npm install
+npm start
 ```
 
-> `.env` is now optional for provider secrets. AIOS can boot without it, and provider credentials can be configured in the UI.
+Open: <http://localhost:8080>
 
-2. Build and run everything:
+### Docker
 
 ```bash
 docker compose up --build
 ```
 
-3. Open:
+Open: <http://localhost:8080>
 
-- Linux desktop stream: `http://localhost:3000` (configurable via `DESKTOP_PORT`)
-- AIOS control layer: `http://localhost:8080` (configurable via `PORT`)
+## What you get on port 8080
 
-In GitHub Codespaces, `.devcontainer/devcontainer.json` forwards both ports.
+- Desktop wallpaper + top menu bar + dock
+- Windowed apps: **AI Chat**, **Files**, **Terminal**, **Settings**, **Setup Assistant**
+- First-run setup flow (provider select/connect/test/finish)
+- Provider status and GitHub Copilot device-login integration
 
-## Architecture
+## Local data model
 
-AIOS uses companion services in `docker-compose.yml`:
+AIOS stores local shell data in:
 
-- `desktop`: Linux XFCE desktop stream (webtop/noVNC style browser desktop)
-- `aios`: Node.js + Express AI layer (`public/` + `server/`)
+- `AIOS_DATA_DIR` when set, or
+- `./workspace/.aios-data` by default
 
-Inside the Linux desktop, a launcher (`AIOS Control Layer`) is placed on the desktop and opens `http://aios:8080`.
+This local data includes:
 
-## Linux apps included out-of-the-box
+- web shell window/layout/preferences state
+- explicit imported JSON metadata (apps/settings/bookmarks/history/cookie exports)
+- safe API-key audit events (provider, timestamp, action, masked fingerprint/last4 only)
 
-The desktop image pre-installs and supports real Linux GUI apps including:
+Provider secrets remain in the existing config store:
 
-- Terminal: `xfce4-terminal`
-- File manager: `thunar`
-- Text editor: `mousepad`
-- Web browser: `firefox`
+- `AIOS_CONFIG_DIR` (or `~/.config/aios`)
+- secrets are never returned raw to the frontend
 
-You can install additional Linux apps in the desktop container with `apt-get`.
+## Import center privacy rules
 
+Imports are explicit and user-initiated through a file picker.
 
-## macOS-inspired XFCE desktop (port 3000)
-
-AIOS uses XFCE as the desktop base and applies a lightweight **macOS-inspired** theme at startup (not macOS itself).
-
-What is applied by default:
-
-- WhiteSur GTK + xfwm4 theme (window controls on the left)
-- WhiteSur icon and cursor themes
-- Inter font (open substitute for proprietary San Francisco)
-- AIOS abstract gradient wallpaper
-- Top XFCE menu/status panel
-- Bottom Plank dock (Files, Terminal, Mousepad, Firefox, AIOS Control Layer)
-
-Theme sources and licenses:
-
-- WhiteSur GTK theme — <https://github.com/vinceliuice/WhiteSur-gtk-theme> (GPL-3.0)
-- WhiteSur icon theme — <https://github.com/vinceliuice/WhiteSur-icon-theme> (GPL-3.0)
-- WhiteSur cursors — <https://github.com/vinceliuice/WhiteSur-cursors> (GPL-3.0)
-- Inter font (`fonts-inter`) — SIL Open Font License
-- AIOS wallpaper (`desktop/assets/aios-wallpaper.svg`) — CC0-1.0
-
-> AIOS is macOS-inspired only and is not affiliated with Apple.
-
-Customize/disable:
-
-- Set `AIOS_THEME_DISABLE=1` in the desktop container environment to skip automatic theme application.
-- Edit `~/.config/xfce4/` and `~/.config/plank/` inside the desktop session for custom layouts.
-
-## First-run setup assistant (port 8080)
-
-On first launch, AIOS opens a guided setup flow in the web control layer:
-
-1. Welcome
-2. Provider selection (grouped catalog)
-3. Provider connection (API key, local no-key, or GitHub Copilot device login)
-4. Live provider connection test
-5. Finish into chat
-
-Used endpoints:
-
-- `GET/POST/DELETE /api/settings/first-run`
-- `GET /api/providers`
-- `POST /api/settings/providers/:providerId`
-- `POST /api/settings/providers/:providerId/test`
-- `POST /api/auth/github-copilot/start`
-- `POST /api/auth/github-copilot/poll`
-
-The settings panel includes **Run setup again** to reset first-run state and reopen the wizard.
-
-First-run state is stored outside git in `AIOS_CONFIG_DIR/setup.json` (or `~/.config/aios/setup.json`), and provider secrets stay in the same external config directory.
+- AIOS does **not** auto-read browser profile directories
+- AIOS does **not** silently scrape cookies
+- imported data stays local unless the user explicitly sends data to a provider through normal app usage
+- cookies are supported only from user-provided exported files and labeled sensitive
 
 ## AI provider selection
 
-The provider catalog is centrally defined in `server/providers.js` and surfaced by `GET /api/providers`.
+Provider catalog is defined in `server/providers.js` and exposed via `GET /api/providers`.
 
-Included providers are grouped in the UI and dispatched through adapter modules in `server/adapters/`:
+Provider settings APIs:
 
-### 1. Major cloud LLM providers
+- `GET /api/settings/providers`
+- `POST /api/settings/providers/:providerId`
+- `DELETE /api/settings/providers/:providerId`
+- `POST /api/settings/providers/:providerId/test`
 
-| Provider | Adapter | Auth | Models |
-| --- | --- | --- | --- |
-| Anthropic Claude | `anthropic` | `static-key` | Claude 4.6 Opus/Sonnet, Claude 3.5 Sonnet/Haiku, Claude Haiku |
-| OpenAI GPT | `openai` | `static-key` | GPT-5.5, GPT-5.4, GPT-4o, ChatGPT Codex |
-| Google Gemini | `gemini-native` | `static-key` | Gemini 3 Pro, Gemini 3 Flash, Gemini 2.5 Pro/Flash |
-| DeepSeek | `openai` | `static-key` | DeepSeek V4 Flash, DeepSeek Reasoner, DeepSeek Chat |
-| xAI (Grok) | `openai` | `static-key` | Grok-4.3, Grok-4 |
-| Mistral AI | `openai` | `static-key` | Mistral Large, Mixtral 8x7B |
+First-run setup APIs:
 
-### 2. Regional & emerging providers
+- `GET /api/settings/first-run`
+- `POST /api/settings/first-run`
+- `DELETE /api/settings/first-run`
 
-| Provider | Adapter | Auth | Models |
-| --- | --- | --- | --- |
-| Moonshot AI (Kimi) | `openai` | `static-key` | Kimi K2.5, K2-Thinking, K2-Turbo |
-| MiniMax | `openai` | `static-key` | MiniMax-M3, MiniMax-VL-01, MiniMax 2.7 |
-| Zhipu AI | `openai` | `static-key` | GLM-4.7-Flash, GLM-4.7, GLM-4 |
-| Volcano Engine / BytePlus | `openai` | `static-key` | Doubao Seed 1.8, Ark-Code Latest, Seed 1.8 |
-| Alibaba Cloud (Qwen) | `openai` | `static-key` | Qwen Portal Coder/Vision, plus fallback `qwen-plus` and `qwen-max` IDs |
-| Baidu Qianfan | `baidu` | `static-key` | ERNIE 4.5, ERNIE Speed |
-| Xiaomi MiMo | `openai` | `static-key` | MiMo-v2.5 Pro, MiMo-v2 Flash |
+GitHub Copilot auth APIs:
 
-### 3. Open-source / local runtimes
+- `POST /api/auth/github-copilot/start`
+- `POST /api/auth/github-copilot/poll`
 
-| Provider | Adapter | Auth | Notes |
-| --- | --- | --- | --- |
-| Ollama | `openai` | `none` | Local weights such as Llama 3.3 70B, Qwen 2.5 32B, Gemma |
-| GitHub Copilot | `github-copilot` | `oauth-device` | Uses GitHub OAuth device login and short-lived Copilot chat tokens |
-| LM Studio | `openai` | `none` | Preserved local runtime |
-| Custom OpenAI-compatible endpoint | `openai` | `static-key` | User-set base URL and optional one-off API key in the UI |
+## AI OS-control APIs and safety
 
-### 4. Aggregators
+- `POST /api/chat`
+- `POST /api/exec` (guarded by `ENABLE_EXEC_API=true`)
+- `POST /api/fs/list`
+- `POST /api/fs/read`
+- `POST /api/fs/write`
 
-| Provider | Adapter | Auth | Models |
-| --- | --- | --- | --- |
-| OpenRouter | `openai` | `static-key` | OpenAI, Anthropic, NVIDIA routed models |
-| Vercel AI Gateway | `openai` | `static-key` | `openai/gpt-4o`, `anthropic/claude-3.5-sonnet` |
-| NVIDIA NIM | `openai` | `static-key` | Preserved |
-| Nous Portal | `openai` | `static-key` | Preserved |
-| Hugging Face Router | `openai` | `static-key` | Preserved |
+Sandbox protections reject absolute paths and traversal escapes for FS APIs.
 
-Provider settings are now primarily managed in the AIOS UI and stored outside the git tree.
+## Web shell local-data APIs
 
-### Static-key configuration
-
-For static-key providers (OpenAI, Anthropic, Gemini, DeepSeek, MiniMax, OpenRouter, etc.), configure API keys and optional base URLs in the AIOS interface.
-
-AIOS persists provider settings in:
-
-- `AIOS_CONFIG_DIR` (if set), or
-- `~/.config/aios` by default
-
-Secrets are never returned raw to the frontend. The UI only receives safe status fields (configured true/false, auth source, and effective base URL).
-Because this is local file-based secret storage, secure the host machine/user account appropriately.
-
-`.env` still works as a fallback source for compatibility. Optional fallback examples:
-
-```bash
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
-GEMINI_API_KEY=
-BAIDU_API_KEY=
-BAIDU_SECRET_KEY=
-OPENROUTER_API_KEY=
-CUSTOM_OPENAI_BASE_URL=https://your-gateway.example/v1
-CUSTOM_OPENAI_API_KEY=
-```
-
-Chat auth resolution order is:
-
-1. persisted provider settings from the AIOS config store
-2. `.env` fallback values
-3. provider-specific no-auth / OAuth-device behavior
-
-Anthropic uses its native Messages API, Gemini uses the native Google Generative Language API shape, Baidu exchanges `BAIDU_API_KEY` + `BAIDU_SECRET_KEY` for an access token, and the rest of the compatible providers use `/chat/completions`.
-
-### GitHub Copilot device login
-
-AIOS can sign into GitHub Copilot with a GitHub OAuth app that has device flow enabled:
-
-```bash
-GITHUB_COPILOT_CLIENT_ID=your_oauth_app_client_id
-GITHUB_COPILOT_BASE_URL=https://api.githubcopilot.com
-GITHUB_COPILOT_OAUTH_SCOPE=read:user copilot
-AIOS_CONFIG_DIR=/absolute/path/outside/the/repo
-```
-
-When GitHub Copilot is selected in the UI, AIOS shows a **Sign in with GitHub** flow instead of an API-key field. The server:
-
-1. Starts GitHub device login with `POST /api/auth/github-copilot/start`
-2. Polls `POST /api/auth/github-copilot/poll`
-3. Stores the GitHub OAuth token and refreshed Copilot chat token metadata in the same outside-git AIOS config directory
-4. Never returns raw tokens to the browser; the frontend only gets connection status
-
-> Warning: this is an opt-in integration that depends on undocumented/private GitHub Copilot token exchange behavior. It is not officially sanctioned by GitHub, may break without notice, and you are responsible for complying with your Copilot plan's terms.
-
-### Custom OpenAI-compatible endpoints
-
-Choose **Custom OpenAI-compatible endpoint** in the provider selector to send chat traffic to a user-set base URL such as DeepInfra, Together AI, LiteLLM, or an internal gateway. You can store an optional API key and base URL in AIOS settings; the adapter still uses the normal OpenAI-compatible `/chat/completions` shape.
-
-## AI OS-control APIs and security model
-
-- `POST /api/exec` — guarded shell command execution in the workspace root.
-  - Disabled by default; enable with `ENABLE_EXEC_API=true` only in trusted dev environments.
-  - Uses timeout (`EXEC_TIMEOUT_MS`) and output cap (`EXEC_MAX_OUTPUT_BYTES`).
-- `POST /api/fs/write` — sandboxed file write under `WORKSPACE_ROOT`.
-- `POST /api/fs/read` — sandboxed file read (with size limit `FS_READ_MAX_BYTES`).
-- `POST /api/fs/list` — sandboxed directory listing.
-
-Path traversal and absolute path escapes are rejected for all sandboxed FS routes.
-
-In the UI, you can run:
-
-- system action button (visible command runner)
-- slash commands in chat: `/exec ...`, `/list [path]`, `/read <path>`
-
-Use these carefully: this is a power-user/dev tool and should not be exposed to untrusted networks.
+- `GET /api/local-data/info`
+- `GET /api/local-data/shell-state`
+- `POST /api/local-data/shell-state`
+- `GET /api/local-data/imports`
+- `POST /api/local-data/imports`
+- `GET /api/settings/provider-audit`
 
 ## Project structure
 
@@ -230,40 +104,26 @@ Use these carefully: this is a power-user/dev tool and should not be exposed to 
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
-├── desktop/
-│   ├── Dockerfile
-│   └── AIOS.desktop
+├── public/
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
 ├── server/
+│   ├── appDataStore.js
 │   ├── configDir.js
 │   ├── exec.js
+│   ├── firstRunStore.js
 │   ├── index.js
 │   ├── providerSettings.js
 │   ├── providerSettingsStore.js
 │   ├── providers.js
 │   └── sandbox.js
-├── public/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
 ├── test/
-│   ├── exec.test.js
-│   └── sandbox.test.js
 └── workspace/
 ```
 
-## Local (non-Docker) run
-
-```bash
-npm install
-npm start
-```
-
-Run tests:
+## Testing
 
 ```bash
 npm test
 ```
-
-## Build footprint notes
-
-Expect the desktop image to be significantly heavier than the original chat-only container (roughly 1–3 GB class depending on cache/base updates). First build may take several minutes in a fresh Codespace.

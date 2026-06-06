@@ -17,6 +17,18 @@ test('setup wizard markup exists in public index', async () => {
   assert.match(indexHtml, /id="runSetupAgainButton"/);
 });
 
+test('web shell desktop markup includes menu bar, dock, and app windows', async () => {
+  const indexHtml = await fs.readFile(path.join(repoRoot, 'public', 'index.html'), 'utf8');
+
+  assert.match(indexHtml, /class="menu-bar"/);
+  assert.match(indexHtml, /class="dock"/);
+  assert.match(indexHtml, /id="windowChat"/);
+  assert.match(indexHtml, /id="windowFiles"/);
+  assert.match(indexHtml, /id="windowTerminal"/);
+  assert.match(indexHtml, /id="windowSettings"/);
+  assert.match(indexHtml, /id="openSetupAssistant"/);
+});
+
 test('wizard frontend uses existing first-run and provider test endpoints', async () => {
   const appJs = await fs.readFile(path.join(repoRoot, 'public', 'app.js'), 'utf8');
 
@@ -25,13 +37,7 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /\/api\/settings\/providers\/\$\{encodeURIComponent\(provider\.id\)\}\/test/);
   assert.match(appJs, /\/api\/auth\/github-copilot\/start/);
   assert.match(appJs, /\/api\/auth\/github-copilot\/poll/);
-});
-
-test('desktop Dockerfile now applies AIOS theme assets and scripts', async () => {
-  const dockerfile = await fs.readFile(path.join(repoRoot, 'desktop', 'Dockerfile'), 'utf8');
-
-  assert.match(dockerfile, /WhiteSur-gtk-theme/);
-  assert.match(dockerfile, /plank/);
-  assert.match(dockerfile, /COPY desktop\/scripts\/apply-theme\.sh/);
-  assert.match(dockerfile, /COPY desktop\/assets\/aios-wallpaper\.svg/);
+  assert.match(appJs, /\/api\/local-data\/shell-state/);
+  assert.match(appJs, /\/api\/local-data\/imports/);
+  assert.match(appJs, /\/api\/settings\/provider-audit/);
 });
