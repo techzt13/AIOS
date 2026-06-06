@@ -138,10 +138,12 @@ function maskSecret(secret) {
     return null;
   }
 
-  const digest = crypto.createHash('sha256').update(trimmed).digest('hex').slice(0, 12);
+  const digest = trimmed.split('').reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) >>> 0, 7)
+    .toString(16)
+    .padStart(8, '0');
   return {
     last4: trimmed.slice(-4),
-    fingerprint: `sha256:${digest}`
+    fingerprint: `chk:${digest}`
   };
 }
 
