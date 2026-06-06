@@ -1394,6 +1394,95 @@ button.secondary {
   box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
+/* Performance profile: keep the glass aesthetic without stacking GPU-heavy blur layers everywhere. */
+.desktop-shell::before,
+.desktop-shell::after,
+.wizard-hero-panel::before,
+.control-group::before,
+.auth-card::before,
+.provider-card::before,
+.model-picker-card::before,
+.composer::before,
+.message::before {
+  display: none;
+}
+
+.menu-bar::before,
+.app-window::before,
+.dock::before,
+.wizard-card::before {
+  opacity: 0.28;
+  mix-blend-mode: normal;
+}
+
+.menu-bar,
+.app-window,
+.dock,
+.wizard-card,
+.wizard-overlay,
+.chat-status-pill,
+.titlebar-button,
+.message.assistant,
+.message.system,
+.composer,
+input,
+select,
+textarea,
+.apps-hero,
+.app-launch-card,
+.control-group,
+.provider-setup-item,
+.auth-card,
+.provider-card,
+.model-picker-card {
+  backdrop-filter: none;
+}
+
+.app-window {
+  box-shadow:
+    0 18px 44px rgba(8, 16, 36, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.app-window.focused {
+  box-shadow:
+    0 24px 58px rgba(4, 12, 28, 0.38),
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.app-window.dragging {
+  pointer-events: none;
+  box-shadow:
+    0 14px 32px rgba(4, 12, 28, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.message,
+.control-group,
+.app-launch-card,
+.provider-setup-item,
+button,
+input,
+select,
+textarea {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 58%, white);
+  outline-offset: 2px;
+}
+
+.dock {
+  box-shadow:
+    0 14px 34px rgba(6, 12, 24, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
 @media (max-width: 900px) {
   .app-window {
     left: 8px !important;

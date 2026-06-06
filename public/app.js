@@ -98,6 +98,8 @@ const WINDOW_LAYOUT = {
   settings: { x: 0.5, y: 0.08, centerX: true },
   apps: { x: 0.5, y: 0.16, centerX: true }
 };
+const MAX_CHAT_HISTORY_MESSAGES = 80;
+const MAX_RENDERED_MESSAGES = 140;
 
 let providers = [];
 let wizardProviders = [];
@@ -185,7 +187,16 @@ function renderMessage(role, content) {
   el.className = `message ${role}`;
   renderMessageContent(el, content);
   messagesEl.appendChild(el);
+  while (messagesEl.children.length > MAX_RENDERED_MESSAGES) {
+    messagesEl.firstElementChild?.remove();
+  }
   messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function trimChatHistory() {
+  if (chatHistory.length > MAX_CHAT_HISTORY_MESSAGES) {
+    chatHistory = chatHistory.slice(-MAX_CHAT_HISTORY_MESSAGES);
+  }
 }
 
 function startNewChat({ showWelcome = true } = {}) {
@@ -442,6 +453,9 @@ function initWindowDrag(windowEl) {
   let startY = 0;
   let originX = 0;
   let originY = 0;
+  let lastX = 0;
+  let lastY = 0;
+  let dragFrame = 0;
   let dragging = false;
 
   titlebar.addEventListener('mousedown', (event) => {
@@ -451,8 +465,12 @@ function initWindowDrag(windowEl) {
     startX = event.clientX;
     startY = event.clientY;
     const rect = windowEl.getBoundingClientRect();
+    const canvasRect = desktopCanvas.getBoundingClientRect();
     originX = rect.left;
     originY = rect.top;
+    lastX = Math.round(originX - canvasRect.left);
+    lastY = Math.round(originY - canvasRect.top);
+    windowEl.classList.add('dragging');
     event.preventDefault();
   });
 
@@ -462,12 +480,29 @@ function initWindowDrag(windowEl) {
     const bounds = safeWindowBounds(windowEl);
     const nextX = clamp(originX + (event.clientX - startX) - canvasRect.left, 8, bounds.maxLeft);
     const nextY = clamp(originY + (event.clientY - startY) - canvasRect.top, 8, bounds.maxTop);
-    windowEl.style.left = `${Math.round(nextX)}px`;
-    windowEl.style.top = `${Math.round(nextY)}px`;
-    recordWindowState(windowEl.dataset.app, { left: Math.round(nextX), top: Math.round(nextY) });
+    lastX = Math.round(nextX);
+    lastY = Math.round(nextY);
+
+    if (!dragFrame) {
+      dragFrame = requestAnimationFrame(() => {
+        windowEl.style.left = `${lastX}px`;
+        windowEl.style.top = `${lastY}px`;
+        dragFrame = 0;
+      });
+    }
   });
 
   window.addEventListener('mouseup', () => {
+    if (dragging) {
+      if (dragFrame) {
+        cancelAnimationFrame(dragFrame);
+        dragFrame = 0;
+      }
+      windowEl.style.left = `${lastX}px`;
+      windowEl.style.top = `${lastY}px`;
+      windowEl.classList.remove('dragging');
+      recordWindowState(windowEl.dataset.app, { left: lastX, top: lastY });
+    }
     dragging = false;
   });
 }
@@ -1388,6 +1423,7 @@ chatForm.addEventListener('submit', async (event) => {
 
   try {
     chatHistory.push({ role: 'user', content: text });
+    trimChatHistory();
 
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -1407,6 +1443,7 @@ chatForm.addEventListener('submit', async (event) => {
 
     const assistantText = payload.message || '[No response text returned]';
     chatHistory.push({ role: 'assistant', content: assistantText });
+    trimChatHistory();
     renderMessage('assistant', assistantText);
   } catch (error) {
     renderMessage('system', `System error: ${error.message}`);

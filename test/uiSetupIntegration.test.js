@@ -58,6 +58,12 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /function normalizeWindowPosition/);
   assert.match(appJs, /savedPositionIsStale/);
   assert.match(appJs, /safeWindowBounds/);
+  assert.match(appJs, /requestAnimationFrame/);
+  assert.match(appJs, /windowEl\.classList\.add\('dragging'\)/);
+  assert.match(appJs, /recordWindowState\(windowEl\.dataset\.app, \{ left: lastX, top: lastY \}\)/);
+  assert.match(appJs, /MAX_CHAT_HISTORY_MESSAGES = 80/);
+  assert.match(appJs, /MAX_RENDERED_MESSAGES = 140/);
+  assert.match(appJs, /function trimChatHistory/);
   assert.match(appJs, /function chooseDefaultProviderId/);
   assert.match(appJs, /configuredCopilot/);
   assert.match(appJs, /modelsByProvider/);
@@ -108,6 +114,8 @@ test('setup wizard uses provider cards and device-login copy', async () => {
   assert.match(stylesCss, /\.settings-window/);
   assert.match(stylesCss, /#windowChat\s*\{[\s\S]*left: clamp/);
   assert.match(stylesCss, /#windowApps\s*\{[\s\S]*calc\(\(100vw - min\(820px/);
-  assert.match(stylesCss, /backdrop-filter: blur\(30px\) saturate\(190%\) brightness\(1\.08\)/);
-  assert.match(stylesCss, /backdrop-filter: blur\(30px\) saturate\(190%\) brightness\(1\.04\)/);
+  assert.match(stylesCss, /Performance profile/);
+  assert.match(stylesCss, /\.app-window\.dragging/);
+  assert.match(stylesCss, /\.message\.assistant,[\s\S]*backdrop-filter: none/);
+  assert.match(stylesCss, /mix-blend-mode: normal/);
 });
