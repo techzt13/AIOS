@@ -14,12 +14,48 @@ const COPILOT_TOKEN_ENV_VARS = ['COPILOT_GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_TOKE
 const COPILOT_SETUP_HINT = 'Use Sign in with GitHub, or set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN in .env.';
 const FALLBACK_COPILOT_MODELS = [
   'github-copilot/gpt-4o',
+  'github-copilot/gpt-4.1',
+  'github-copilot/gpt-5-mini',
+  'github-copilot/gpt-5.4',
   'github-copilot/claude-opus-4.7',
   'github-copilot/claude-sonnet-4.6',
-  'github-copilot/claude-3.5-sonnet',
-  'github-copilot/gpt-5.5',
+  'github-copilot/gemini-3.5-flash',
+  'github-copilot/gemini-2.5-pro'
+];
+const COPILOT_CHAT_COMPLETIONS_UNSUPPORTED_MODELS = new Set([
+  'claude-opus-4.5',
+  'gpt-5.3-codex',
+  'gpt-5.4-mini',
+  'gpt-5.5',
+  'mai-code-1-flash',
+  'mai-code-1-flash-picker',
+  'mai-code-1-flash-secondary',
+  'mai-code-1-flash-tertiary'
+]);
+const COPILOT_INTERNAL_MODEL_PATTERNS = [
+  /^accounts\//,
+  /(?:^|[-_.])embedding(?:$|[-_.])/,
+  /(?:^|[-_.])embed(?:$|[-_.])/,
+  /(?:^|[-_.])router(?:$|[-_.])/,
+  /(?:^|[-_.])internal(?:$|[-_.])/,
+  /(?:^|[-_.])trajectory(?:$|[-_.])/,
+  /(?:^|[-_.])compaction(?:$|[-_.])/,
+  /(?:^|[-_.])picker(?:$|[-_.])/,
+  /(?:^|[-_.])secondary(?:$|[-_.])/,
+  /(?:^|[-_.])tertiary(?:$|[-_.])/,
+  /^oswe-/
+];
+const COPILOT_MODEL_PRIORITY = [
   'github-copilot/gpt-5.4',
-  'github-copilot/gpt-5.3-codex'
+  'github-copilot/gpt-5-mini',
+  'github-copilot/gemini-3.5-flash',
+  'github-copilot/gemini-3.1-pro-preview',
+  'github-copilot/claude-sonnet-4.6',
+  'github-copilot/claude-opus-4.7',
+  'github-copilot/claude-opus-4.8',
+  'github-copilot/gemini-2.5-pro',
+  'github-copilot/claude-sonnet-4.5',
+  'github-copilot/claude-haiku-4.5'
 ];
 // GitHub Copilot device-login support in AIOS is opt-in and uses undocumented/private
 // Copilot token exchange behavior. It may break if GitHub changes their APIs, and each
@@ -329,14 +365,26 @@ function normalizeCopilotModelId(id) {
 function isAllowedCopilotModel(item) {
   const id = String(item?.id || '').trim().toLowerCase();
   if (!id) return false;
-  if (id.includes('embedding') || id.includes('embed')) return false;
-  if (id.includes('router') || id.includes('internal')) return false;
+  if (COPILOT_CHAT_COMPLETIONS_UNSUPPORTED_MODELS.has(id)) return false;
+  if (COPILOT_INTERNAL_MODEL_PATTERNS.some((pattern) => pattern.test(id))) return false;
   if (item?.object && !String(item.object).toLowerCase().includes('model')) return false;
+  if (item?.capabilities?.type && String(item.capabilities.type).toLowerCase() !== 'chat') return false;
+  if (item?.model_picker_enabled === false) return false;
   return true;
 }
 
 function dedupeModels(models = []) {
   return [...new Set(models.filter(Boolean))];
+}
+
+function sortCopilotModels(models = []) {
+  const priority = new Map(COPILOT_MODEL_PRIORITY.map((model, index) => [model, index]));
+  return [...models].sort((a, b) => {
+    const aRank = priority.has(a) ? priority.get(a) : Number.MAX_SAFE_INTEGER;
+    const bRank = priority.has(b) ? priority.get(b) : Number.MAX_SAFE_INTEGER;
+    if (aRank !== bRank) return aRank - bRank;
+    return a.localeCompare(b);
+  });
 }
 
 async function discoverModels({ baseUrl, fetchImpl = fetch }) {
@@ -358,11 +406,11 @@ async function discoverModels({ baseUrl, fetchImpl = fetch }) {
   }
 
   const entries = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
-  const models = dedupeModels(
+  const models = sortCopilotModels(dedupeModels(
     entries
       .filter(isAllowedCopilotModel)
       .map((item) => normalizeCopilotModelId(item.id))
-  );
+  ));
 
   return models.length > 0 ? models : FALLBACK_COPILOT_MODELS;
 }
@@ -379,6 +427,8 @@ async function getCopilotModels({ baseUrl, fetchImpl = fetch } = {}) {
 module.exports = {
   CONFIG_DIR: getConfigDir(),
   COPILOT_SETUP_HINT,
+  COPILOT_CHAT_COMPLETIONS_UNSUPPORTED_MODELS,
+  COPILOT_MODEL_PRIORITY,
   COPILOT_TOKEN_ENV_VARS,
   FALLBACK_COPILOT_MODELS,
   TOKEN_PATH,

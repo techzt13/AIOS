@@ -207,12 +207,13 @@ const providerCatalog = [
     defaultModel: 'github-copilot/gpt-4o',
     models: [
       'github-copilot/gpt-4o',
+      'github-copilot/gpt-4.1',
+      'github-copilot/gpt-5-mini',
+      'github-copilot/gpt-5.4',
       'github-copilot/claude-opus-4.7',
       'github-copilot/claude-sonnet-4.6',
-      'github-copilot/claude-3.5-sonnet',
-      'github-copilot/gpt-5.5',
-      'github-copilot/gpt-5.4',
-      'github-copilot/gpt-5.3-codex'
+      'github-copilot/gemini-3.5-flash',
+      'github-copilot/gemini-2.5-pro'
     ]
   },
   {

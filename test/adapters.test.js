@@ -124,6 +124,25 @@ test('github copilot adapter reports model 404 as unavailable', async () => {
   assert.match(result.error, /unavailable/);
 });
 
+test('github copilot adapter explains chat-completions incompatible models', async () => {
+  const result = await copilotAdapter.sendChat({
+    provider: { id: 'github-copilot', defaultBaseUrl: 'https://api.githubcopilot.com' },
+    model: 'github-copilot/gpt-5.3-codex',
+    messages: [{ role: 'user', content: 'ping' }],
+    auth: {
+      accessToken: 'copilot-chat-token',
+      chatCompletionsUrl: 'https://custom.copilot.test/chat/completions'
+    },
+    fetchImpl: async () => jsonResponse(400, {
+      error: { message: 'model "gpt-5.3-codex" is not accessible via the /chat/completions endpoint' }
+    })
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 400);
+  assert.match(result.error, /not available through AIOS chat/);
+});
+
 test('adapter registry dispatches through the configured adapter type', async () => {
   assert.equal(typeof getAdapter('anthropic').sendChat, 'function');
 

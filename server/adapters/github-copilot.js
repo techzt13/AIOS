@@ -47,7 +47,10 @@ async function sendChat({ provider, model, messages, auth, fetchImpl = fetch }) 
 
   if (!response.ok) {
     const providerMessage = data?.error?.message || data?.message || '';
-    const message = response.status === 404
+    const isUnsupportedChatModel = /not accessible via the \/chat\/completions endpoint|requested model is not supported/i.test(providerMessage);
+    const message = isUnsupportedChatModel
+      ? `GitHub Copilot model "${model}" is not available through AIOS chat. Pick a model from the refreshed live Copilot model list.`
+      : response.status === 404
       ? `GitHub Copilot model "${model}" is unavailable for this account. Pick a model from the live Copilot model list or try github-copilot/gpt-4o.`
       : (providerMessage || `GitHub Copilot request failed with status ${response.status}.`);
     return { ok: false, status: response.status, error: message, raw: data };

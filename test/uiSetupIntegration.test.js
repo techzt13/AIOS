@@ -50,9 +50,11 @@ test('copilot provider catalog includes OpenClaw-style model IDs', async () => {
   const providersJs = await fs.readFile(path.join(repoRoot, 'server', 'providers.js'), 'utf8');
 
   assert.match(providersJs, /github-copilot\/claude-opus-4\.7/);
-  assert.match(providersJs, /github-copilot\/gpt-5\.5/);
+  assert.match(providersJs, /github-copilot\/gpt-5\.4/);
   assert.match(providersJs, /defaultModel: 'github-copilot\/gpt-4o'/);
   assert.doesNotMatch(providersJs, /github-copilot\/o3/);
+  assert.doesNotMatch(providersJs, /github-copilot\/gpt-5\.3-codex/);
+  assert.doesNotMatch(providersJs, /github-copilot\/gpt-5\.5/);
 });
 
 test('setup wizard uses provider cards and device-login copy', async () => {
@@ -60,8 +62,12 @@ test('setup wizard uses provider cards and device-login copy', async () => {
   const stylesCss = await fs.readFile(path.join(repoRoot, 'public', 'styles.css'), 'utf8');
 
   assert.match(indexHtml, /class="wizard-stepper"/);
+  assert.match(indexHtml, /class="wizard-hero-panel"/);
+  assert.match(indexHtml, /Live model catalog/);
   assert.match(indexHtml, /id="wizardProviderGroups" class="wizard-provider-cards"/);
   assert.match(indexHtml, /github\.com\/login\/device/);
+  assert.match(stylesCss, /\.wizard-hero-panel/);
+  assert.match(stylesCss, /\.provider-card-glyph/);
   assert.match(stylesCss, /\.provider-card/);
   assert.match(stylesCss, /\.model-picker-card/);
 });

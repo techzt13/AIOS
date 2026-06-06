@@ -166,6 +166,16 @@ function statusLabel(provider) {
   return provider.configured ? 'Configured' : 'Needs setup';
 }
 
+function providerGlyph(provider) {
+  const id = provider?.id || '';
+  if (id === 'github-copilot') return 'GH';
+  if (id === 'anthropic') return 'A';
+  if (id === 'openai') return 'O';
+  if (id === 'gemini') return 'G';
+  if (id === 'ollama' || id === 'lmstudio') return '⌘';
+  return (provider?.name || '?').trim().slice(0, 1).toUpperCase();
+}
+
 function formatPathUp(pathValue) {
   if (!pathValue || pathValue === '.') return '.';
   const parts = pathValue.split('/').filter(Boolean);
@@ -388,6 +398,10 @@ function renderWizardProviderGroups() {
     card.dataset.providerId = provider.id;
     card.setAttribute('aria-pressed', String(provider.id === wizardProviderSelect.value));
 
+    const glyph = document.createElement('span');
+    glyph.className = 'provider-card-glyph';
+    glyph.textContent = providerGlyph(provider);
+
     const eyebrow = document.createElement('span');
     eyebrow.className = 'provider-card-eyebrow';
     eyebrow.textContent = provider.id === 'github-copilot' ? 'Recommended' : provider.category;
@@ -405,6 +419,7 @@ function renderWizardProviderGroups() {
     badge.className = 'provider-status';
     badge.textContent = statusLabel(provider);
 
+    card.appendChild(glyph);
     card.appendChild(eyebrow);
     card.appendChild(name);
     card.appendChild(meta);

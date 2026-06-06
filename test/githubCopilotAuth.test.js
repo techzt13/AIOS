@@ -225,7 +225,47 @@ test('github copilot model fallback catalog includes required defaults', async (
 
     assert.equal(result.source, 'fallback');
     assert.equal(result.models.includes('github-copilot/claude-opus-4.7'), true);
-    assert.equal(result.models.includes('github-copilot/gpt-5.5'), true);
+    assert.equal(result.models.includes('github-copilot/gpt-4o'), true);
+    assert.equal(result.models.includes('github-copilot/gpt-5.4'), true);
+    assert.equal(result.models.includes('github-copilot/gpt-5.3-codex'), false);
+    assert.equal(result.models.includes('github-copilot/gpt-5.5'), false);
     assert.equal(result.models.some((model) => model.includes('o3')), false);
+  });
+});
+
+test('github copilot live discovery excludes non-chat-completions and internal models', async () => {
+  await withCopilotModule({
+    GH_TOKEN: 'gh-token',
+    GITHUB_COPILOT_CLIENT_ID: undefined
+  }, async ({ discoverModels }) => {
+    const models = await discoverModels({
+      baseUrl: 'https://api.githubcopilot.com',
+      fetchImpl: async (url) => {
+        if (String(url) === 'https://api.github.com/copilot_internal/v2/token') {
+          return jsonResponse(200, {
+            token: 'tid=1;exp=9999999999;proxy-ep=proxy.individual.githubcopilot.com;',
+            expires_in: 1800
+          });
+        }
+        if (String(url) === 'https://api.individual.githubcopilot.com/models') {
+          return jsonResponse(200, {
+            data: [
+              { id: 'gpt-4o', object: 'model', model_picker_enabled: true, capabilities: { type: 'chat' } },
+              { id: 'gpt-5.4', object: 'model', model_picker_enabled: true, capabilities: { type: 'chat' } },
+              { id: 'gpt-5.3-codex', object: 'model', model_picker_enabled: true, capabilities: { type: 'chat' } },
+              { id: 'gpt-5.5', object: 'model', model_picker_enabled: true, capabilities: { type: 'chat' } },
+              { id: 'mai-code-1-flash-picker', object: 'model', model_picker_enabled: true, capabilities: { type: 'chat' } },
+              { id: 'trajectory-compaction', object: 'model', model_picker_enabled: false, capabilities: { type: 'chat' } },
+              { id: 'oswe-vscode-prime', object: 'model', model_picker_enabled: true, capabilities: { type: 'chat' } },
+              { id: 'text-embedding-3-small', object: 'model', model_picker_enabled: true, capabilities: { type: 'embedding' } }
+            ]
+          });
+        }
+
+        throw new Error(`Unexpected URL: ${url}`);
+      }
+    });
+
+    assert.deepEqual(models, ['github-copilot/gpt-5.4', 'github-copilot/gpt-4o']);
   });
 });

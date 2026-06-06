@@ -210,6 +210,18 @@
         <section id="wizardStepWelcome" class="wizard-step">
           <h3>AIOS by Zack and Richard</h3>
           <p class="wizard-copy">Configure one chat provider for the local web OS shell. GitHub Copilot can sign in through the normal GitHub device-code page.</p>
+          <div class="wizard-hero-panel">
+            <span class="wizard-hero-icon">AIOS</span>
+            <div>
+              <strong>Private by default</strong>
+              <p class="wizard-copy">Provider tokens are saved on this Mac in the AIOS config directory. The browser only sees connection status.</p>
+            </div>
+          </div>
+          <div class="wizard-chip-row" aria-label="Setup highlights">
+            <span>Local web shell</span>
+            <span>Server-side secrets</span>
+            <span>Live model catalog</span>
+          </div>
         </section>
 
         <section id="wizardStepProvider" class="wizard-step hidden">
@@ -263,6 +275,7 @@
 
         <section id="wizardStepTest" class="wizard-step hidden">
           <h3>Test connection</h3>
+          <p class="wizard-copy">AIOS will send one short check message to the selected provider and model.</p>
           <button id="wizardTestButton" type="button">Test provider connection</button>
           <p id="wizardTestStatus" class="wizard-feedback"></p>
         </section>
