@@ -90,14 +90,7 @@ const WINDOW_IDS = {
 let providers = [];
 let wizardProviders = [];
 let chatHistory = [];
-let copilotStatus = {
-  configured: false,
-  login: null,
-  connectedAt: null,
-  authSource: 'not-configured',
-  canDeviceLogin: false,
-  guidance: 'Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or configure GITHUB_COPILOT_CLIENT_ID to use device login.'
-};
+let copilotStatus = { configured: false, login: null, connectedAt: null };
 let copilotDeviceFlow = null;
 let copilotPollTimer = null;
 let currentWizardStep = 0;
@@ -127,26 +120,6 @@ function selectedWizardProvider() {
   return providers.find((provider) => provider.id === wizardProviderSelect.value)
     || wizardProviders.find((provider) => provider.id === wizardProviderSelect.value)
     || selectedProvider();
-}
-
-function selectValidModel(selectEl, models, preferredModel = '') {
-  const preferred = String(preferredModel || '').trim();
-  const current = String(selectEl.value || '').trim();
-  const nextModel = models.includes(preferred)
-    ? preferred
-    : (models.includes(current) ? current : (models[0] || ''));
-
-  selectEl.innerHTML = '';
-  models.forEach((model) => {
-    const option = document.createElement('option');
-    option.value = model;
-    option.textContent = model;
-    selectEl.appendChild(option);
-  });
-
-  if (nextModel) {
-    selectEl.value = nextModel;
-  }
 }
 
 function statusLabel(provider) {
@@ -320,11 +293,9 @@ function renderProviderSetupList() {
     row.className = 'provider-setup-item';
 
     const left = document.createElement('div');
-    left.className = 'provider-setup-name';
     left.textContent = provider.name;
 
     const right = document.createElement('div');
-    right.className = 'provider-setup-actions';
     const status = document.createElement('span');
     status.className = 'provider-status';
     status.textContent = statusLabel(provider);
@@ -351,7 +322,19 @@ function renderProviderSetupList() {
 function updateModelOptions() {
   const provider = selectedProvider();
   const models = provider?.models || [];
-  selectValidModel(modelSelect, models);
+  const current = modelSelect.value;
+  modelSelect.innerHTML = '';
+
+  models.forEach((model) => {
+    const option = document.createElement('option');
+    option.value = model;
+    option.textContent = model;
+    modelSelect.appendChild(option);
+  });
+
+  if (models.includes(current)) {
+    modelSelect.value = current;
+  }
 
   providerBaseUrlInput.value = provider?.effectiveBaseUrl || '';
   providerApiKeyInput.value = '';
@@ -365,7 +348,22 @@ function updateModelOptions() {
 
 function updateWizardModelOptions() {
   const provider = selectedWizardProvider();
-  selectValidModel(wizardModelSelect, provider?.models || []);
+  const models = provider?.models || [];
+  const current = wizardModelSelect.value;
+  wizardModelSelect.innerHTML = '';
+
+  models.forEach((model) => {
+    const option = document.createElement('option');
+    option.value = model;
+    option.textContent = model;
+    wizardModelSelect.appendChild(option);
+  });
+
+  if (models.includes(current)) {
+    wizardModelSelect.value = current;
+  } else if (models.length > 0) {
+    wizardModelSelect.value = models[0];
+  }
 }
 
 function renderWizardProviderGroups() {
@@ -388,7 +386,7 @@ function renderWizardProviderGroups() {
 
     const row = document.createElement('div');
     row.className = 'provider-setup-item';
-    row.innerHTML = `<span class="provider-setup-name">${provider.name}</span><span class="provider-status">${statusLabel(provider)}</span>`;
+    row.innerHTML = `<span>${provider.name}</span><span class="provider-status">${statusLabel(provider)}</span>`;
     groups.get(provider.category).appendChild(row);
   });
 }
@@ -415,17 +413,12 @@ function renderWizardConnectState() {
   if (provider.authMethod === 'none') {
     wizardConnectSummary.textContent = `${provider.name} can run without an API key. You can keep or update the base URL.`;
   } else if (isCopilot) {
-    wizardConnectSummary.textContent = provider.configured
-      ? 'GitHub Copilot is ready. AIOS can use COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN, or an existing Copilot session.'
-      : (copilotStatus.canDeviceLogin
-          ? 'Use GitHub device login, or set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN.'
-          : (copilotStatus.guidance || 'Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or configure GITHUB_COPILOT_CLIENT_ID to use device login.'));
+    wizardConnectSummary.textContent = 'Use GitHub device login. Tokens are stored server-side and not returned to the browser.';
   } else {
     wizardConnectSummary.textContent = `Enter ${provider.name} connection details. Secrets stay server-side.`;
   }
 
   wizardCopilotPollButton.disabled = !copilotDeviceFlow;
-  wizardCopilotStartButton.disabled = !copilotStatus.canDeviceLogin;
   wizardCopilotCode.classList.toggle('hidden', !copilotDeviceFlow?.userCode);
   wizardCopilotLink.classList.toggle('hidden', !copilotDeviceFlow?.verificationUri);
 
@@ -468,8 +461,6 @@ function closeWizard() {
 }
 
 async function loadWizardProviders() {
-  const currentProvider = wizardProviderSelect.value;
-  const currentModel = wizardModelSelect.value;
   const response = await fetch('/api/providers');
   const payload = await response.json();
   if (!response.ok || !Array.isArray(payload.providers)) {
@@ -496,20 +487,13 @@ async function loadWizardProviders() {
 
   if (providerSelect.value && wizardProviders.some((provider) => provider.id === providerSelect.value)) {
     wizardProviderSelect.value = providerSelect.value;
-  } else if (currentProvider && wizardProviders.some((provider) => provider.id === currentProvider)) {
-    wizardProviderSelect.value = currentProvider;
-  } else if (wizardProviders[0]) {
-    wizardProviderSelect.value = wizardProviders[0].id;
   }
 
-  const provider = selectedWizardProvider();
-  selectValidModel(wizardModelSelect, provider?.models || [], currentModel);
+  updateWizardModelOptions();
   renderWizardProviderGroups();
 }
 
 async function loadProviders() {
-  const currentProvider = providerSelect.value;
-  const currentModel = modelSelect.value;
   const response = await fetch('/api/settings/providers');
   const payload = await response.json();
 
@@ -518,13 +502,7 @@ async function loadProviders() {
   }
 
   providers = payload.providers || [];
-  copilotStatus = payload.copilot || {
-    configured: false,
-    login: null,
-    connectedAt: null,
-    authSource: 'not-configured',
-    canDeviceLogin: false
-  };
+  copilotStatus = payload.copilot || { configured: false, login: null, connectedAt: null };
 
   providerSelect.innerHTML = '';
   const groups = new Map();
@@ -542,16 +520,7 @@ async function loadProviders() {
     groups.get(provider.category).appendChild(option);
   });
 
-  if (currentProvider && providers.some((provider) => provider.id === currentProvider)) {
-    providerSelect.value = currentProvider;
-  } else if (providers[0]) {
-    providerSelect.value = providers[0].id;
-  }
-
-  const provider = selectedProvider();
-  selectValidModel(modelSelect, provider?.models || [], currentModel);
-  renderAuthState(provider);
-  providerStatusBadge.textContent = `Provider: ${provider?.name || 'not selected'}`;
+  updateModelOptions();
   renderProviderSetupList();
 }
 
@@ -606,18 +575,13 @@ function renderAuthState(provider = selectedProvider()) {
   }
 
   if (isCopilot) {
-    authSummary.textContent = provider.configured
+    authSummary.textContent = copilotStatus.configured
       ? `Connected${copilotStatus.login ? ` as @${copilotStatus.login}` : ''}`
       : 'GitHub sign-in required';
-    authDetail.textContent = provider.configured
-      ? (copilotStatus.authSource === 'env'
-          ? 'Using GitHub token from environment variables. Secrets are never sent back to the browser.'
-          : 'OAuth token and Copilot session are stored outside the repository.')
-      : (copilotStatus.canDeviceLogin
-          ? 'Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or use Sign in with GitHub.'
-          : (copilotStatus.guidance || 'Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or configure GITHUB_COPILOT_CLIENT_ID to use device login.'));
-    copilotStartButton.textContent = provider.configured ? 'Reconnect GitHub' : 'Sign in with GitHub';
-    copilotStartButton.disabled = !copilotStatus.canDeviceLogin;
+    authDetail.textContent = copilotStatus.configured
+      ? 'OAuth token and Copilot session are stored outside the repository.'
+      : 'Sign in with GitHub to use Copilot routing.';
+    copilotStartButton.textContent = copilotStatus.configured ? 'Reconnect GitHub' : 'Sign in with GitHub';
     return;
   }
 
@@ -726,9 +690,7 @@ async function pollCopilotLogin() {
   copilotStatus = {
     configured: true,
     login: payload.login || null,
-    connectedAt: new Date().toISOString(),
-    authSource: 'oauth-device',
-    canDeviceLogin: true
+    connectedAt: new Date().toISOString()
   };
   copilotDeviceFlow = null;
   await loadProviders();
@@ -744,12 +706,7 @@ async function saveWizardConnection() {
   }
 
   if (provider.authMethod === 'oauth-device') {
-    if (provider.configured) {
-      setFeedback(wizardConnectStatus, 'GitHub Copilot is already configured.', 'success');
-      return;
-    }
-
-    setFeedback(wizardConnectStatus, copilotStatus.guidance || 'Use Sign in with GitHub for Copilot providers.', 'error');
+    setFeedback(wizardConnectStatus, 'Use Sign in with GitHub for Copilot providers.', 'error');
     return;
   }
 
@@ -812,9 +769,10 @@ async function finishWizard() {
   }
 
   providerSelect.value = provider.id;
-  const selected = selectedProvider();
-  selectValidModel(modelSelect, selected?.models || [], wizardModelSelect.value);
-  renderAuthState(selected);
+  updateModelOptions();
+  if (wizardModelSelect.value) {
+    modelSelect.value = wizardModelSelect.value;
+  }
 
   closeWizard();
   openWindow('chat');
@@ -1093,14 +1051,6 @@ chatForm.addEventListener('submit', async (event) => {
 
   const provider = selectedProvider();
   if (!provider) return;
-  const model = provider.models?.includes(modelSelect.value) ? modelSelect.value : provider.models?.[0];
-  if (!model) {
-    renderMessage('system', `No model is available for ${provider.name}.`);
-    return;
-  }
-  if (modelSelect.value !== model) {
-    modelSelect.value = model;
-  }
 
   renderMessage('user', text);
   messageInput.value = '';
@@ -1113,7 +1063,7 @@ chatForm.addEventListener('submit', async (event) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         providerId: provider.id,
-        model,
+        model: modelSelect.value,
         messages: chatHistory
       })
     });

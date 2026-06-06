@@ -6,7 +6,6 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 const { dispatchChat } = require('./adapters');
 const {
-  getCopilotModels,
   getChatSession,
   getStatus: getGitHubCopilotStatus,
   pollDeviceFlow,
@@ -73,30 +72,11 @@ function createApp(deps = {}) {
       getGitHubCopilotStatusImpl()
     ]);
 
-    let providers = buildProviderSettingsResponse({
+    const providers = buildProviderSettingsResponse({
       providers: providerCatalog,
       providerSettings,
       copilotStatus
     });
-
-    const copilotProvider = providers.find((provider) => provider.id === 'github-copilot');
-    if (copilotProvider) {
-      const copilotModels = await getCopilotModels({
-        baseUrl: copilotProvider.effectiveBaseUrl || copilotProvider.defaultBaseUrl
-      });
-
-      providers = providers.map((provider) => {
-        if (provider.id !== 'github-copilot') {
-          return provider;
-        }
-
-        return {
-          ...provider,
-          models: copilotModels.models,
-          modelSource: copilotModels.source
-        };
-      });
-    }
 
     return { providerSettings, copilotStatus, providers };
   }

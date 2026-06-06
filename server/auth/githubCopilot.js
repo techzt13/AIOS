@@ -5,18 +5,6 @@ const { getConfigDir } = require('../configDir');
 
 const TOKEN_PATH = path.join(getConfigDir(), 'github-copilot.json');
 const DEFAULT_DEVICE_SCOPE = process.env.GITHUB_COPILOT_OAUTH_SCOPE || 'read:user copilot';
-const COPILOT_TOKEN_ENV_VARS = ['COPILOT_GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'];
-const COPILOT_SETUP_HINT = 'Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or configure GITHUB_COPILOT_CLIENT_ID to use device login.';
-const FALLBACK_COPILOT_MODELS = [
-  'github-copilot/claude-opus-4.7',
-  'github-copilot/claude-sonnet-4.6',
-  'github-copilot/claude-3.5-sonnet',
-  'github-copilot/gpt-5.5',
-  'github-copilot/gpt-5.4',
-  'github-copilot/gpt-5.3-codex',
-  'github-copilot/gpt-4o',
-  'github-copilot/o3-mini'
-];
 // GitHub Copilot device-login support in AIOS is opt-in and uses undocumented/private
 // Copilot token exchange behavior. It may break if GitHub changes their APIs, and each
 // user remains responsible for making sure their Copilot plan allows this usage.
@@ -51,16 +39,10 @@ async function saveSession(session) {
 }
 
 function getSafeStatus(session) {
-  const resolvedToken = resolveGitHubOAuthToken({ session });
-  const configuredViaEnv = Boolean(resolveEnvGitHubToken());
-
   return {
-    configured: Boolean(resolvedToken),
+    configured: Boolean(session.oauthToken),
     login: session.login || null,
-    connectedAt: session.connectedAt || null,
-    authSource: configuredViaEnv ? 'env' : (session.oauthToken ? 'oauth-device' : 'not-configured'),
-    canDeviceLogin: Boolean(process.env.GITHUB_COPILOT_CLIENT_ID),
-    guidance: COPILOT_SETUP_HINT
+    connectedAt: session.connectedAt || null
   };
 }
 
@@ -71,7 +53,7 @@ async function getStatus() {
 async function startDeviceFlow({ fetchImpl = fetch } = {}) {
   const clientId = process.env.GITHUB_COPILOT_CLIENT_ID;
   if (!clientId) {
-    throw new Error(COPILOT_SETUP_HINT);
+    throw new Error('Missing GITHUB_COPILOT_CLIENT_ID. Configure your GitHub OAuth app with device flow enabled.');
   }
 
   const response = await fetchImpl('https://github.com/login/device/code', {
@@ -121,7 +103,7 @@ async function fetchGitHubLogin(oauthToken, fetchImpl = fetch) {
 async function pollDeviceFlow({ deviceCode, fetchImpl = fetch }) {
   const clientId = process.env.GITHUB_COPILOT_CLIENT_ID;
   if (!clientId) {
-    throw new Error(COPILOT_SETUP_HINT);
+    throw new Error('Missing GITHUB_COPILOT_CLIENT_ID. Configure your GitHub OAuth app with device flow enabled.');
   }
 
   const response = await fetchImpl('https://github.com/login/oauth/access_token', {
@@ -208,9 +190,8 @@ async function exchangeCopilotToken({ oauthToken, baseUrl, fetchImpl = fetch }) 
 
 async function getChatSession({ baseUrl, fetchImpl = fetch }) {
   const session = await loadSession();
-  const oauthToken = resolveGitHubOAuthToken({ session });
-  if (!oauthToken) {
-    throw new Error(`GitHub Copilot is not connected yet. ${COPILOT_SETUP_HINT}`);
+  if (!session.oauthToken) {
+    throw new Error('GitHub Copilot is not connected yet. Use “Sign in with GitHub” in AIOS first.');
   }
 
   const expiresAt = session.copilotTokenExpiresAt ? new Date(session.copilotTokenExpiresAt).getTime() : 0;
@@ -221,7 +202,7 @@ async function getChatSession({ baseUrl, fetchImpl = fetch }) {
     };
   }
 
-  const refreshed = await exchangeCopilotToken({ oauthToken, baseUrl, fetchImpl });
+  const refreshed = await exchangeCopilotToken({ oauthToken: session.oauthToken, baseUrl, fetchImpl });
   await saveSession({
     ...session,
     copilotToken: refreshed.accessToken,
@@ -235,89 +216,14 @@ async function getChatSession({ baseUrl, fetchImpl = fetch }) {
   };
 }
 
-function resolveEnvGitHubToken(env = process.env) {
-  for (const envKey of COPILOT_TOKEN_ENV_VARS) {
-    const value = String(env[envKey] || '').trim();
-    if (value) {
-      return value;
-    }
-  }
-
-  return '';
-}
-
-function resolveGitHubOAuthToken({ session = {}, env = process.env } = {}) {
-  return resolveEnvGitHubToken(env) || String(session.oauthToken || '').trim();
-}
-
-function normalizeCopilotModelId(id) {
-  const trimmed = String(id || '').trim();
-  if (!trimmed) return '';
-  return trimmed.startsWith('github-copilot/') ? trimmed : `github-copilot/${trimmed}`;
-}
-
-function isAllowedCopilotModel(item) {
-  const id = String(item?.id || '').trim().toLowerCase();
-  if (!id) return false;
-  if (id.includes('embedding') || id.includes('embed')) return false;
-  if (id.includes('router') || id.includes('internal')) return false;
-  if (item?.object && !String(item.object).toLowerCase().includes('model')) return false;
-  return true;
-}
-
-function dedupeModels(models = []) {
-  return [...new Set(models.filter(Boolean))];
-}
-
-async function discoverModels({ baseUrl, fetchImpl = fetch }) {
-  const chatSession = await getChatSession({ baseUrl, fetchImpl });
-  const response = await fetchImpl(`${normalizeBaseUrl(baseUrl)}/models`, {
-    headers: {
-      Accept: 'application/json',
-      Authorization: 'Bearer ' + chatSession.accessToken,
-      'User-Agent': 'AIOS'
-    }
-  });
-
-  const data = await parseProviderResponse(response);
-  if (!response.ok) {
-    throw new Error(data?.error?.message || data?.message || 'Failed to fetch GitHub Copilot model catalog.');
-  }
-
-  const entries = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
-  const models = dedupeModels(
-    entries
-      .filter(isAllowedCopilotModel)
-      .map((item) => normalizeCopilotModelId(item.id))
-  );
-
-  return models.length > 0 ? models : FALLBACK_COPILOT_MODELS;
-}
-
-async function getCopilotModels({ baseUrl, fetchImpl = fetch } = {}) {
-  try {
-    const discovered = await discoverModels({ baseUrl, fetchImpl });
-    return { models: discovered, source: 'live' };
-  } catch {
-    return { models: [...FALLBACK_COPILOT_MODELS], source: 'fallback' };
-  }
-}
-
 module.exports = {
   CONFIG_DIR: getConfigDir(),
-  COPILOT_SETUP_HINT,
-  COPILOT_TOKEN_ENV_VARS,
-  FALLBACK_COPILOT_MODELS,
   TOKEN_PATH,
-  discoverModels,
   exchangeCopilotToken,
-  getCopilotModels,
   getChatSession,
   getStatus,
   loadSession,
   pollDeviceFlow,
-  resolveEnvGitHubToken,
-  resolveGitHubOAuthToken,
   saveSession,
   startDeviceFlow
 };

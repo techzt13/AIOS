@@ -38,16 +38,3 @@ test('provider settings response keeps github copilot configured status', () => 
   const copilot = providers.find((provider) => provider.id === 'github-copilot');
   assert.equal(copilot.configured, true);
 });
-
-test('provider settings marks github copilot configured from env token', () => {
-  const providers = buildProviderSettingsResponse({
-    providers: providerCatalog,
-    providerSettings: { providers: {} },
-    copilotStatus: { configured: false },
-    env: { GH_TOKEN: 'gh-token-from-env' }
-  });
-
-  const copilot = providers.find((provider) => provider.id === 'github-copilot');
-  assert.equal(copilot.configured, true);
-  assert.equal(copilot.authSource, 'env');
-});

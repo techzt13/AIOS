@@ -313,13 +313,6 @@ button.secondary {
   gap: 8px;
 }
 
-#providerSelect,
-#modelSelect,
-#wizardProviderSelect,
-#wizardModelSelect {
-  max-width: 100%;
-}
-
 .group-title {
   margin: 0;
   font-weight: 600;
@@ -332,42 +325,20 @@ button.secondary {
 }
 
 .provider-setup-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .provider-setup-item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   font-size: 0.84rem;
-  padding: 8px 9px;
-  border-radius: 10px;
-  border: 1px solid rgba(117, 133, 164, 0.25);
-  background: rgba(255, 255, 255, 0.66);
-}
-
-.provider-setup-name {
-  font-weight: 600;
-}
-
-.provider-setup-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .provider-status {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(232, 239, 255, 0.9);
   color: #4a5f83;
-  font-size: 0.75rem;
 }
 
 .auth-card {
@@ -429,8 +400,8 @@ button.secondary {
 }
 
 .wizard-card {
-  width: min(680px, 100%);
-  max-height: 84vh;
+  width: min(740px, 100%);
+  max-height: 90vh;
   overflow: auto;
   background: rgba(245, 249, 255, 0.94);
   color: #0f1c33;
@@ -438,12 +409,6 @@ button.secondary {
   border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow: 0 26px 54px rgba(6, 12, 24, 0.4);
   padding: 18px;
-}
-
-.wizard-provider-groups {
-  max-height: 220px;
-  overflow: auto;
-  padding-right: 4px;
 }
 
 .wizard-step-label,
