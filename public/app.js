@@ -24,6 +24,7 @@ const runSetupAgainButton = document.getElementById('runSetupAgainButton');
 const messagesEl = document.getElementById('messages');
 const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
+const newChatButton = document.getElementById('newChatButton');
 
 const filesPathInput = document.getElementById('filesPathInput');
 const filesUpButton = document.getElementById('filesUpButton');
@@ -105,12 +106,84 @@ let wizardTestSucceeded = false;
 let shellState = { windows: {}, preferences: {} };
 let zCounter = 10;
 
+function renderMessageContent(container, content) {
+  const text = String(content ?? '');
+  const fencePattern = /```([^\n`]*)\n?([\s\S]*?)```/g;
+  let cursor = 0;
+  let match;
+  let foundCode = false;
+
+  while ((match = fencePattern.exec(text)) !== null) {
+    foundCode = true;
+    const before = text.slice(cursor, match.index);
+    if (before) {
+      const paragraph = document.createElement('p');
+      paragraph.className = 'message-text';
+      paragraph.textContent = before;
+      container.appendChild(paragraph);
+    }
+
+    const language = String(match[1] || '').trim() || 'code';
+    const codeText = String(match[2] || '').replace(/\n$/, '');
+    const block = document.createElement('div');
+    block.className = 'code-block';
+
+    const header = document.createElement('div');
+    header.className = 'code-block-header';
+    const label = document.createElement('span');
+    label.textContent = language;
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'code-copy-button';
+    copyButton.textContent = 'Copy';
+    copyButton.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(codeText);
+        copyButton.textContent = 'Copied';
+        setTimeout(() => {
+          copyButton.textContent = 'Copy';
+        }, 1200);
+      } catch {
+        copyButton.textContent = 'Copy failed';
+      }
+    });
+
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+    code.textContent = codeText;
+    pre.appendChild(code);
+    header.appendChild(label);
+    header.appendChild(copyButton);
+    block.appendChild(header);
+    block.appendChild(pre);
+    container.appendChild(block);
+    cursor = match.index + match[0].length;
+  }
+
+  const rest = text.slice(cursor);
+  if (rest || !foundCode) {
+    const paragraph = document.createElement('p');
+    paragraph.className = 'message-text';
+    paragraph.textContent = rest || text;
+    container.appendChild(paragraph);
+  }
+}
+
 function renderMessage(role, content) {
   const el = document.createElement('div');
   el.className = `message ${role}`;
-  el.textContent = content;
+  renderMessageContent(el, content);
   messagesEl.appendChild(el);
   messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function startNewChat({ showWelcome = true } = {}) {
+  chatHistory = [];
+  messagesEl.innerHTML = '';
+  if (showWelcome) {
+    renderMessage('system', 'New chat started. Your provider login and saved API keys were not changed.');
+  }
+  messageInput.focus();
 }
 
 function setFeedback(node, message = '', type = '') {
@@ -260,7 +333,7 @@ function initWindowDrag(windowEl) {
   let dragging = false;
 
   titlebar.addEventListener('mousedown', (event) => {
-    if (event.target.closest('[data-window-action]')) return;
+    if (event.target.closest('button, input, select, textarea, a')) return;
     dragging = true;
     focusWindow(windowEl.dataset.app);
     startX = event.clientX;
@@ -1109,6 +1182,7 @@ runSetupAgainButton.addEventListener('click', () => {
   resetFirstRunAndOpenWizard().catch((error) => renderMessage('system', `Setup reset failed: ${error.message}`));
 });
 openSetupAssistant.addEventListener('click', openWizard);
+newChatButton.addEventListener('click', () => startNewChat());
 
 wizardProviderSelect.addEventListener('change', () => {
   updateWizardModelOptions();
