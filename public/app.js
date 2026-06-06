@@ -25,6 +25,7 @@ const messagesEl = document.getElementById('messages');
 const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
 const newChatButton = document.getElementById('newChatButton');
+const chatStatusPill = document.getElementById('chatStatusPill');
 
 const filesPathInput = document.getElementById('filesPathInput');
 const filesUpButton = document.getElementById('filesUpButton');
@@ -492,7 +493,18 @@ function updateModelOptions() {
 
   renderAuthState(provider);
   providerStatusBadge.textContent = `Provider: ${provider?.name || 'not selected'}`;
+  updateChatStatusPill(provider, modelSelect.value);
   persistProviderChoice(provider, modelSelect.value);
+}
+
+function updateChatStatusPill(provider = selectedProvider(), model = modelSelect.value) {
+  const modelName = String(model || provider?.defaultModel || provider?.models?.[0] || 'No model')
+    .replace(/^github-copilot\//, '')
+    .replace(/^(.{42}).+$/, '$1...');
+  const status = provider?.configured || provider?.authMethod === 'none' ? 'Ready' : statusLabel(provider || {});
+  chatStatusPill.textContent = provider
+    ? `${status} - ${provider.name} / ${modelName}`
+    : 'No provider selected';
 }
 
 function updateWizardModelOptions() {
@@ -710,6 +722,7 @@ async function loadProviders() {
   selectValidModel(modelSelect, provider?.models || [], preferredModelForProvider(provider, currentModel));
   renderAuthState(provider);
   providerStatusBadge.textContent = `Provider: ${provider?.name || 'not selected'}`;
+  updateChatStatusPill(provider, modelSelect.value);
   persistProviderChoice(provider, modelSelect.value);
   renderProviderSetupList();
 }
@@ -986,6 +999,7 @@ async function finishWizard() {
   selectValidModel(modelSelect, selected?.models || [], preferredModelForProvider(selected, wizardModelSelect.value));
   persistProviderChoice(selected, modelSelect.value);
   renderAuthState(selected);
+  updateChatStatusPill(selected, modelSelect.value);
 
   closeWizard();
   openWindow('chat');
@@ -1206,7 +1220,10 @@ function tickClock() {
 }
 
 providerSelect.addEventListener('change', updateModelOptions);
-modelSelect.addEventListener('change', () => persistProviderChoice(selectedProvider(), modelSelect.value));
+modelSelect.addEventListener('change', () => {
+  updateChatStatusPill(selectedProvider(), modelSelect.value);
+  persistProviderChoice(selectedProvider(), modelSelect.value);
+});
 
 copilotStartButton.addEventListener('click', () => {
   startCopilotLogin().catch((error) => renderMessage('system', `GitHub Copilot sign-in error: ${error.message}`));
