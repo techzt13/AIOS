@@ -54,6 +54,10 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /code-copy-button/);
   assert.match(appJs, /function persistProviderChoice/);
   assert.match(appJs, /function updateChatStatusPill/);
+  assert.match(appJs, /const WINDOW_LAYOUT/);
+  assert.match(appJs, /function normalizeWindowPosition/);
+  assert.match(appJs, /savedPositionIsStale/);
+  assert.match(appJs, /safeWindowBounds/);
   assert.match(appJs, /function chooseDefaultProviderId/);
   assert.match(appJs, /configuredCopilot/);
   assert.match(appJs, /modelsByProvider/);
@@ -102,6 +106,8 @@ test('setup wizard uses provider cards and device-login copy', async () => {
   assert.match(stylesCss, /\.app-window::before/);
   assert.match(stylesCss, /#windowSettings/);
   assert.match(stylesCss, /\.settings-window/);
+  assert.match(stylesCss, /#windowChat\s*\{[\s\S]*left: clamp/);
+  assert.match(stylesCss, /#windowApps\s*\{[\s\S]*calc\(\(100vw - min\(820px/);
   assert.match(stylesCss, /backdrop-filter: blur\(30px\) saturate\(190%\) brightness\(1\.08\)/);
   assert.match(stylesCss, /backdrop-filter: blur\(30px\) saturate\(190%\) brightness\(1\.04\)/);
 });

@@ -210,33 +210,33 @@ body {
 }
 
 #windowChat {
-  left: 18px;
-  top: 18px;
+  left: clamp(18px, 8vw, 96px);
+  top: clamp(18px, 8vh, 72px);
   height: min(620px, calc(100vh - 200px));
 }
 
 #windowFiles {
-  left: 120px;
-  top: 76px;
+  left: clamp(42px, 16vw, 190px);
+  top: clamp(56px, 14vh, 126px);
   height: min(600px, calc(100vh - 210px));
 }
 
 #windowTerminal {
-  left: 240px;
-  top: 110px;
+  left: clamp(64px, 24vw, 290px);
+  top: clamp(74px, 20vh, 170px);
   height: min(500px, calc(100vh - 240px));
 }
 
 #windowSettings {
-  left: 90px;
+  left: max(14px, calc((100vw - min(1240px, calc(100vw - 28px))) / 2 - 12px));
   top: 34px;
   width: min(1240px, calc(100vw - 28px));
   height: min(760px, calc(100vh - 140px));
 }
 
 #windowApps {
-  left: 190px;
-  top: 70px;
+  left: max(16px, calc((100vw - min(820px, calc(100vw - 32px))) / 2 - 12px));
+  top: clamp(58px, 16vh, 130px);
   width: min(820px, calc(100vw - 32px));
   height: min(540px, calc(100vh - 190px));
 }

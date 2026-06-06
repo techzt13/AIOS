@@ -51,6 +51,7 @@ const importList = document.getElementById('importList');
 const apiAuditList = document.getElementById('apiAuditList');
 
 const setupWizard = document.getElementById('setupWizard');
+const desktopCanvas = document.getElementById('desktopCanvas');
 const wizardStepLabel = document.getElementById('wizardStepLabel');
 const wizardBackButton = document.getElementById('wizardBackButton');
 const wizardNextButton = document.getElementById('wizardNextButton');
@@ -88,6 +89,14 @@ const WINDOW_IDS = {
   terminal: 'windowTerminal',
   settings: 'windowSettings',
   apps: 'windowApps'
+};
+
+const WINDOW_LAYOUT = {
+  chat: { x: 0.08, y: 0.08 },
+  files: { x: 0.16, y: 0.14 },
+  terminal: { x: 0.24, y: 0.2 },
+  settings: { x: 0.5, y: 0.08, centerX: true },
+  apps: { x: 0.5, y: 0.16, centerX: true }
 };
 
 let providers = [];
@@ -310,6 +319,64 @@ function recordWindowState(app, update = {}) {
   persistShellState();
 }
 
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function safeWindowBounds(windowEl) {
+  const canvasRect = desktopCanvas.getBoundingClientRect();
+  const rect = windowEl.getBoundingClientRect();
+  const width = rect.width || windowEl.offsetWidth || 720;
+  const height = rect.height || windowEl.offsetHeight || 420;
+  const maxLeft = Math.max(8, window.innerWidth - width - 16 - canvasRect.left);
+  const maxTop = Math.max(8, window.innerHeight - height - 116 - canvasRect.top);
+
+  return {
+    canvasLeft: canvasRect.left || 0,
+    canvasTop: canvasRect.top || 0,
+    width,
+    height,
+    maxLeft,
+    maxTop
+  };
+}
+
+function defaultWindowPosition(app, windowEl) {
+  const layout = WINDOW_LAYOUT[app] || { x: 0.12, y: 0.12 };
+  const bounds = safeWindowBounds(windowEl);
+  const baseLeft = layout.centerX
+    ? (window.innerWidth - bounds.width) / 2
+    : window.innerWidth * layout.x;
+  const baseTop = window.innerHeight * layout.y;
+
+  return {
+    left: clamp(Math.round(baseLeft - bounds.canvasLeft), 8, bounds.maxLeft),
+    top: clamp(Math.round(baseTop - bounds.canvasTop), 8, bounds.maxTop)
+  };
+}
+
+function normalizeWindowPosition(app, { useDefault = false, save = false } = {}) {
+  const windowEl = document.getElementById(WINDOW_IDS[app]);
+  if (!windowEl) return;
+
+  const bounds = safeWindowBounds(windowEl);
+  const fallback = defaultWindowPosition(app, windowEl);
+  const currentLeft = Number.parseFloat(windowEl.style.left);
+  const currentTop = Number.parseFloat(windowEl.style.top);
+  const hasSavedPosition = Number.isFinite(currentLeft) && Number.isFinite(currentTop);
+  const savedPositionIsStale = hasSavedPosition
+    && (currentLeft < 8 || currentTop < 8 || currentLeft > bounds.maxLeft || currentTop > bounds.maxTop);
+  const shouldUseDefault = useDefault || !hasSavedPosition || savedPositionIsStale;
+  const nextLeft = shouldUseDefault ? fallback.left : currentLeft;
+  const nextTop = shouldUseDefault ? fallback.top : currentTop;
+  const left = clamp(Math.round(nextLeft), 8, bounds.maxLeft);
+  const top = clamp(Math.round(nextTop), 8, bounds.maxTop);
+
+  windowEl.style.left = `${left}px`;
+  windowEl.style.top = `${top}px`;
+  if (save) recordWindowState(app, { left, top });
+}
+
 let persistTimer = null;
 function persistShellState() {
   if (persistTimer) clearTimeout(persistTimer);
@@ -340,7 +407,12 @@ function focusWindow(app) {
 function openWindow(app) {
   const windowEl = document.getElementById(WINDOW_IDS[app]);
   if (!windowEl) return;
+  const state = shellState.windows?.[app] || {};
   windowEl.classList.remove('hidden');
+  normalizeWindowPosition(app, {
+    useDefault: typeof state.left !== 'number' || typeof state.top !== 'number',
+    save: true
+  });
   focusWindow(app);
   recordWindowState(app, { open: true, minimized: false });
 }
@@ -386,11 +458,13 @@ function initWindowDrag(windowEl) {
 
   window.addEventListener('mousemove', (event) => {
     if (!dragging) return;
-    const nextX = Math.max(6, originX + (event.clientX - startX));
-    const nextY = Math.max(52, originY + (event.clientY - startY));
-    windowEl.style.left = `${nextX}px`;
-    windowEl.style.top = `${nextY}px`;
-    recordWindowState(windowEl.dataset.app, { left: nextX, top: nextY });
+    const canvasRect = desktopCanvas.getBoundingClientRect();
+    const bounds = safeWindowBounds(windowEl);
+    const nextX = clamp(originX + (event.clientX - startX) - canvasRect.left, 8, bounds.maxLeft);
+    const nextY = clamp(originY + (event.clientY - startY) - canvasRect.top, 8, bounds.maxTop);
+    windowEl.style.left = `${Math.round(nextX)}px`;
+    windowEl.style.top = `${Math.round(nextY)}px`;
+    recordWindowState(windowEl.dataset.app, { left: Math.round(nextX), top: Math.round(nextY) });
   });
 
   window.addEventListener('mouseup', () => {
@@ -427,6 +501,11 @@ async function loadShellState() {
   if (![...document.querySelectorAll('.app-window')].some((node) => !node.classList.contains('hidden'))) {
     openWindow('chat');
   } else {
+    Object.entries(WINDOW_IDS).forEach(([app, id]) => {
+      if (!document.getElementById(id)?.classList.contains('hidden')) {
+        normalizeWindowPosition(app, { save: true });
+      }
+    });
     focusWindow('chat');
   }
 }
