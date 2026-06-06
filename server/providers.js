@@ -5,8 +5,6 @@ const GROUPS = {
   aggregators: 'Aggregators'
 };
 
-const COPILOT_TOKEN_ENV_VARS = ['COPILOT_GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'];
-
 const providerCatalog = [
   {
     id: 'anthropic',
@@ -204,16 +202,7 @@ const providerCatalog = [
     defaultBaseUrl: 'https://api.githubcopilot.com',
     baseUrlEnv: 'GITHUB_COPILOT_BASE_URL',
     requiresApiKey: false,
-    models: [
-      'github-copilot/claude-opus-4.7',
-      'github-copilot/claude-sonnet-4.6',
-      'github-copilot/claude-3.5-sonnet',
-      'github-copilot/gpt-5.5',
-      'github-copilot/gpt-5.4',
-      'github-copilot/gpt-5.3-codex',
-      'github-copilot/gpt-4o',
-      'github-copilot/o3-mini'
-    ]
+    models: ['gpt-4o', 'claude-3.5-sonnet']
   },
   {
     id: 'custom-openai',
@@ -301,7 +290,7 @@ function isConfigured(provider, configuredProviders = {}) {
   }
 
   if (provider.authMethod === 'oauth-device') {
-    return COPILOT_TOKEN_ENV_VARS.some((envKey) => String(process.env[envKey] || '').trim().length > 0);
+    return false;
   }
 
   const requiredValues = [provider.apiKeyEnv, provider.apiSecretEnv]
