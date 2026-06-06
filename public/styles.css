@@ -228,10 +228,17 @@ body {
 }
 
 #windowSettings {
-  left: 160px;
-  top: 36px;
-  width: min(1080px, calc(100vw - 32px));
-  height: min(700px, calc(100vh - 160px));
+  left: 90px;
+  top: 34px;
+  width: min(1240px, calc(100vw - 28px));
+  height: min(760px, calc(100vh - 140px));
+}
+
+#windowApps {
+  left: 190px;
+  top: 70px;
+  width: min(820px, calc(100vw - 32px));
+  height: min(540px, calc(100vh - 190px));
 }
 
 .app-window.focused {
@@ -291,6 +298,7 @@ body {
 #windowFiles .window-titlebar h2::before { content: 'FS'; }
 #windowTerminal .window-titlebar h2::before { content: '$'; }
 #windowSettings .window-titlebar h2::before { content: 'ST'; }
+#windowApps .window-titlebar h2::before { content: 'AP'; }
 
 .titlebar-actions {
   margin-left: auto;
@@ -693,14 +701,121 @@ button.secondary {
     0 16px 34px rgba(0, 0, 0, 0.18);
 }
 
+.apps-window {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.68), transparent 30%),
+    radial-gradient(circle at 90% 4%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 34%),
+    linear-gradient(180deg, rgba(244, 248, 255, 0.32), rgba(238, 245, 255, 0.14));
+}
+
+.apps-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 26px;
+  padding: 18px;
+  background:
+    var(--liquid-glass-bg),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.74), rgba(225, 237, 255, 0.44));
+  box-shadow:
+    0 18px 42px rgba(8, 18, 38, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(24px) saturate(180%);
+}
+
+.apps-hero h3 {
+  margin: 4px 0 2px;
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  letter-spacing: -0.06em;
+}
+
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.app-launch-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.76), transparent 34%),
+    linear-gradient(150deg, rgba(255, 255, 255, 0.68), rgba(226, 238, 255, 0.34));
+  box-shadow:
+    0 18px 40px rgba(8, 18, 38, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(22px) saturate(180%);
+}
+
+.app-launch-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.58), transparent 30%, transparent 70%, rgba(255, 255, 255, 0.18));
+  opacity: 0.52;
+}
+
+.app-launch-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-launch-card strong {
+  color: #12203b;
+  font-size: 1.05rem;
+}
+
+.app-launch-card small {
+  color: #526783;
+  line-height: 1.35;
+}
+
+.app-launch-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 30% 14%, rgba(255, 255, 255, 0.66), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 78%, white), var(--accent));
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 900;
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
 .settings-window {
   display: grid;
-  grid-template-columns: minmax(300px, 1.1fr) minmax(260px, 0.95fr) minmax(280px, 1fr);
-  grid-auto-rows: minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(440px, 1.25fr) minmax(340px, 0.9fr);
+  grid-auto-rows: minmax(168px, auto);
+  gap: 16px;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
+  padding: 14px;
+}
+
+.settings-window .control-group:first-child {
+  grid-row: span 3;
+  min-height: 100%;
 }
 
 .control-group {
@@ -714,7 +829,7 @@ button.secondary {
     rgba(218, 229, 248, 0.34);
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 26px;
-  padding: 16px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -723,6 +838,14 @@ button.secondary {
     inset 0 1px 0 rgba(255, 255, 255, 0.84),
     inset 0 -1px 0 rgba(255, 255, 255, 0.26);
   backdrop-filter: blur(30px) saturate(190%) brightness(1.04);
+}
+
+.settings-window .control-group {
+  overflow: visible;
+}
+
+.settings-window .control-group:first-child {
+  overflow: auto;
 }
 
 .control-group::-webkit-scrollbar,
@@ -755,8 +878,8 @@ button.secondary {
 .group-title {
   margin: 0;
   font-weight: 600;
-  font-size: 1.05rem;
-  letter-spacing: -0.02em;
+  font-size: 1.18rem;
+  letter-spacing: -0.035em;
 }
 
 .provider-setup-group h3 {
@@ -950,6 +1073,7 @@ button.secondary {
 .dock-item[data-open-app='files']::before { content: 'FS'; }
 .dock-item[data-open-app='terminal']::before { content: '$'; }
 .dock-item[data-open-app='settings']::before { content: 'ST'; }
+.dock-item[data-open-app='apps']::before { content: 'AP'; }
 #openSetupAssistant::before { content: 'SET'; }
 
 .dock-item:hover {
@@ -1291,6 +1415,11 @@ button.secondary {
   .settings-window {
     grid-template-columns: 1fr;
     overflow: auto;
+  }
+
+  .settings-window .control-group:first-child {
+    grid-row: auto;
+    min-height: 0;
   }
 
   .model-picker-card {

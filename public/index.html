@@ -182,6 +182,46 @@
             </section>
           </div>
         </section>
+
+        <section id="windowApps" class="app-window hidden" data-app="apps" data-title="Apps">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="apps" aria-label="Close Apps"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="apps" aria-label="Minimize Apps"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="apps" aria-label="Zoom Apps"></button>
+            </div>
+            <h2>Apps</h2>
+          </header>
+          <div class="window-body apps-window">
+            <section class="apps-hero">
+              <p class="wizard-kicker">Launcher</p>
+              <h3>Open an AIOS app</h3>
+              <p class="status-text">Fast access to the local web OS tools. Opening apps never clears provider login or saved API keys.</p>
+            </section>
+            <div class="apps-grid" aria-label="Available AIOS apps">
+              <button type="button" class="app-launch-card" data-launch-app="chat">
+                <span class="app-launch-icon">AI</span>
+                <strong>AI Chat</strong>
+                <small>Talk to your selected provider and model.</small>
+              </button>
+              <button type="button" class="app-launch-card" data-launch-app="files">
+                <span class="app-launch-icon">FS</span>
+                <strong>Files</strong>
+                <small>Browse and edit workspace files.</small>
+              </button>
+              <button type="button" class="app-launch-card" data-launch-app="terminal">
+                <span class="app-launch-icon">$</span>
+                <strong>Terminal</strong>
+                <small>Run local workspace commands when enabled.</small>
+              </button>
+              <button type="button" class="app-launch-card" data-launch-app="settings">
+                <span class="app-launch-icon">ST</span>
+                <strong>Settings</strong>
+                <small>Providers, models, imports, and theme.</small>
+              </button>
+            </div>
+          </div>
+        </section>
       </main>
 
       <nav class="dock" aria-label="AIOS dock">

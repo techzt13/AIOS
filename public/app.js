@@ -86,7 +86,8 @@ const WINDOW_IDS = {
   chat: 'windowChat',
   files: 'windowFiles',
   terminal: 'windowTerminal',
-  settings: 'windowSettings'
+  settings: 'windowSettings',
+  apps: 'windowApps'
 };
 
 let providers = [];
@@ -1384,12 +1385,18 @@ wallpaperSelect.addEventListener('change', () => {
 
 document.querySelectorAll('.dock-item[data-open-app]').forEach((button) => {
   button.addEventListener('click', () => {
-    if (button.dataset.openApp === 'apps') {
-      openWindow('settings');
-      return;
-    }
     openWindow(button.dataset.openApp);
     if (button.dataset.openApp === 'files') {
+      refreshFileList().catch((error) => setFeedback(fileReadStatus, error.message, 'error'));
+    }
+  });
+});
+
+document.querySelectorAll('[data-launch-app]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const app = button.dataset.launchApp;
+    openWindow(app);
+    if (app === 'files') {
       refreshFileList().catch((error) => setFeedback(fileReadStatus, error.message, 'error'));
     }
   });
@@ -1412,7 +1419,7 @@ document.querySelectorAll('.app-window').forEach((windowEl) => {
   windowEl.addEventListener('mousedown', () => focusWindow(windowEl.dataset.app));
 });
 
-renderMessage('system', 'Welcome to AIOS web shell. Use dock apps for chat, files, terminal, and setup.');
+renderMessage('system', 'Welcome to AIOS web shell. Use dock apps for chat, files, terminal, apps, and setup.');
 
 tickClock();
 setInterval(tickClock, 30000);

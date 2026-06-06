@@ -28,7 +28,10 @@ test('web shell desktop markup includes menu bar, dock, and app windows', async 
   assert.match(indexHtml, /id="windowFiles"/);
   assert.match(indexHtml, /id="windowTerminal"/);
   assert.match(indexHtml, /id="windowSettings"/);
+  assert.match(indexHtml, /id="windowApps"/);
   assert.match(indexHtml, /id="openSetupAssistant"/);
+  assert.match(indexHtml, /data-launch-app="chat"/);
+  assert.match(indexHtml, /data-launch-app="settings"/);
 });
 
 test('wizard frontend uses existing first-run and provider test endpoints', async () => {
@@ -43,6 +46,9 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /\/api\/local-data\/imports/);
   assert.match(appJs, /\/api\/settings\/provider-audit/);
   assert.match(appJs, /function startNewChat/);
+  assert.match(appJs, /apps: 'windowApps'/);
+  assert.match(appJs, /data-launch-app/);
+  assert.doesNotMatch(appJs, /dataset\.openApp === 'apps'[\s\S]{0,120}openWindow\('settings'\)/);
   assert.match(appJs, /Your provider login and saved API keys were not changed/);
   assert.match(appJs, /function renderMessageContent/);
   assert.match(appJs, /code-copy-button/);
@@ -89,6 +95,8 @@ test('setup wizard uses provider cards and device-login copy', async () => {
   assert.match(stylesCss, /--liquid-glass-shadow/);
   assert.match(stylesCss, /\.desktop-shell::before/);
   assert.match(stylesCss, /\.dock-item::before/);
+  assert.match(stylesCss, /\.apps-window/);
+  assert.match(stylesCss, /\.app-launch-card/);
   assert.match(stylesCss, /\.chat-status-pill/);
   assert.match(stylesCss, /\.messages \.message:first-child\.system/);
   assert.match(stylesCss, /\.app-window::before/);
