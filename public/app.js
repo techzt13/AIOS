@@ -124,8 +124,8 @@ function selectedProvider() {
 }
 
 function selectedWizardProvider() {
-  return providers.find((provider) => provider.id === wizardProviderSelect.value)
-    || wizardProviders.find((provider) => provider.id === wizardProviderSelect.value)
+  return wizardProviders.find((provider) => provider.id === wizardProviderSelect.value)
+    || providers.find((provider) => provider.id === wizardProviderSelect.value)
     || selectedProvider();
 }
 
@@ -501,8 +501,8 @@ function closeWizard() {
   setupWizard.classList.add('hidden');
 }
 
-async function loadWizardProviders() {
-  const currentProvider = wizardProviderSelect.value;
+async function loadWizardProviders(preferredProviderId = '') {
+  const currentProvider = String(preferredProviderId || wizardProviderSelect.value || '').trim();
   const currentModel = wizardModelSelect.value;
   const response = await fetch('/api/providers');
   const payload = await response.json();
@@ -528,10 +528,10 @@ async function loadWizardProviders() {
     groups.get(provider.category).appendChild(option);
   });
 
-  if (providerSelect.value && wizardProviders.some((provider) => provider.id === providerSelect.value)) {
-    wizardProviderSelect.value = providerSelect.value;
-  } else if (currentProvider && wizardProviders.some((provider) => provider.id === currentProvider)) {
+  if (currentProvider && wizardProviders.some((provider) => provider.id === currentProvider)) {
     wizardProviderSelect.value = currentProvider;
+  } else if (providerSelect.value && wizardProviders.some((provider) => provider.id === providerSelect.value)) {
+    wizardProviderSelect.value = providerSelect.value;
   } else if (wizardProviders[0]) {
     wizardProviderSelect.value = wizardProviders[0].id;
   }
@@ -769,8 +769,9 @@ async function pollCopilotLogin() {
     canDeviceLogin: true
   };
   copilotDeviceFlow = null;
+  const wizardProviderId = wizardProviderSelect.value;
   await loadProviders();
-  await loadWizardProviders();
+  await loadWizardProviders(wizardProviderId);
   setFeedback(wizardConnectStatus, `Connected${payload.login ? ` as @${payload.login}` : ''}.`, 'success');
   renderWizardConnectState();
 }

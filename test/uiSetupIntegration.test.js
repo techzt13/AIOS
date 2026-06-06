@@ -42,6 +42,8 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /\/api\/settings\/provider-audit/);
   assert.match(appJs, /preferredModelForProvider/);
   assert.match(appJs, /github-copilot\/gpt-4o/);
+  assert.match(appJs, /loadWizardProviders\(preferredProviderId = ''\)/);
+  assert.match(appJs, /await loadWizardProviders\(wizardProviderId\)/);
 });
 
 test('copilot provider catalog includes OpenClaw-style model IDs', async () => {
