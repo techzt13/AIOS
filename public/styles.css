@@ -47,9 +47,13 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
+  width: 100%;
+  height: 100%;
   min-height: 100vh;
+  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   background: #121d32;
   color: #152038;
@@ -58,7 +62,8 @@ body {
 .desktop-shell {
   position: relative;
   overflow: hidden;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   padding: 10px 12px 96px;
   background:
     radial-gradient(circle at 62% 8%, rgba(255, 255, 255, 0.2), transparent 22%),
@@ -182,7 +187,9 @@ body {
 .desktop-canvas {
   position: relative;
   z-index: 1;
-  min-height: calc(100vh - 160px);
+  height: calc(100vh - 160px);
+  min-height: 0;
+  overflow: visible;
   margin-top: 12px;
 }
 
@@ -191,6 +198,7 @@ body {
   width: min(960px, calc(100vw - 32px));
   min-height: 260px;
   max-height: calc(100vh - 180px);
+  contain: layout paint style;
   isolation: isolate;
   border-radius: 26px;
   overflow: hidden;
@@ -375,7 +383,8 @@ body {
 
 .window-body {
   height: calc(100% - 44px);
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
   padding: 12px;
 }
 
@@ -642,6 +651,7 @@ button.secondary {
   grid-template-columns: 220px 1fr;
   gap: 10px;
   height: calc(100% - 44px);
+  min-height: 0;
 }
 
 .file-list,
@@ -845,18 +855,27 @@ button.secondary {
 }
 
 .settings-window .control-group:first-child {
-  overflow: auto;
+  overflow: visible;
 }
 
 .control-group::-webkit-scrollbar,
 .messages::-webkit-scrollbar,
-.wizard-provider-cards::-webkit-scrollbar {
+.wizard-provider-cards::-webkit-scrollbar,
+.settings-window::-webkit-scrollbar,
+.wizard-card::-webkit-scrollbar,
+.file-list::-webkit-scrollbar,
+.terminal-output::-webkit-scrollbar {
   width: 9px;
+  height: 9px;
 }
 
 .control-group::-webkit-scrollbar-thumb,
 .messages::-webkit-scrollbar-thumb,
-.wizard-provider-cards::-webkit-scrollbar-thumb {
+.wizard-provider-cards::-webkit-scrollbar-thumb,
+.settings-window::-webkit-scrollbar-thumb,
+.wizard-card::-webkit-scrollbar-thumb,
+.file-list::-webkit-scrollbar-thumb,
+.terminal-output::-webkit-scrollbar-thumb {
   background: rgba(82, 103, 133, 0.24);
   border: 2px solid transparent;
   border-radius: 999px;
@@ -1481,6 +1500,61 @@ button:focus-visible {
   box-shadow:
     0 14px 34px rgba(6, 12, 24, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
+/* App-shell layout: one fixed desktop, intentional pane scrolling only. */
+.messages,
+.file-list,
+#fileEditorContent,
+.terminal-output,
+.settings-window,
+.wizard-card,
+.wizard-provider-cards {
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.messages,
+.file-list,
+#fileEditorContent,
+.terminal-output,
+.settings-window,
+.wizard-card {
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-window {
+  align-content: start;
+}
+
+.settings-window .control-group,
+.settings-window .control-group:first-child {
+  min-height: auto;
+  overflow: visible;
+}
+
+.message,
+.control-group,
+.provider-card,
+.model-picker-card,
+.app-launch-card,
+.provider-setup-item,
+.auth-card {
+  contain: layout paint style;
+}
+
+.app-window.dragging {
+  will-change: left, top;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 @media (max-width: 900px) {
