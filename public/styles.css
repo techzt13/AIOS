@@ -715,6 +715,9 @@ button.secondary {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.68), transparent 30%),
     radial-gradient(circle at 90% 4%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 34%),
@@ -813,19 +816,21 @@ button.secondary {
 }
 
 .settings-window {
-  display: grid;
-  grid-template-columns: minmax(440px, 1.25fr) minmax(340px, 0.9fr);
-  grid-auto-rows: minmax(168px, auto);
-  gap: 16px;
-  height: 100%;
+  display: block;
+  column-count: 2;
+  column-gap: 16px;
+  column-fill: balance;
+  height: calc(100% - 44px);
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 14px;
 }
 
-.settings-window .control-group:first-child {
-  grid-row: span 3;
-  min-height: 100%;
+.settings-window .control-group {
+  break-inside: avoid;
+  width: 100%;
+  margin: 0 0 16px;
 }
 
 .control-group {
@@ -851,10 +856,6 @@ button.secondary {
 }
 
 .settings-window .control-group {
-  overflow: visible;
-}
-
-.settings-window .control-group:first-child {
   overflow: visible;
 }
 
@@ -1524,23 +1525,23 @@ button:focus-visible {
 }
 
 .settings-window {
-  align-content: start;
+  column-fill: balance;
 }
 
 .settings-window .control-group,
 .settings-window .control-group:first-child {
   min-height: auto;
   overflow: visible;
+  break-inside: avoid;
 }
 
 .message,
-.control-group,
 .provider-card,
 .model-picker-card,
 .app-launch-card,
 .provider-setup-item,
 .auth-card {
-  contain: layout paint style;
+  contain: layout style;
 }
 
 .app-window.dragging {
@@ -1576,13 +1577,8 @@ button:focus-visible {
   }
 
   .settings-window {
-    grid-template-columns: 1fr;
-    overflow: auto;
-  }
-
-  .settings-window .control-group:first-child {
-    grid-row: auto;
-    min-height: 0;
+    column-count: 1;
+    overflow-y: auto;
   }
 
   .model-picker-card {
