@@ -1,11 +1,9 @@
 # AIOS
 Zack and Richard have made an operating system called AIOS. Built for AI users and nerds.
 
-AIOS now runs as a macOS-inspired **web OS shell** served directly by the AIOS app on port `8080`.
+AIOS runs as a macOS-inspired **web OS shell** served directly by the AIOS app on port `8080`.
 
 ## Quick start
-
-### Local (recommended)
 
 ```bash
 npm install
@@ -14,13 +12,7 @@ npm start
 
 Open: <http://localhost:8080>
 
-### Docker
-
-```bash
-docker compose up --build
-```
-
-Open: <http://localhost:8080>
+No Docker, XFCE desktop, VNC, or container runtime is part of the supported app path.
 
 ## What you get on port 8080
 
@@ -116,8 +108,6 @@ Sandbox protections reject absolute paths and traversal escapes for FS APIs.
 
 ```text
 .
-├── Dockerfile
-├── docker-compose.yml
 ├── .env.example
 ├── public/
 │   ├── index.html

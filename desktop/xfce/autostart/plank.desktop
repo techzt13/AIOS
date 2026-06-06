@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Version=1.0
-Name=Plank
-Comment=Dock for AIOS desktop
-Exec=plank
-Terminal=false
-X-GNOME-Autostart-enabled=true
-OnlyShowIn=XFCE;

@@ -1,9 +1,0 @@
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=AIOS Control Layer
-Comment=Open AIOS command palette UI
-Exec=/usr/local/bin/aios-open-control-layer
-Icon=utilities-terminal
-Terminal=false
-Categories=Utility;

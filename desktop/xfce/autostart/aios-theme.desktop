@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Version=1.0
-Name=AIOS Theme Apply
-Comment=Apply macOS-inspired defaults for AIOS
-Exec=/usr/local/bin/aios-apply-theme
-Terminal=false
-X-GNOME-Autostart-enabled=true
-OnlyShowIn=XFCE;
