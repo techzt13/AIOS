@@ -22,16 +22,25 @@ RUN apt-get update \
     xfce4-terminal \
     xfce4-whiskermenu-plugin \
     fonts-inter \
+    gtk2-engines-murrine \
+    gtk2-engines-pixbuf \
+    sassc \
+    libglib2.0-bin \
   && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
   tmpdir="$(mktemp -d)"; \
   git clone --depth 1 "$WHITE_SUR_GTK_REPO" "$tmpdir/WhiteSur-gtk-theme"; \
-  "$tmpdir/WhiteSur-gtk-theme/install.sh" -d /usr/share/themes -l -N stable; \
+  cd "$tmpdir/WhiteSur-gtk-theme"; \
+  bash ./install.sh -d /usr/share/themes -N stable; \
+  cd /; \
   git clone --depth 1 "$WHITE_SUR_ICON_REPO" "$tmpdir/WhiteSur-icon-theme"; \
-  "$tmpdir/WhiteSur-icon-theme/install.sh" -d /usr/share/icons -b; \
+  cd "$tmpdir/WhiteSur-icon-theme"; \
+  bash ./install.sh -d /usr/share/icons; \
+  cd /; \
   git clone --depth 1 "$WHITE_SUR_CURSOR_REPO" "$tmpdir/WhiteSur-cursors"; \
-  "$tmpdir/WhiteSur-cursors/install.sh" -d /usr/share/icons; \
+  cd "$tmpdir/WhiteSur-cursors"; \
+  bash ./install.sh -d /usr/share/icons; \
   rm -rf "$tmpdir"
 
 COPY desktop/assets/aios-wallpaper.svg /usr/local/share/aios-theme/assets/aios-wallpaper.svg
