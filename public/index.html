@@ -7,6 +7,189 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <div class="desktop-shell">
+      <header class="menu-bar">
+        <div class="menu-left">
+          <strong>AIOS</strong>
+          <span>by Zack and Richard</span>
+        </div>
+        <div id="activeWindowTitle" class="menu-center">Desktop</div>
+        <div class="menu-right">
+          <span id="providerStatusBadge">Provider: loading</span>
+          <span id="runtimeBadge">Local runtime</span>
+          <span id="clockLabel"></span>
+        </div>
+      </header>
+
+      <main class="desktop-canvas" id="desktopCanvas">
+        <section id="windowChat" class="app-window" data-app="chat" data-title="AI Chat">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="chat" aria-label="Close AI Chat"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="chat" aria-label="Minimize AI Chat"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="chat" aria-label="Zoom AI Chat"></button>
+            </div>
+            <h2>AI Chat</h2>
+          </header>
+          <div class="window-body chat-window">
+            <div id="messages" class="messages" aria-live="polite"></div>
+            <form id="chatForm" class="composer">
+              <input id="messageInput" type="text" placeholder="Message AIOS..." required />
+              <button type="submit">Send</button>
+            </form>
+          </div>
+        </section>
+
+        <section id="windowFiles" class="app-window hidden" data-app="files" data-title="Files">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="files" aria-label="Close Files"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="files" aria-label="Minimize Files"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="files" aria-label="Zoom Files"></button>
+            </div>
+            <h2>Files</h2>
+          </header>
+          <div class="window-body files-window">
+            <div class="toolbar">
+              <input id="filesPathInput" type="text" value="." aria-label="Current directory" />
+              <button id="filesUpButton" type="button">Up</button>
+              <button id="filesRefreshButton" type="button">Refresh</button>
+            </div>
+            <div class="split-layout">
+              <ul id="filesEntries" class="file-list" aria-label="File entries"></ul>
+              <section class="editor-panel">
+                <p id="fileEditorPath">No file selected</p>
+                <textarea id="fileEditorContent" placeholder="Select a text file to view/edit"></textarea>
+                <div class="toolbar">
+                  <button id="fileSaveButton" type="button">Save file</button>
+                </div>
+                <p id="fileReadStatus" class="status-text"></p>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section id="windowTerminal" class="app-window hidden" data-app="terminal" data-title="Terminal">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="terminal" aria-label="Close Terminal"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="terminal" aria-label="Minimize Terminal"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="terminal" aria-label="Zoom Terminal"></button>
+            </div>
+            <h2>Terminal</h2>
+          </header>
+          <div class="window-body terminal-window">
+            <div class="toolbar">
+              <input id="terminalCommandInput" type="text" placeholder="pwd" />
+              <button id="terminalRunButton" type="button">Run</button>
+            </div>
+            <pre id="terminalOutput" class="terminal-output"></pre>
+          </div>
+        </section>
+
+        <section id="windowSettings" class="app-window hidden" data-app="settings" data-title="Settings">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="settings" aria-label="Close Settings"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="settings" aria-label="Minimize Settings"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="settings" aria-label="Zoom Settings"></button>
+            </div>
+            <h2>Settings</h2>
+          </header>
+          <div class="window-body settings-window">
+            <section class="control-group">
+              <p class="group-title">Provider setup</p>
+              <div id="providerSetupGroups" class="provider-setup-groups"></div>
+              <label for="providerSelect">Provider</label>
+              <select id="providerSelect"></select>
+              <label for="modelSelect">Model</label>
+              <select id="modelSelect"></select>
+              <div id="providerSettingsFields" class="custom-fields">
+                <div id="providerBaseUrlRow" class="field-row">
+                  <label for="providerBaseUrl">Base URL</label>
+                  <input id="providerBaseUrl" type="url" placeholder="https://api.example.com/v1" />
+                </div>
+                <div id="providerApiKeyRow" class="field-row">
+                  <label for="providerApiKey">API key</label>
+                  <input id="providerApiKey" type="password" placeholder="sk-..." autocomplete="off" />
+                </div>
+                <div id="providerApiSecretRow" class="field-row hidden">
+                  <label for="providerApiSecret">API secret</label>
+                  <input id="providerApiSecret" type="password" placeholder="secret" autocomplete="off" />
+                </div>
+                <div class="toolbar">
+                  <button id="saveProviderSettingsButton" type="button">Save provider settings</button>
+                  <button id="clearProviderSettingsButton" type="button" class="secondary">Clear</button>
+                </div>
+              </div>
+              <section id="authCard" class="auth-card">
+                <p id="authSummary" class="auth-summary"></p>
+                <p id="authDetail" class="auth-detail"></p>
+                <div id="copilotAuth" class="hidden">
+                  <div class="toolbar">
+                    <button id="copilotStartButton" type="button">Sign in with GitHub</button>
+                    <button id="copilotPollButton" type="button" class="secondary" disabled>Check sign-in</button>
+                  </div>
+                  <p id="copilotCode" class="auth-code hidden"></p>
+                  <a id="copilotLink" class="auth-link hidden" href="#" target="_blank" rel="noreferrer">Open GitHub device login</a>
+                </div>
+              </section>
+            </section>
+
+            <section class="control-group">
+              <p class="group-title">Desktop preferences</p>
+              <label for="accentSelect">Accent</label>
+              <select id="accentSelect">
+                <option value="blue">Blue</option>
+                <option value="violet">Violet</option>
+                <option value="mint">Mint</option>
+              </select>
+              <label for="wallpaperSelect">Wallpaper</label>
+              <select id="wallpaperSelect">
+                <option value="aurora">Aurora</option>
+                <option value="dusk">Dusk</option>
+                <option value="graphite">Graphite</option>
+              </select>
+              <p class="status-text">Local app data path: <code id="dataDirValue">loading...</code></p>
+              <button id="runSetupAgainButton" type="button" class="secondary">Run setup assistant again</button>
+            </section>
+
+            <section class="control-group">
+              <p class="group-title">Import center (local-only)</p>
+              <p class="status-text">Imports are explicit, user-initiated, and stored locally only. AIOS never auto-reads browser profiles.</p>
+              <label for="importTypeSelect">Import type</label>
+              <select id="importTypeSelect">
+                <option value="apps">App shortcuts/bookmarks</option>
+                <option value="settings">Settings/preferences</option>
+                <option value="bookmarks">Browser bookmarks export</option>
+                <option value="history">Browser history export</option>
+                <option value="cookies">Cookie export (sensitive)</option>
+              </select>
+              <input id="importFileInput" type="file" accept="application/json" />
+              <button id="importButton" type="button">Import JSON file</button>
+              <p id="importStatus" class="status-text"></p>
+              <ul id="importList" class="import-list"></ul>
+            </section>
+
+            <section class="control-group">
+              <p class="group-title">API key history (safe audit)</p>
+              <p class="status-text">Only provider, time, action, and masked fingerprint are stored. Raw secrets are never shown.</p>
+              <ul id="apiAuditList" class="import-list"></ul>
+            </section>
+          </div>
+        </section>
+      </main>
+
+      <nav class="dock" aria-label="AIOS dock">
+        <button type="button" class="dock-item" data-open-app="chat">AI Chat</button>
+        <button type="button" class="dock-item" data-open-app="files">Files</button>
+        <button type="button" class="dock-item" data-open-app="terminal">Terminal</button>
+        <button type="button" class="dock-item" data-open-app="settings">Settings</button>
+        <button type="button" class="dock-item" id="openSetupAssistant">Setup Assistant</button>
+        <button type="button" class="dock-item" data-open-app="apps">Apps</button>
+      </nav>
+    </div>
+
     <div id="setupWizard" class="wizard-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
       <div class="wizard-card">
         <header class="wizard-header">
@@ -17,13 +200,11 @@
 
         <section id="wizardStepWelcome" class="wizard-step">
           <h3>AIOS by Zack and Richard</h3>
-          <p>AIOS is an AI-driven, browser-accessible Linux environment with a themed desktop and control layer.</p>
-          <p>Choose your provider, connect it, run a real test, then jump straight into chat.</p>
+          <p class="wizard-copy">This setup configures chat providers for your local AIOS web OS shell.</p>
         </section>
 
         <section id="wizardStepProvider" class="wizard-step hidden">
           <h3>Choose a provider</h3>
-          <p class="wizard-copy">Providers are grouped by ecosystem. Your selection will be used for chat after setup.</p>
           <label for="wizardProviderSelect">Provider</label>
           <select id="wizardProviderSelect"></select>
           <label for="wizardModelSelect">Default model</label>
@@ -37,7 +218,7 @@
 
           <div id="wizardStaticAuthFields" class="custom-fields hidden">
             <div class="field-row">
-              <label for="wizardBaseUrl">Base URL (optional for most providers)</label>
+              <label for="wizardBaseUrl">Base URL</label>
               <input id="wizardBaseUrl" type="url" placeholder="https://api.example.com/v1" />
             </div>
             <div class="field-row" id="wizardApiKeyRow">
@@ -53,8 +234,7 @@
 
           <div id="wizardCopilotAuth" class="auth-card hidden">
             <p class="auth-summary">GitHub Copilot device login</p>
-            <p class="auth-detail">Use your GitHub account to authorize AIOS.</p>
-            <div class="auth-actions">
+            <div class="toolbar">
               <button id="wizardCopilotStartButton" type="button">Sign in with GitHub</button>
               <button id="wizardCopilotPollButton" type="button" class="secondary" disabled>Check sign-in</button>
             </div>
@@ -67,14 +247,12 @@
 
         <section id="wizardStepTest" class="wizard-step hidden">
           <h3>Test connection</h3>
-          <p class="wizard-copy">Run a minimal chat round-trip before finishing setup.</p>
           <button id="wizardTestButton" type="button">Test provider connection</button>
           <p id="wizardTestStatus" class="wizard-feedback"></p>
         </section>
 
         <section id="wizardStepFinish" class="wizard-step hidden">
           <h3>Finish setup</h3>
-          <p class="wizard-copy">You're ready to use AIOS chat with your chosen provider.</p>
           <p id="wizardFinishStatus" class="wizard-feedback"></p>
         </section>
 
@@ -84,82 +262,6 @@
           <button id="wizardFinishButton" type="button" class="hidden">Finish setup</button>
         </footer>
       </div>
-    </div>
-
-    <div class="app-shell">
-      <header class="topbar">
-        <div>
-          <h1>AIOS</h1>
-          <p>Built for AI users and nerds · by Zack and Richard</p>
-        </div>
-      </header>
-
-      <aside class="settings-card">
-        <section class="provider-setup-card">
-          <p class="provider-setup-title">Provider setup</p>
-          <div id="providerSetupGroups" class="provider-setup-groups"></div>
-          <button id="runSetupAgainButton" type="button" class="secondary">Run setup again</button>
-        </section>
-
-        <section class="control-group">
-          <label for="providerSelect">Provider</label>
-          <select id="providerSelect"></select>
-
-          <label for="modelSelect">Model</label>
-          <select id="modelSelect"></select>
-
-          <div id="providerSettingsFields" class="custom-fields">
-            <div id="providerBaseUrlRow" class="field-row">
-              <label for="providerBaseUrl">Base URL</label>
-              <input id="providerBaseUrl" type="url" placeholder="https://api.example.com/v1" />
-            </div>
-
-            <div id="providerApiKeyRow" class="field-row">
-              <label for="providerApiKey">API key</label>
-              <input id="providerApiKey" type="password" placeholder="sk-..." autocomplete="off" />
-            </div>
-
-            <div id="providerApiSecretRow" class="field-row hidden">
-              <label for="providerApiSecret">API secret</label>
-              <input id="providerApiSecret" type="password" placeholder="secret" autocomplete="off" />
-            </div>
-
-            <div class="auth-actions">
-              <button id="saveProviderSettingsButton" type="button">Save provider settings</button>
-              <button id="clearProviderSettingsButton" type="button" class="secondary">Clear stored settings</button>
-            </div>
-          </div>
-        </section>
-
-        <section id="authCard" class="auth-card">
-          <p id="authSummary" class="auth-summary"></p>
-          <p id="authDetail" class="auth-detail"></p>
-          <div id="copilotAuth" class="hidden">
-            <div class="auth-actions">
-              <button id="copilotStartButton" type="button">Sign in with GitHub</button>
-              <button id="copilotPollButton" type="button" class="secondary" disabled>Check sign-in</button>
-            </div>
-            <p id="copilotCode" class="auth-code hidden"></p>
-            <a id="copilotLink" class="auth-link hidden" href="#" target="_blank" rel="noreferrer">Open GitHub device login</a>
-          </div>
-        </section>
-
-        <section class="control-group">
-          <label for="systemCommand">System action (Linux command)</label>
-          <input id="systemCommand" type="text" placeholder="xfce4-terminal &" />
-          <button id="runSystemCommand" type="button">Run command in workspace</button>
-          <button id="listWorkspace" type="button">List workspace files</button>
-          <button id="writeTestFile" type="button">Write test file in sandbox</button>
-        </section>
-      </aside>
-
-      <main class="chat-card">
-        <div id="messages" class="messages" aria-live="polite"></div>
-        <form id="chatForm" class="composer">
-          <input id="messageInput" type="text" placeholder="Message AIOS..." required />
-          <button type="submit">Send</button>
-        </form>
-      </main>
     </div>
 
     <script src="/app.js"></script>

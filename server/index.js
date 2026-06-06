@@ -22,6 +22,17 @@ const {
   loadProviderSettings,
   upsertProviderSettings
 } = require('./providerSettingsStore');
+const {
+  appendApiKeyAuditEvent,
+  appendImportRecord,
+  ensureDataDir,
+  getDataDir,
+  listImports,
+  loadApiKeyAuditEvents,
+  loadShellState,
+  maskSecret,
+  saveShellState
+} = require('./appDataStore');
 const { resolveSandboxPath } = require('./sandbox');
 const { validateExecCommand, runExecCommand } = require('./exec');
 
@@ -76,6 +87,64 @@ function createApp(deps = {}) {
 
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, app: 'AIOS' });
+  });
+
+  app.get('/api/local-data/info', async (_req, res) => {
+    await ensureDataDir();
+    res.json({
+      ok: true,
+      dataDir: getDataDir(),
+      localOnly: true
+    });
+  });
+
+  app.get('/api/local-data/shell-state', async (_req, res) => {
+    const state = await loadShellState();
+    res.json({ ok: true, state });
+  });
+
+  app.post('/api/local-data/shell-state', async (req, res) => {
+    const state = await saveShellState(req.body?.state || {});
+    res.json({ ok: true, state });
+  });
+
+  app.get('/api/local-data/imports', async (_req, res) => {
+    const imports = await listImports();
+    res.json({ ok: true, imports });
+  });
+
+  app.post('/api/local-data/imports', async (req, res) => {
+    const type = typeof req.body?.type === 'string' ? req.body.type.trim().toLowerCase() : '';
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const payload = req.body?.payload;
+    const allowedTypes = new Set(['apps', 'settings', 'bookmarks', 'history', 'cookies']);
+
+    if (!allowedTypes.has(type)) {
+      return res.status(400).json({ ok: false, error: 'Unsupported import type.' });
+    }
+
+    if (!name) {
+      return res.status(400).json({ ok: false, error: 'Import name is required.' });
+    }
+
+    const item = await appendImportRecord({
+      type,
+      name,
+      payload,
+      containsSensitiveData: type === 'cookies'
+    });
+
+    return res.json({
+      ok: true,
+      import: {
+        id: item.id,
+        importedAt: item.importedAt,
+        type: item.type,
+        name: item.name,
+        containsSensitiveData: item.containsSensitiveData,
+        recordCount: item.recordCount
+      }
+    });
   });
 
   app.get('/api/providers', async (_req, res) => {
@@ -144,6 +213,11 @@ function createApp(deps = {}) {
       }
 
       await upsertProviderSettingsImpl(provider.id, updates);
+      await appendApiKeyAuditEvent({
+        providerId: provider.id,
+        action: 'saved',
+        maskedKey: maskSecret(updates.apiKey)
+      });
       const { providers } = await loadSettingsContext();
       const updated = providers.find((item) => item.id === provider.id);
       return res.json({ ok: true, provider: updated });
@@ -160,6 +234,11 @@ function createApp(deps = {}) {
       }
 
       await clearProviderSettingsImpl(provider.id);
+      await appendApiKeyAuditEvent({
+        providerId: provider.id,
+        action: 'cleared',
+        maskedKey: null
+      });
       const { providers } = await loadSettingsContext();
       const updated = providers.find((item) => item.id === provider.id);
       return res.json({ ok: true, provider: updated });
@@ -182,6 +261,12 @@ function createApp(deps = {}) {
         providerSettings,
         dispatchChat: dispatchChatImpl,
         getGitHubCopilotChatSession: getChatSessionImpl
+      });
+
+      await appendApiKeyAuditEvent({
+        providerId: provider.id,
+        action: 'tested',
+        maskedKey: maskSecret(providerSettings.providers?.[provider.id]?.apiKey || null)
       });
 
       return res.status(result.ok ? 200 : (result.status || 400)).json(result);
@@ -219,6 +304,11 @@ function createApp(deps = {}) {
     } catch (error) {
       return res.status(400).json({ ok: false, error: error.message });
     }
+  });
+
+  app.get('/api/settings/provider-audit', async (_req, res) => {
+    const events = await loadApiKeyAuditEvents();
+    return res.json({ ok: true, events });
   });
 
   app.post('/api/chat', async (req, res) => {

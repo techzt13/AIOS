@@ -13,15 +13,11 @@
     "memory": "16gb",
     "storage": "32gb"
   },
-  "forwardPorts": [3000, 8080],
+  "forwardPorts": [8080],
   "portsAttributes": {
-    "3000": {
-      "label": "AIOS Linux Desktop",
-      "onAutoForward": "openBrowser"
-    },
     "8080": {
-      "label": "AIOS Control Layer",
-      "onAutoForward": "notify"
+      "label": "AIOS Web OS Shell",
+      "onAutoForward": "openBrowser"
     }
   },
   "onCreateCommand": "cp -n .env.example .env || true",
