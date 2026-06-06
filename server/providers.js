@@ -212,8 +212,7 @@ const providerCatalog = [
       'github-copilot/claude-3.5-sonnet',
       'github-copilot/gpt-5.5',
       'github-copilot/gpt-5.4',
-      'github-copilot/gpt-5.3-codex',
-      'github-copilot/o3-mini'
+      'github-copilot/gpt-5.3-codex'
     ]
   },
   {

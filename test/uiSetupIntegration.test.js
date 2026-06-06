@@ -50,6 +50,7 @@ test('copilot provider catalog includes OpenClaw-style model IDs', async () => {
   assert.match(providersJs, /github-copilot\/claude-opus-4\.7/);
   assert.match(providersJs, /github-copilot\/gpt-5\.5/);
   assert.match(providersJs, /defaultModel: 'github-copilot\/gpt-4o'/);
+  assert.doesNotMatch(providersJs, /github-copilot\/o3/);
 });
 
 test('setup wizard uses provider cards and device-login copy', async () => {

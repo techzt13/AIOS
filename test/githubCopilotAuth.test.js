@@ -201,5 +201,6 @@ test('github copilot model fallback catalog includes required defaults', async (
     assert.equal(result.source, 'fallback');
     assert.equal(result.models.includes('github-copilot/claude-opus-4.7'), true);
     assert.equal(result.models.includes('github-copilot/gpt-5.5'), true);
+    assert.equal(result.models.some((model) => model.includes('o3')), false);
   });
 });
