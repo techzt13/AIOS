@@ -102,12 +102,21 @@
             </div>
             <h2>Notes</h2>
             <div class="titlebar-actions">
-              <button id="notesSaveButton" type="button" class="titlebar-button">Save</button>
+              <button id="notesNewButton" type="button" class="titlebar-button">New Note</button>
             </div>
           </header>
-          <div class="window-body">
-            <textarea id="notesTextarea" class="notes-textarea" placeholder="Type your notes here..."></textarea>
-            <div id="notesStatus" class="notes-status">Notes saved automatically</div>
+          <div class="window-body notes-window">
+            <aside class="notes-sidebar">
+              <ul id="notesList" class="notes-list" aria-label="Saved notes"></ul>
+            </aside>
+            <div class="notes-editor">
+              <input id="notesTitleInput" class="notes-title-input" type="text" placeholder="Note title" />
+              <textarea id="notesTextarea" class="notes-textarea" placeholder="Start writing..."></textarea>
+              <div class="notes-editor-footer">
+                <span id="notesStatus" class="notes-status">No note selected</span>
+                <button id="notesDeleteButton" type="button" class="secondary notes-delete">Delete</button>
+              </div>
+            </div>
           </div>
         </section>
 

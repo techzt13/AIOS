@@ -30,8 +30,10 @@ const {
   getDataDir,
   listImports,
   loadApiKeyAuditEvents,
+  loadNotes,
   loadShellState,
   maskSecret,
+  saveNotes,
   saveShellState
 } = require('./appDataStore');
 const { resolveSandboxPath } = require('./sandbox');
@@ -129,6 +131,17 @@ function createApp(deps = {}) {
   app.post('/api/local-data/shell-state', async (req, res) => {
     const state = await saveShellState(req.body?.state || {});
     res.json({ ok: true, state });
+  });
+
+  app.get('/api/local-data/notes', async (_req, res) => {
+    const { notes } = await loadNotes();
+    res.json({ ok: true, notes });
+  });
+
+  app.post('/api/local-data/notes', async (req, res) => {
+    const incoming = Array.isArray(req.body?.notes) ? req.body.notes : [];
+    const { notes } = await saveNotes(incoming);
+    res.json({ ok: true, notes });
   });
 
   app.get('/api/local-data/imports', async (_req, res) => {

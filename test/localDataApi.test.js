@@ -50,6 +50,27 @@ test('local data APIs persist shell state and explicit imports in AIOS_DATA_DIR'
       assert.equal(response.ok, true);
       assert.equal(payload.state.preferences.accent, 'violet');
 
+      response = await fetch(`${baseUrl}/api/local-data/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notes: [
+            { id: 'note-1', title: 'Ideas', content: 'Ship polished dock' },
+            { id: 'note-2', title: 'Bugs', content: 'Fix stutter' }
+          ]
+        })
+      });
+      payload = await response.json();
+      assert.equal(response.ok, true);
+      assert.equal(Array.isArray(payload.notes), true);
+      assert.equal(payload.notes.length, 2);
+
+      response = await fetch(`${baseUrl}/api/local-data/notes`);
+      payload = await response.json();
+      assert.equal(response.ok, true);
+      assert.equal(Array.isArray(payload.notes), true);
+      assert.equal(payload.notes[0].id, 'note-1');
+
       response = await fetch(`${baseUrl}/api/local-data/imports`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -86,6 +86,9 @@ const openSetupAssistant = document.getElementById('openSetupAssistant');
 const activeWindowTitle = document.getElementById('activeWindowTitle');
 const providerStatusBadge = document.getElementById('providerStatusBadge');
 const clockLabel = document.getElementById('clockLabel');
+const dock = document.querySelector('.dock');
+const dockItems = Array.from(document.querySelectorAll('.dock-item'));
+const dockAppButtons = dockItems.filter((button) => Boolean(button.dataset.openApp));
 
 const WIZARD_STEPS = ['welcome', 'provider', 'connect', 'test', 'finish'];
 const WINDOW_IDS = {
@@ -326,8 +329,27 @@ function formatPathUp(pathValue) {
 }
 
 function setDockState(app) {
-  document.querySelectorAll('.dock-item[data-open-app]').forEach((button) => {
+  dockAppButtons.forEach((button) => {
     button.classList.toggle('active', button.dataset.openApp === app);
+  });
+}
+
+function clearDockHoverState() {
+  if (!dock) return;
+  dock.classList.remove('hovering');
+  dockItems.forEach((button) => {
+    button.classList.remove('hovered', 'near');
+  });
+}
+
+function applyDockHoverState(hoveredButton) {
+  if (!dock) return;
+  const hoveredIndex = dockItems.indexOf(hoveredButton);
+  if (hoveredIndex < 0) return;
+  dock.classList.add('hovering');
+  dockItems.forEach((button, index) => {
+    button.classList.toggle('hovered', index === hoveredIndex);
+    button.classList.toggle('near', Math.abs(index - hoveredIndex) === 1);
   });
 }
 
@@ -435,6 +457,9 @@ function openWindow(app) {
   });
   focusWindow(app);
   recordWindowState(app, { open: true, minimized: false });
+  if (app === 'notes' && typeof loadNotesApp === 'function') {
+    loadNotesApp();
+  }
 }
 
 function closeWindow(app) {
@@ -1429,7 +1454,6 @@ function tickClock() {
   clockLabel.textContent = new Date().toLocaleString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     month: 'short',
     day: 'numeric'
   });
@@ -1664,7 +1688,7 @@ wallpaperSelect.addEventListener('change', () => {
   persistShellState();
 });
 
-document.querySelectorAll('.dock-item[data-open-app]').forEach((button) => {
+dockAppButtons.forEach((button) => {
   button.addEventListener('click', () => {
     openWindow(button.dataset.openApp);
     if (button.dataset.openApp === 'files') {
@@ -1672,6 +1696,14 @@ document.querySelectorAll('.dock-item[data-open-app]').forEach((button) => {
     }
   });
 });
+
+dockItems.forEach((button) => {
+  button.addEventListener('pointerenter', () => applyDockHoverState(button));
+});
+
+if (dock) {
+  dock.addEventListener('pointerleave', clearDockHoverState);
+}
 
 document.querySelectorAll('[data-launch-app]').forEach((button) => {
   button.addEventListener('click', () => {
@@ -1711,7 +1743,7 @@ document.querySelectorAll('.app-window').forEach((windowEl) => {
 renderMessage('system', 'Welcome to AIOS web shell. Use dock apps for chat, files, terminal, apps, and setup.');
 
 tickClock();
-setInterval(tickClock, 1000);
+setInterval(tickClock, 30000);
 
 loadShellState()
   .then(() => Promise.all([
@@ -1728,46 +1760,158 @@ loadShellState()
   .catch((error) => renderMessage('system', `Failed to load AIOS: ${error.message}`));
 
 // --- Notes App Logic ---
+const notesList = document.getElementById('notesList');
+const notesTitleInput = document.getElementById('notesTitleInput');
 const notesTextarea = document.getElementById('notesTextarea');
-const notesSaveButton = document.getElementById('notesSaveButton');
 const notesStatus = document.getElementById('notesStatus');
-const NOTES_PATH = 'Notes.txt';
+const notesNewButton = document.getElementById('notesNewButton');
+const notesDeleteButton = document.getElementById('notesDeleteButton');
 
-let notesTimer = null;
+let notesData = [];
+let activeNoteId = null;
+let notesSaveTimer = null;
+let notesLoaded = false;
 
-async function loadNotes() {
-  try {
-    const result = await readWorkspaceFile(NOTES_PATH);
-    if (result && result.content !== undefined) {
-      notesTextarea.value = result.content;
-      notesStatus.textContent = 'Notes loaded';
-    }
-  } catch (error) {
-    // If file doesn't exist, it's fine
-    notesStatus.textContent = 'New notes file ready';
-  }
+function noteDisplayTitle(note) {
+  const title = (note.title || '').trim();
+  if (title) return title;
+  const firstLine = (note.content || '').split('\n').find((line) => line.trim());
+  return firstLine ? firstLine.trim().slice(0, 40) : 'Untitled note';
 }
 
-async function saveNotes() {
+function renderNotesList() {
+  notesList.innerHTML = '';
+
+  if (notesData.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'notes-empty';
+    empty.textContent = 'No notes yet. Click "New Note" to start.';
+    notesList.appendChild(empty);
+    return;
+  }
+
+  notesData.forEach((note) => {
+    const item = document.createElement('li');
+    item.className = 'notes-list-item' + (note.id === activeNoteId ? ' active' : '');
+    item.dataset.noteId = note.id;
+
+    const title = document.createElement('span');
+    title.className = 'notes-list-title';
+    title.textContent = noteDisplayTitle(note);
+
+    const preview = document.createElement('span');
+    preview.className = 'notes-list-preview';
+    const body = (note.content || '').replace(/\s+/g, ' ').trim();
+    preview.textContent = body ? body.slice(0, 60) : 'No additional text';
+
+    item.appendChild(title);
+    item.appendChild(preview);
+    item.addEventListener('click', () => selectNote(note.id));
+    notesList.appendChild(item);
+  });
+}
+
+function activeNote() {
+  return notesData.find((note) => note.id === activeNoteId) || null;
+}
+
+function selectNote(id) {
+  activeNoteId = id;
+  const note = activeNote();
+  if (note) {
+    notesTitleInput.value = note.title || '';
+    notesTextarea.value = note.content || '';
+    notesTitleInput.disabled = false;
+    notesTextarea.disabled = false;
+    notesDeleteButton.disabled = false;
+    notesStatus.textContent = 'Editing • saved';
+  } else {
+    notesTitleInput.value = '';
+    notesTextarea.value = '';
+    notesTitleInput.disabled = true;
+    notesTextarea.disabled = true;
+    notesDeleteButton.disabled = true;
+    notesStatus.textContent = 'No note selected';
+  }
+  renderNotesList();
+}
+
+async function persistNotes() {
   try {
     notesStatus.textContent = 'Saving...';
-    await writeWorkspaceFile(NOTES_PATH, notesTextarea.value);
-    notesStatus.textContent = 'Notes saved at ' + new Date().toLocaleTimeString();
+    const response = await fetch('/api/local-data/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: notesData })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || 'Failed to save notes.');
+    }
+    notesStatus.textContent = 'Saved ' + new Date().toLocaleTimeString();
   } catch (error) {
-    notesStatus.textContent = 'Failed to save notes';
+    notesStatus.textContent = 'Save failed';
   }
 }
 
-notesTextarea.addEventListener('input', () => {
+function scheduleNotesSave() {
+  if (notesSaveTimer) clearTimeout(notesSaveTimer);
+  notesSaveTimer = setTimeout(persistNotes, 800);
+}
+
+function handleNoteEdit() {
+  const note = activeNote();
+  if (!note) return;
+  note.title = notesTitleInput.value;
+  note.content = notesTextarea.value;
+  note.updatedAt = new Date().toISOString();
   notesStatus.textContent = 'Unsaved changes';
-  if (notesTimer) clearTimeout(notesTimer);
-  notesTimer = setTimeout(saveNotes, 2000);
-});
+  renderNotesList();
+  scheduleNotesSave();
+}
 
-notesSaveButton.addEventListener('click', () => {
-  if (notesTimer) clearTimeout(notesTimer);
-  saveNotes();
-});
+function createNote() {
+  const note = {
+    id: (crypto.randomUUID && crypto.randomUUID()) || `note-${Date.now()}`,
+    title: '',
+    content: '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  notesData.unshift(note);
+  selectNote(note.id);
+  notesTitleInput.focus();
+  persistNotes();
+}
 
-// Load notes on startup
-loadNotes();
+function deleteActiveNote() {
+  const note = activeNote();
+  if (!note) return;
+  notesData = notesData.filter((entry) => entry.id !== note.id);
+  activeNoteId = notesData[0]?.id || null;
+  selectNote(activeNoteId);
+  persistNotes();
+}
+
+async function loadNotesApp() {
+  if (notesLoaded) return;
+  notesLoaded = true;
+  try {
+    const response = await fetch('/api/local-data/notes');
+    const payload = await response.json();
+    if (response.ok && payload.ok && Array.isArray(payload.notes)) {
+      notesData = payload.notes;
+    }
+  } catch {
+    notesData = [];
+  }
+  activeNoteId = notesData[0]?.id || null;
+  selectNote(activeNoteId);
+}
+
+notesTitleInput.addEventListener('input', handleNoteEdit);
+notesTextarea.addEventListener('input', handleNoteEdit);
+notesNewButton.addEventListener('click', createNote);
+notesDeleteButton.addEventListener('click', deleteActiveNote);
+
+selectNote(null);

@@ -6,6 +6,7 @@ const DATA_DIR_NAME = '.aios-data';
 const SHELL_STATE_FILE = 'shell-state.json';
 const IMPORTS_FILE = 'imports.json';
 const API_KEY_AUDIT_FILE = 'api-key-audit.json';
+const NOTES_FILE = 'notes.json';
 
 function getDataDir() {
   return path.resolve(process.env.AIOS_DATA_DIR || path.join(process.cwd(), 'workspace', DATA_DIR_NAME));
@@ -21,6 +22,10 @@ function getImportsPath() {
 
 function getApiKeyAuditPath() {
   return path.join(getDataDir(), API_KEY_AUDIT_FILE);
+}
+
+function getNotesPath() {
+  return path.join(getDataDir(), NOTES_FILE);
 }
 
 async function ensureDataDir() {
@@ -172,6 +177,40 @@ async function loadApiKeyAuditEvents() {
   return store.events;
 }
 
+function sanitizeNoteText(value, maxLength) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const trimmed = value.slice(0, maxLength);
+  return trimmed;
+}
+
+function normalizeNote(note) {
+  if (!note || typeof note !== 'object') {
+    return null;
+  }
+  const id = typeof note.id === 'string' && note.id.trim() ? note.id : crypto.randomUUID();
+  return {
+    id,
+    title: sanitizeNoteText(note.title, 200),
+    content: sanitizeNoteText(note.content, 100000),
+    createdAt: typeof note.createdAt === 'string' ? note.createdAt : new Date().toISOString(),
+    updatedAt: typeof note.updatedAt === 'string' ? note.updatedAt : new Date().toISOString()
+  };
+}
+
+async function loadNotes() {
+  const parsed = await readJson(getNotesPath(), { notes: [] });
+  const notes = Array.isArray(parsed.notes) ? parsed.notes.map(normalizeNote).filter(Boolean) : [];
+  return { notes };
+}
+
+async function saveNotes(nextNotes) {
+  const notes = Array.isArray(nextNotes) ? nextNotes.map(normalizeNote).filter(Boolean) : [];
+  await writeJson(getNotesPath(), { notes });
+  return { notes };
+}
+
 module.exports = {
   appendApiKeyAuditEvent,
   appendImportRecord,
@@ -179,10 +218,13 @@ module.exports = {
   getApiKeyAuditPath,
   getDataDir,
   getImportsPath,
+  getNotesPath,
   getShellStatePath,
   listImports,
   loadApiKeyAuditEvents,
+  loadNotes,
   loadShellState,
   maskSecret,
+  saveNotes,
   saveShellState
 };
