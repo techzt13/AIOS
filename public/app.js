@@ -459,6 +459,8 @@ function initWindowDrag(windowEl) {
   let startY = 0;
   let originX = 0;
   let originY = 0;
+  let initialLeft = 0;
+  let initialTop = 0;
   let lastX = 0;
   let lastY = 0;
   let dragFrame = 0;
@@ -474,8 +476,10 @@ function initWindowDrag(windowEl) {
     const canvasRect = desktopCanvas.getBoundingClientRect();
     originX = rect.left;
     originY = rect.top;
-    lastX = Math.round(originX - canvasRect.left);
-    lastY = Math.round(originY - canvasRect.top);
+    initialLeft = Math.round(originX - canvasRect.left);
+    initialTop = Math.round(originY - canvasRect.top);
+    lastX = initialLeft;
+    lastY = initialTop;
     windowEl.classList.add('dragging');
     event.preventDefault();
   });
@@ -491,8 +495,9 @@ function initWindowDrag(windowEl) {
 
     if (!dragFrame) {
       dragFrame = requestAnimationFrame(() => {
-        windowEl.style.left = `${lastX}px`;
-        windowEl.style.top = `${lastY}px`;
+        const tx = lastX - initialLeft;
+        const ty = lastY - initialTop;
+        windowEl.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
         dragFrame = 0;
       });
     }
@@ -504,6 +509,7 @@ function initWindowDrag(windowEl) {
         cancelAnimationFrame(dragFrame);
         dragFrame = 0;
       }
+      windowEl.style.transform = '';
       windowEl.style.left = `${lastX}px`;
       windowEl.style.top = `${lastY}px`;
       windowEl.classList.remove('dragging');
