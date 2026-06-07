@@ -1128,7 +1128,7 @@ button.secondary {
   bottom: 14px;
   transform: translateX(-50%);
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
   background:
     var(--liquid-glass-bg),
     rgba(15, 24, 40, 0.42);
