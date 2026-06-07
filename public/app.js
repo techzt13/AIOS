@@ -1766,6 +1766,7 @@ const notesTextarea = document.getElementById('notesTextarea');
 const notesStatus = document.getElementById('notesStatus');
 const notesNewButton = document.getElementById('notesNewButton');
 const notesDeleteButton = document.getElementById('notesDeleteButton');
+const NOTES_STORAGE_KEY = 'aios.notes.v1';
 
 let notesData = [];
 let activeNoteId = null;
@@ -1847,14 +1848,28 @@ async function persistNotes({ showStatus = false } = {}) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ notes: notesData })
     });
-    const payload = await response.json();
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || 'Failed to save notes.');
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+    if (!response.ok || !payload?.ok) {
+      throw new Error(payload?.error || 'Failed to save notes.');
     }
     if (shouldShowStatus) {
       notesStatus.textContent = 'Saved ' + new Date().toLocaleTimeString();
     }
   } catch (error) {
+    try {
+      localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notesData));
+      if (shouldShowStatus) {
+        notesStatus.textContent = 'Saved locally ' + new Date().toLocaleTimeString();
+      }
+      return;
+    } catch {
+      // Continue to error status below.
+    }
     if (shouldShowStatus) {
       notesStatus.textContent = 'Save failed';
     }
@@ -1905,10 +1920,25 @@ async function loadNotesApp() {
   notesLoaded = true;
   try {
     const response = await fetch('/api/local-data/notes');
-    const payload = await response.json();
-    if (response.ok && payload.ok && Array.isArray(payload.notes)) {
-      notesData = payload.notes;
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
     }
+    if (response.ok && payload?.ok && Array.isArray(payload.notes)) {
+      notesData = payload.notes;
+      activeNoteId = notesData[0]?.id || null;
+      selectNote(activeNoteId);
+      return;
+    }
+  } catch {
+    // Fall back to local cache.
+  }
+  try {
+    const raw = localStorage.getItem(NOTES_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    notesData = Array.isArray(parsed) ? parsed : [];
   } catch {
     notesData = [];
   }
