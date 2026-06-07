@@ -113,6 +113,7 @@ test('setup wizard uses provider cards and device-login copy', async () => {
   assert.match(stylesCss, /\.messages \.message:first-child\.system/);
   assert.match(stylesCss, /\.app-window::before/);
   assert.match(stylesCss, /#windowSettings/);
+  assert.match(stylesCss, /#windowBrowser/);
   assert.match(stylesCss, /\.settings-window/);
   assert.match(stylesCss, /#windowChat\s*\{[\s\S]*left: clamp/);
   assert.match(stylesCss, /#windowApps\s*\{[\s\S]*calc\(\(100vw - min\(820px/);
