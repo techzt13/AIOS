@@ -470,7 +470,17 @@ function initWindowDrag(windowEl) {
 
   titlebar.addEventListener('mousedown', (event) => {
     if (event.target.closest('button, input, select, textarea, a')) return;
-    if (windowEl.classList.contains('maximized')) return;
+    
+    // If we drag a maximized or snapped window, unsnap it
+    if (windowEl.classList.contains('maximized') || windowEl.classList.contains('snapped-left') || windowEl.classList.contains('snapped-right')) {
+      windowEl.classList.remove('maximized', 'snapped-left', 'snapped-right');
+      const rect = windowEl.getBoundingClientRect();
+      const canvasRect = desktopCanvas.getBoundingClientRect();
+      
+      // Attempt to center the window under the mouse when dragging out of snap
+      windowEl.style.left = `${Math.round(event.clientX - canvasRect.left - (rect.width / 2))}px`;
+    }
+    
     dragging = true;
     focusWindow(windowEl.dataset.app);
     startX = event.clientX;
@@ -511,7 +521,7 @@ function initWindowDrag(windowEl) {
     }
   });
 
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', (event) => {
     if (dragging) {
       if (dragFrame) {
         cancelAnimationFrame(dragFrame);
@@ -521,6 +531,15 @@ function initWindowDrag(windowEl) {
       windowEl.style.left = `${lastX}px`;
       windowEl.style.top = `${lastY}px`;
       windowEl.classList.remove('dragging');
+      
+      // Window Snapping logic
+      windowEl.classList.remove('snapped-left', 'snapped-right', 'maximized');
+      if (event.clientX < 20) {
+        windowEl.classList.add('snapped-left');
+      } else if (event.clientX > window.innerWidth - 20) {
+        windowEl.classList.add('snapped-right');
+      }
+      
       recordWindowState(windowEl.dataset.app, { left: lastX, top: lastY });
     }
     dragging = false;
@@ -1557,9 +1576,41 @@ chatForm.addEventListener('submit', async (event) => {
   }
 });
 
+let commandHistory = [];
+let historyIndex = -1;
+
+terminalCommandInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    terminalRunButton.click();
+  } else if (event.key === 'ArrowUp') {
+    if (historyIndex > 0) {
+      historyIndex--;
+      terminalCommandInput.value = commandHistory[historyIndex];
+      event.preventDefault();
+    }
+  } else if (event.key === 'ArrowDown') {
+    if (historyIndex < commandHistory.length - 1) {
+      historyIndex++;
+      terminalCommandInput.value = commandHistory[historyIndex];
+      event.preventDefault();
+    } else {
+      historyIndex = commandHistory.length;
+      terminalCommandInput.value = '';
+      event.preventDefault();
+    }
+  }
+});
+
 terminalRunButton.addEventListener('click', async () => {
   const command = terminalCommandInput.value.trim();
   if (!command) return;
+
+  if (commandHistory[commandHistory.length - 1] !== command) {
+    commandHistory.push(command);
+  }
+  historyIndex = commandHistory.length;
+  terminalCommandInput.value = '';
 
   terminalOutput.textContent += `\n$ ${command}\n`;
   try {

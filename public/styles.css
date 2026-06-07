@@ -1195,7 +1195,18 @@ button.secondary {
 #openSetupAssistant::before { content: 'SET'; }
 
 .dock-item:hover {
-  transform: translateY(-6px) scale(1.04);
+  transform: translateY(-12px) scale(1.25);
+  margin: 0 10px;
+}
+
+.dock:has(.dock-item:hover) .dock-item:not(:hover) {
+  transform: translateY(-2px) scale(1.02);
+}
+
+.dock-item:has(+ .dock-item:hover),
+.dock-item:hover + .dock-item {
+  transform: translateY(-6px) scale(1.12);
+  margin: 0 4px;
 }
 
 .dock-item:active {
@@ -1698,5 +1709,27 @@ button:focus-visible {
   max-width: none !important;
   max-height: none !important;
   border-radius: 12px !important;
+  transform: none !important;
+}
+
+.app-window.snapped-left {
+  left: 0 !important;
+  top: 0 !important;
+  width: 50% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 12px 0 0 12px !important;
+  transform: none !important;
+}
+
+.app-window.snapped-right {
+  left: 50% !important;
+  top: 0 !important;
+  width: 50% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 12px 12px 0 !important;
   transform: none !important;
 }
