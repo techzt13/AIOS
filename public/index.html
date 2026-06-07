@@ -140,46 +140,48 @@
               </section>
             </section>
 
-            <section class="control-group">
-              <p class="group-title">Desktop preferences</p>
-              <label for="accentSelect">Accent</label>
-              <select id="accentSelect">
-                <option value="blue">Blue</option>
-                <option value="violet">Violet</option>
-                <option value="mint">Mint</option>
-              </select>
-              <label for="wallpaperSelect">Wallpaper</label>
-              <select id="wallpaperSelect">
-                <option value="aurora">Aurora</option>
-                <option value="dusk">Dusk</option>
-                <option value="graphite">Graphite</option>
-              </select>
-              <p class="status-text">Local app data path: <code id="dataDirValue">loading...</code></p>
-              <button id="runSetupAgainButton" type="button" class="secondary">Run setup assistant again</button>
-            </section>
+            <div class="settings-right-col">
+              <section class="control-group">
+                <p class="group-title">Desktop preferences</p>
+                <label for="accentSelect">Accent</label>
+                <select id="accentSelect">
+                  <option value="blue">Blue</option>
+                  <option value="violet">Violet</option>
+                  <option value="mint">Mint</option>
+                </select>
+                <label for="wallpaperSelect">Wallpaper</label>
+                <select id="wallpaperSelect">
+                  <option value="aurora">Aurora</option>
+                  <option value="dusk">Dusk</option>
+                  <option value="graphite">Graphite</option>
+                </select>
+                <p class="status-text">Local app data path: <code id="dataDirValue">loading...</code></p>
+                <button id="runSetupAgainButton" type="button" class="secondary">Run setup assistant again</button>
+              </section>
 
-            <section class="control-group">
-              <p class="group-title">Import center (local-only)</p>
-              <p class="status-text">Imports are explicit, user-initiated, and stored locally only. AIOS never auto-reads browser profiles.</p>
-              <label for="importTypeSelect">Import type</label>
-              <select id="importTypeSelect">
-                <option value="apps">App shortcuts/bookmarks</option>
-                <option value="settings">Settings/preferences</option>
-                <option value="bookmarks">Browser bookmarks export</option>
-                <option value="history">Browser history export</option>
-                <option value="cookies">Cookie export (sensitive)</option>
-              </select>
-              <input id="importFileInput" type="file" accept="application/json" />
-              <button id="importButton" type="button">Import JSON file</button>
-              <p id="importStatus" class="status-text"></p>
-              <ul id="importList" class="import-list"></ul>
-            </section>
+              <section class="control-group">
+                <p class="group-title">Import center (local-only)</p>
+                <p class="status-text">Imports are explicit, user-initiated, and stored locally only. AIOS never auto-reads browser profiles.</p>
+                <label for="importTypeSelect">Import type</label>
+                <select id="importTypeSelect">
+                  <option value="apps">App shortcuts/bookmarks</option>
+                  <option value="settings">Settings/preferences</option>
+                  <option value="bookmarks">Browser bookmarks export</option>
+                  <option value="history">Browser history export</option>
+                  <option value="cookies">Cookie export (sensitive)</option>
+                </select>
+                <input id="importFileInput" type="file" accept="application/json" />
+                <button id="importButton" type="button">Import JSON file</button>
+                <p id="importStatus" class="status-text"></p>
+                <ul id="importList" class="import-list"></ul>
+              </section>
 
-            <section class="control-group">
-              <p class="group-title">API key history (safe audit)</p>
-              <p class="status-text">Only provider, time, action, and masked fingerprint are stored. Raw secrets are never shown.</p>
-              <ul id="apiAuditList" class="import-list"></ul>
-            </section>
+              <section class="control-group">
+                <p class="group-title">API key history (safe audit)</p>
+                <p class="status-text">Only provider, time, action, and masked fingerprint are stored. Raw secrets are never shown.</p>
+                <ul id="apiAuditList" class="import-list"></ul>
+              </section>
+            </div>
           </div>
         </section>
 

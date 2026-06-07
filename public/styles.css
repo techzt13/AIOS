@@ -818,7 +818,6 @@ button.secondary {
 .settings-window {
   display: grid;
   grid-template-columns: minmax(440px, 1.25fr) minmax(340px, 0.9fr);
-  grid-auto-rows: minmax(168px, auto);
   gap: 16px;
   align-items: start;
   height: calc(100% - 44px);
@@ -828,13 +827,18 @@ button.secondary {
   padding: 14px;
 }
 
+.settings-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .settings-window .control-group {
   width: 100%;
   margin: 0;
 }
 
-.settings-window .control-group:first-child {
-  grid-row: span 3;
+.settings-window > .control-group {
   min-height: 100%;
 }
 

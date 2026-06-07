@@ -584,6 +584,7 @@ function renderProviderSetupList() {
       openWindow('settings');
       providerSelect.value = provider.id;
       updateModelOptions();
+      providerSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
     right.appendChild(status);
