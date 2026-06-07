@@ -634,6 +634,7 @@ function renderChatModelSelect() {
     option.value = '';
     option.textContent = 'No providers configured';
     chatModelSelect.appendChild(option);
+    updateProviderStatusBadge();
     return;
   }
   
@@ -648,11 +649,24 @@ function renderChatModelSelect() {
           const val = `${prefProvider}|${prefModel}`;
           if (chatModelSelect.querySelector(`option[value="${val}"]`)) {
              chatModelSelect.value = val;
+             updateProviderStatusBadge();
              return;
           }
        }
     }
     chatModelSelect.value = chatModelSelect.querySelector('option:not([value=""])').value;
+  }
+  updateProviderStatusBadge();
+}
+
+function updateProviderStatusBadge() {
+  if (!providerStatusBadge) return;
+  const [providerId, model] = (chatModelSelect.value || '').split('|');
+  const provider = providers.find(p => p.id === providerId);
+  if (provider) {
+    providerStatusBadge.textContent = `Provider: ${provider.name}`;
+  } else {
+    providerStatusBadge.textContent = 'Provider: none';
   }
 }
 
@@ -1458,7 +1472,7 @@ browserToolbar.addEventListener('submit', (event) => {
     if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(url) || url.startsWith('localhost:')) {
       url = `https://${url}`;
     } else {
-      url = `https://www.bing.com/search?q=${encodeURIComponent(url)}`;
+      url = `https://www.google.com/search?igu=1&q=${encodeURIComponent(url)}`;
     }
   }
 
@@ -1480,6 +1494,7 @@ chatModelSelect.addEventListener('change', () => {
   const [providerId, model] = (chatModelSelect.value || '').split('|');
   const provider = providers.find(p => p.id === providerId);
   if (provider) persistProviderChoice(provider, model);
+  updateProviderStatusBadge();
 });
 
 chatForm.addEventListener('submit', async (event) => {
