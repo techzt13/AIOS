@@ -1836,9 +1836,12 @@ function selectNote(id) {
   renderNotesList();
 }
 
-async function persistNotes() {
+async function persistNotes({ showStatus = false } = {}) {
+  const shouldShowStatus = showStatus && Boolean(activeNote());
   try {
-    notesStatus.textContent = 'Saving...';
+    if (shouldShowStatus) {
+      notesStatus.textContent = 'Saving...';
+    }
     const response = await fetch('/api/local-data/notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1848,15 +1851,19 @@ async function persistNotes() {
     if (!response.ok || !payload.ok) {
       throw new Error(payload.error || 'Failed to save notes.');
     }
-    notesStatus.textContent = 'Saved ' + new Date().toLocaleTimeString();
+    if (shouldShowStatus) {
+      notesStatus.textContent = 'Saved ' + new Date().toLocaleTimeString();
+    }
   } catch (error) {
-    notesStatus.textContent = 'Save failed';
+    if (shouldShowStatus) {
+      notesStatus.textContent = 'Save failed';
+    }
   }
 }
 
 function scheduleNotesSave() {
   if (notesSaveTimer) clearTimeout(notesSaveTimer);
-  notesSaveTimer = setTimeout(persistNotes, 800);
+  notesSaveTimer = setTimeout(() => persistNotes({ showStatus: true }), 800);
 }
 
 function handleNoteEdit() {
