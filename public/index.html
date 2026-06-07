@@ -93,6 +93,24 @@
           </div>
         </section>
 
+        <section id="windowNotes" class="app-window hidden" data-app="notes" data-title="Notes">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="notes" aria-label="Close Notes"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="notes" aria-label="Minimize Notes"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="notes" aria-label="Zoom Notes"></button>
+            </div>
+            <h2>Notes</h2>
+            <div class="titlebar-actions">
+              <button id="notesSaveButton" type="button" class="titlebar-button">Save</button>
+            </div>
+          </header>
+          <div class="window-body">
+            <textarea id="notesTextarea" class="notes-textarea" placeholder="Type your notes here..."></textarea>
+            <div id="notesStatus" class="notes-status">Notes saved automatically</div>
+          </div>
+        </section>
+
         <section id="windowBrowser" class="app-window hidden" data-app="browser" data-title="Browser">
           <header class="window-titlebar">
             <div class="traffic-lights">
@@ -229,6 +247,11 @@
                 <strong>AI Chat</strong>
                 <small>Talk to your selected provider and model.</small>
               </button>
+              <button type="button" class="app-launch-card" data-launch-app="notes">
+                <span class="app-launch-icon">N</span>
+                <strong>Notes</strong>
+                <small>Jot down ideas and keep track of thoughts.</small>
+              </button>
               <button type="button" class="app-launch-card" data-launch-app="files">
                 <span class="app-launch-icon">FS</span>
                 <strong>Files</strong>
@@ -257,6 +280,7 @@
       <nav class="dock" aria-label="AIOS dock">
         <button type="button" class="dock-item" data-open-app="chat">AI Chat</button>
         <button type="button" class="dock-item" data-open-app="browser">Browser</button>
+        <button type="button" class="dock-item" data-open-app="notes">Notes</button>
         <button type="button" class="dock-item" data-open-app="files">Files</button>
         <button type="button" class="dock-item" data-open-app="terminal">Terminal</button>
         <button type="button" class="dock-item" data-open-app="settings">Settings</button>

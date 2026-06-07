@@ -242,6 +242,13 @@ body {
   height: min(720px, calc(100vh - 160px));
 }
 
+#windowNotes {
+  left: max(16px, calc((100vw - min(640px, calc(100vw - 32px))) / 2));
+  top: clamp(48px, 14vh, 96px);
+  width: min(640px, calc(100vw - 32px));
+  height: min(500px, calc(100vh - 200px));
+}
+
 #windowSettings {
   left: max(14px, calc((100vw - min(1240px, calc(100vw - 28px))) / 2 - 12px));
   top: 34px;
@@ -312,6 +319,7 @@ body {
 #windowChat .window-titlebar h2::before { content: 'AI'; }
 #windowFiles .window-titlebar h2::before { content: 'FS'; }
 #windowTerminal .window-titlebar h2::before { content: '$'; }
+#windowNotes .window-titlebar h2::before { content: 'N'; }
 #windowSettings .window-titlebar h2::before { content: 'ST'; }
 #windowApps .window-titlebar h2::before { content: 'AP'; }
 
@@ -1054,6 +1062,27 @@ button.secondary {
   background: #fff;
 }
 
+.notes-textarea {
+  width: 100%;
+  height: calc(100% - 24px);
+  resize: none;
+  background: transparent;
+  color: #e8f2ff;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: 8px 12px;
+}
+
+.notes-status {
+  font-size: 0.75rem;
+  color: #7b99c6;
+  text-align: right;
+  padding: 4px 8px;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -1655,4 +1684,15 @@ button:focus-visible {
     min-width: 58px;
     font-size: 0.66rem;
   }
+}
+
+.app-window.maximized {
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 12px !important;
+  transform: none !important;
 }

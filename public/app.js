@@ -90,6 +90,7 @@ const WIZARD_STEPS = ['welcome', 'provider', 'connect', 'test', 'finish'];
 const WINDOW_IDS = {
   chat: 'windowChat',
   browser: 'windowBrowser',
+  notes: 'windowNotes',
   files: 'windowFiles',
   terminal: 'windowTerminal',
   settings: 'windowSettings',
@@ -99,6 +100,7 @@ const WINDOW_IDS = {
 const WINDOW_LAYOUT = {
   chat: { x: 0.08, y: 0.08 },
   browser: { x: 0.12, y: 0.10 },
+  notes: { x: 0.14, y: 0.12 },
   files: { x: 0.16, y: 0.14 },
   terminal: { x: 0.24, y: 0.2 },
   settings: { x: 0.5, y: 0.08, centerX: true },
@@ -468,6 +470,7 @@ function initWindowDrag(windowEl) {
 
   titlebar.addEventListener('mousedown', (event) => {
     if (event.target.closest('button, input, select, textarea, a')) return;
+    if (windowEl.classList.contains('maximized')) return;
     dragging = true;
     focusWindow(windowEl.dataset.app);
     startX = event.clientX;
@@ -482,6 +485,11 @@ function initWindowDrag(windowEl) {
     lastY = initialTop;
     windowEl.classList.add('dragging');
     event.preventDefault();
+  });
+
+  titlebar.addEventListener('dblclick', (event) => {
+    if (event.target.closest('button, input, select, textarea, a')) return;
+    windowEl.classList.toggle('maximized');
   });
 
   window.addEventListener('mousemove', (event) => {
@@ -1395,6 +1403,7 @@ function tickClock() {
   clockLabel.textContent = new Date().toLocaleString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     month: 'short',
     day: 'numeric'
   });
@@ -1621,7 +1630,15 @@ document.querySelectorAll('[data-window-action]').forEach((button) => {
     const app = button.dataset.app;
     const action = button.dataset.windowAction;
     if (action === 'zoom') {
+      const windowEl = document.getElementById(WINDOW_IDS[app]);
+      if (windowEl) {
+        windowEl.classList.toggle('maximized');
+      }
       focusWindow(app);
+      return;
+    }
+    if (action === 'minimize') {
+      closeWindow(app);
       return;
     }
     closeWindow(app);
@@ -1636,7 +1653,7 @@ document.querySelectorAll('.app-window').forEach((windowEl) => {
 renderMessage('system', 'Welcome to AIOS web shell. Use dock apps for chat, files, terminal, apps, and setup.');
 
 tickClock();
-setInterval(tickClock, 30000);
+setInterval(tickClock, 1000);
 
 loadShellState()
   .then(() => Promise.all([
@@ -1651,3 +1668,48 @@ loadShellState()
     refreshFileList().catch(() => {});
   })
   .catch((error) => renderMessage('system', `Failed to load AIOS: ${error.message}`));
+
+// --- Notes App Logic ---
+const notesTextarea = document.getElementById('notesTextarea');
+const notesSaveButton = document.getElementById('notesSaveButton');
+const notesStatus = document.getElementById('notesStatus');
+const NOTES_PATH = 'Notes.txt';
+
+let notesTimer = null;
+
+async function loadNotes() {
+  try {
+    const result = await readWorkspaceFile(NOTES_PATH);
+    if (result && result.content !== undefined) {
+      notesTextarea.value = result.content;
+      notesStatus.textContent = 'Notes loaded';
+    }
+  } catch (error) {
+    // If file doesn't exist, it's fine
+    notesStatus.textContent = 'New notes file ready';
+  }
+}
+
+async function saveNotes() {
+  try {
+    notesStatus.textContent = 'Saving...';
+    await writeWorkspaceFile(NOTES_PATH, notesTextarea.value);
+    notesStatus.textContent = 'Notes saved at ' + new Date().toLocaleTimeString();
+  } catch (error) {
+    notesStatus.textContent = 'Failed to save notes';
+  }
+}
+
+notesTextarea.addEventListener('input', () => {
+  notesStatus.textContent = 'Unsaved changes';
+  if (notesTimer) clearTimeout(notesTimer);
+  notesTimer = setTimeout(saveNotes, 2000);
+});
+
+notesSaveButton.addEventListener('click', () => {
+  if (notesTimer) clearTimeout(notesTimer);
+  saveNotes();
+});
+
+// Load notes on startup
+loadNotes();
