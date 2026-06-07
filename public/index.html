@@ -93,6 +93,27 @@
           </div>
         </section>
 
+        <section id="windowBrowser" class="app-window hidden" data-app="browser" data-title="Browser">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="browser" aria-label="Close Browser"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="browser" aria-label="Minimize Browser"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="browser" aria-label="Zoom Browser"></button>
+            </div>
+            <h2>Browser</h2>
+          </header>
+          <div class="window-body browser-window">
+            <form id="browserToolbar" class="toolbar browser-toolbar">
+              <button type="button" id="browserBackButton" class="icon-button" title="Back" aria-label="Back">◀</button>
+              <button type="button" id="browserForwardButton" class="icon-button" title="Forward" aria-label="Forward">▶</button>
+              <button type="button" id="browserRefreshButton" class="icon-button" title="Reload" aria-label="Reload">↻</button>
+              <input id="browserUrlInput" type="text" placeholder="Search the web or enter URL..." />
+              <button type="submit" id="browserGoButton">Go</button>
+            </form>
+            <iframe id="browserFrame" class="browser-frame" src="about:blank" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+          </div>
+        </section>
+
         <section id="windowSettings" class="app-window hidden" data-app="settings" data-title="Settings">
           <header class="window-titlebar">
             <div class="traffic-lights">
@@ -223,6 +244,11 @@
                 <strong>Settings</strong>
                 <small>Providers, models, imports, and theme.</small>
               </button>
+              <button type="button" class="app-launch-card" data-launch-app="browser">
+                <span class="app-launch-icon">BR</span>
+                <strong>Browser</strong>
+                <small>Search the web and view sites natively.</small>
+              </button>
             </div>
           </div>
         </section>
@@ -230,10 +256,11 @@
 
       <nav class="dock" aria-label="AIOS dock">
         <button type="button" class="dock-item" data-open-app="chat">AI Chat</button>
+        <button type="button" class="dock-item" data-open-app="browser">Browser</button>
         <button type="button" class="dock-item" data-open-app="files">Files</button>
         <button type="button" class="dock-item" data-open-app="terminal">Terminal</button>
         <button type="button" class="dock-item" data-open-app="settings">Settings</button>
-        <button type="button" class="dock-item" id="openSetupAssistant">Setup Assistant</button>
+        <button type="button" class="dock-item" id="openSetupAssistant">Setup</button>
         <button type="button" class="dock-item" data-open-app="apps">Apps</button>
       </nav>
     </div>

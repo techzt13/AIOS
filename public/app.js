@@ -40,6 +40,10 @@ const terminalCommandInput = document.getElementById('terminalCommandInput');
 const terminalRunButton = document.getElementById('terminalRunButton');
 const terminalOutput = document.getElementById('terminalOutput');
 
+const browserToolbar = document.getElementById('browserToolbar');
+const browserUrlInput = document.getElementById('browserUrlInput');
+const browserFrame = document.getElementById('browserFrame');
+
 const accentSelect = document.getElementById('accentSelect');
 const wallpaperSelect = document.getElementById('wallpaperSelect');
 const dataDirValue = document.getElementById('dataDirValue');
@@ -85,6 +89,7 @@ const clockLabel = document.getElementById('clockLabel');
 const WIZARD_STEPS = ['welcome', 'provider', 'connect', 'test', 'finish'];
 const WINDOW_IDS = {
   chat: 'windowChat',
+  browser: 'windowBrowser',
   files: 'windowFiles',
   terminal: 'windowTerminal',
   settings: 'windowSettings',
@@ -93,6 +98,7 @@ const WINDOW_IDS = {
 
 const WINDOW_LAYOUT = {
   chat: { x: 0.08, y: 0.08 },
+  browser: { x: 0.12, y: 0.10 },
   files: { x: 0.16, y: 0.14 },
   terminal: { x: 0.24, y: 0.2 },
   settings: { x: 0.5, y: 0.08, centerX: true },
@@ -1440,6 +1446,34 @@ wizardNextButton.addEventListener('click', () => {
 });
 wizardFinishButton.addEventListener('click', () => {
   finishWizard().catch((error) => setFeedback(wizardFinishStatus, error.message, 'error'));
+});
+
+browserToolbar.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const raw = browserUrlInput.value.trim();
+  if (!raw) return;
+
+  let url = raw;
+  if (!/^https?:\/\//i.test(url)) {
+    if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(url) || url.startsWith('localhost:')) {
+      url = `https://${url}`;
+    } else {
+      url = `https://www.bing.com/search?q=${encodeURIComponent(url)}`;
+    }
+  }
+
+  browserUrlInput.value = url;
+  browserFrame.src = url;
+});
+
+document.getElementById('browserBackButton').addEventListener('click', () => {
+  try { browserFrame.contentWindow.history.back(); } catch { /* ignore cross-origin */ }
+});
+document.getElementById('browserForwardButton').addEventListener('click', () => {
+  try { browserFrame.contentWindow.history.forward(); } catch { /* ignore cross-origin */ }
+});
+document.getElementById('browserRefreshButton').addEventListener('click', () => {
+  try { browserFrame.contentWindow.location.reload(); } catch { browserFrame.src = browserFrame.src; }
 });
 
 chatModelSelect.addEventListener('change', () => {

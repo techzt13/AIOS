@@ -1027,6 +1027,45 @@ button.secondary {
   font-weight: 700;
 }
 
+.browser-window {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.browser-toolbar {
+  padding: 8px 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(248, 250, 255, 0.16));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.48);
+}
+
+.browser-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #fff;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 1.1rem;
+  border: 1px solid transparent;
+}
+
+.icon-button:hover {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

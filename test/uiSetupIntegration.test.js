@@ -29,9 +29,11 @@ test('web shell desktop markup includes menu bar, dock, and app windows', async 
   assert.match(indexHtml, /id="windowTerminal"/);
   assert.match(indexHtml, /id="windowSettings"/);
   assert.match(indexHtml, /id="windowApps"/);
+  assert.match(indexHtml, /id="windowBrowser"/);
   assert.match(indexHtml, /id="openSetupAssistant"/);
   assert.match(indexHtml, /data-launch-app="chat"/);
   assert.match(indexHtml, /data-launch-app="settings"/);
+  assert.match(indexHtml, /data-launch-app="browser"/);
 });
 
 test('wizard frontend uses existing first-run and provider test endpoints', async () => {
