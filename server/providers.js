@@ -18,7 +18,7 @@ const providerCatalog = [
     baseUrlEnv: 'ANTHROPIC_BASE_URL',
     apiKeyEnv: 'ANTHROPIC_API_KEY',
     requiresApiKey: true,
-    models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-3-5-sonnet', 'claude-3-5-haiku', 'claude-haiku']
+    models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229']
   },
   {
     id: 'openai',
@@ -30,7 +30,7 @@ const providerCatalog = [
     baseUrlEnv: 'OPENAI_BASE_URL',
     apiKeyEnv: 'OPENAI_API_KEY',
     requiresApiKey: true,
-    models: ['gpt-5.5', 'gpt-5.4', 'gpt-4o', 'chatgpt-codex']
+    models: ['gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini', 'o3-mini']
   },
   {
     id: 'gemini',
@@ -42,7 +42,7 @@ const providerCatalog = [
     baseUrlEnv: 'GEMINI_BASE_URL',
     apiKeyEnv: 'GEMINI_API_KEY',
     requiresApiKey: true,
-    models: ['gemini-3-pro', 'gemini-3-flash', 'gemini-2.5-pro', 'gemini-2.5-flash']
+    models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-1.5-flash']
   },
   {
     id: 'deepseek',
@@ -54,7 +54,7 @@ const providerCatalog = [
     baseUrlEnv: 'DEEPSEEK_BASE_URL',
     apiKeyEnv: 'DEEPSEEK_API_KEY',
     requiresApiKey: true,
-    models: ['deepseek-v4-flash', 'deepseek-reasoner', 'deepseek-chat']
+    models: ['deepseek-chat', 'deepseek-reasoner']
   },
   {
     id: 'xai',
@@ -66,7 +66,7 @@ const providerCatalog = [
     baseUrlEnv: 'XAI_BASE_URL',
     apiKeyEnv: 'XAI_API_KEY',
     requiresApiKey: true,
-    models: ['grok-4.3', 'grok-4']
+    models: ['grok-2-latest', 'grok-beta']
   },
   {
     id: 'mistral',
@@ -78,7 +78,7 @@ const providerCatalog = [
     baseUrlEnv: 'MISTRAL_BASE_URL',
     apiKeyEnv: 'MISTRAL_API_KEY',
     requiresApiKey: true,
-    models: ['mistral-large-latest', 'open-mixtral-8x7b']
+    models: ['mistral-large-latest', 'pixtral-large-latest', 'open-mistral-nemo']
   },
   {
     id: 'moonshot',
@@ -90,7 +90,7 @@ const providerCatalog = [
     baseUrlEnv: 'MOONSHOT_BASE_URL',
     apiKeyEnv: 'MOONSHOT_API_KEY',
     requiresApiKey: true,
-    models: ['kimi-k2.5', 'kimi-k2-thinking', 'kimi-k2-turbo']
+    models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k']
   },
   {
     id: 'minimax',
@@ -102,7 +102,7 @@ const providerCatalog = [
     baseUrlEnv: 'MINIMAX_BASE_URL',
     apiKeyEnv: 'MINIMAX_API_KEY',
     requiresApiKey: true,
-    models: ['MiniMax-M3', 'MiniMax-VL-01', 'MiniMax-2.7']
+    models: ['abab6.5-chat', 'abab6.5s-chat']
   },
   {
     id: 'zhipu',
@@ -114,7 +114,7 @@ const providerCatalog = [
     baseUrlEnv: 'ZHIPU_BASE_URL',
     apiKeyEnv: 'ZHIPU_API_KEY',
     requiresApiKey: true,
-    models: ['glm-4.7-flash', 'glm-4.7', 'glm-4']
+    models: ['glm-4-plus', 'glm-4-0520', 'glm-4-flash']
   },
   {
     id: 'volcano',
@@ -126,7 +126,7 @@ const providerCatalog = [
     baseUrlEnv: 'VOLCANO_BASE_URL',
     apiKeyEnv: 'VOLCANO_API_KEY',
     requiresApiKey: true,
-    models: ['doubao-seed-1.8', 'ark-code-latest', 'seed-1.8']
+    models: ['doubao-pro-32k', 'doubao-lite-32k']
   },
   {
     id: 'qwen',
@@ -138,13 +138,7 @@ const providerCatalog = [
     baseUrlEnv: 'QWEN_BASE_URL',
     apiKeyEnv: 'QWEN_API_KEY',
     requiresApiKey: true,
-    models: [
-      'qwen-portal-coder',
-      'qwen-portal-vision',
-      // Exact portal model IDs can differ by account and may need adjustment.
-      'qwen-plus',
-      'qwen-max'
-    ]
+    models: ['qwen-max', 'qwen-plus', 'qwen-turbo']
   },
   {
     id: 'baidu',
@@ -157,7 +151,7 @@ const providerCatalog = [
     apiKeyEnv: 'BAIDU_API_KEY',
     apiSecretEnv: 'BAIDU_SECRET_KEY',
     requiresApiKey: true,
-    models: ['ernie-4.5', 'ernie-speed']
+    models: ['ernie-4.0-8k-latest', 'ernie-3.5-8k']
   },
   {
     id: 'xiaomi',
