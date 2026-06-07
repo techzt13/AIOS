@@ -12,6 +12,7 @@ const providerApiSecretRow = document.getElementById('providerApiSecretRow');
 const providerApiSecretInput = document.getElementById('providerApiSecret');
 const saveProviderSettingsButton = document.getElementById('saveProviderSettingsButton');
 const clearProviderSettingsButton = document.getElementById('clearProviderSettingsButton');
+const providerSettingsStatus = document.getElementById('providerSettingsStatus');
 const authSummary = document.getElementById('authSummary');
 const authDetail = document.getElementById('authDetail');
 const copilotAuth = document.getElementById('copilotAuth');
@@ -1046,6 +1047,9 @@ async function saveProviderSettings({ provider, baseUrl, apiKey, apiSecret } = {
   await loadWizardProviders();
   await loadApiAudit();
   renderMessage('system', `${targetProvider.name} settings saved.`);
+  if (providerSettingsStatus) {
+    setFeedback(providerSettingsStatus, `${targetProvider.name} settings saved.`, 'success');
+  }
 }
 
 async function clearProviderSettings() {
@@ -1065,6 +1069,9 @@ async function clearProviderSettings() {
   await loadWizardProviders();
   await loadApiAudit();
   renderMessage('system', `${provider.name} stored settings cleared.`);
+  if (providerSettingsStatus) {
+    setFeedback(providerSettingsStatus, `${provider.name} settings cleared.`, 'success');
+  }
 }
 
 async function startCopilotLogin() {

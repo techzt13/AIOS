@@ -159,11 +159,11 @@ const providerCatalog = [
     category: GROUPS.regional,
     adapterType: 'openai',
     authMethod: 'static-key',
-    defaultBaseUrl: 'https://api.xiaomi.com/mimo/v1',
+    defaultBaseUrl: 'https://api.xiaomimimo.com/v1',
     baseUrlEnv: 'XIAOMI_BASE_URL',
     apiKeyEnv: 'XIAOMI_API_KEY',
     requiresApiKey: true,
-    models: ['mimo-v2.5-pro', 'mimo-v2-flash']
+    models: ['mimo-v2.5-pro', 'mimo-v2-flash', 'mimo-7b', 'mimo-v2.5']
   },
   {
     id: 'ollama',
