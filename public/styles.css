@@ -138,8 +138,8 @@ body {
   background:
     linear-gradient(115deg, rgba(255, 255, 255, 0.52), transparent 22%, transparent 68%, rgba(255, 255, 255, 0.2)),
     radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.7), transparent 24%);
-  opacity: 0.55;
-  mix-blend-mode: screen;
+  opacity: 0.35;
+  mix-blend-mode: normal;
 }
 
 .menu-bar > * {
@@ -816,10 +816,11 @@ button.secondary {
 }
 
 .settings-window {
-  display: block;
-  column-count: 2;
-  column-gap: 16px;
-  column-fill: balance;
+  display: grid;
+  grid-template-columns: minmax(440px, 1.25fr) minmax(340px, 0.9fr);
+  grid-auto-rows: minmax(168px, auto);
+  gap: 16px;
+  align-items: start;
   height: calc(100% - 44px);
   min-height: 0;
   overflow-y: auto;
@@ -828,9 +829,13 @@ button.secondary {
 }
 
 .settings-window .control-group {
-  break-inside: avoid;
   width: 100%;
-  margin: 0 0 16px;
+  margin: 0;
+}
+
+.settings-window .control-group:first-child {
+  grid-row: span 3;
+  min-height: 100%;
 }
 
 .control-group {
@@ -1416,23 +1421,8 @@ button.secondary {
 
 /* Performance profile: keep the glass aesthetic without stacking GPU-heavy blur layers everywhere. */
 .desktop-shell::before,
-.desktop-shell::after,
-.wizard-hero-panel::before,
-.control-group::before,
-.auth-card::before,
-.provider-card::before,
-.model-picker-card::before,
-.composer::before,
-.message::before {
+.desktop-shell::after {
   display: none;
-}
-
-.menu-bar::before,
-.app-window::before,
-.dock::before,
-.wizard-card::before {
-  opacity: 0.28;
-  mix-blend-mode: normal;
 }
 
 .menu-bar,
@@ -1524,15 +1514,10 @@ button:focus-visible {
   -webkit-overflow-scrolling: touch;
 }
 
-.settings-window {
-  column-fill: balance;
-}
-
 .settings-window .control-group,
 .settings-window .control-group:first-child {
   min-height: auto;
   overflow: visible;
-  break-inside: avoid;
 }
 
 .message,
@@ -1577,8 +1562,13 @@ button:focus-visible {
   }
 
   .settings-window {
-    column-count: 1;
+    grid-template-columns: 1fr;
     overflow-y: auto;
+  }
+
+  .settings-window .control-group:first-child {
+    grid-row: auto;
+    min-height: 0;
   }
 
   .model-picker-card {

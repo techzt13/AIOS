@@ -122,9 +122,8 @@ test('setup wizard uses provider cards and device-login copy', async () => {
   assert.match(stylesCss, /\.window-body\s*\{[\s\S]*overflow: hidden/);
   assert.match(stylesCss, /App-shell layout: one fixed desktop/);
   assert.match(stylesCss, /\.settings-window \.control-group,[\s\S]*overflow: visible/);
-  assert.match(stylesCss, /\.settings-window\s*\{[\s\S]*column-count: 2/);
+  assert.match(stylesCss, /\.settings-window\s*\{[\s\S]*display: grid/);
   assert.match(stylesCss, /\.settings-window\s*\{[\s\S]*height: calc\(100% - 44px\)/);
-  assert.match(stylesCss, /\.settings-window \.control-group\s*\{[\s\S]*break-inside: avoid/);
   assert.match(stylesCss, /scrollbar-gutter: stable/);
   assert.match(stylesCss, /prefers-reduced-motion: reduce/);
 });
