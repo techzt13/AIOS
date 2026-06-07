@@ -24,7 +24,7 @@ test('web shell desktop markup includes menu bar, dock, and app windows', async 
   assert.match(indexHtml, /class="dock"/);
   assert.match(indexHtml, /id="windowChat"/);
   assert.match(indexHtml, /id="newChatButton"/);
-  assert.match(indexHtml, /id="chatStatusPill"/);
+  assert.match(indexHtml, /id="chatModelSelect"/);
   assert.match(indexHtml, /id="windowFiles"/);
   assert.match(indexHtml, /id="windowTerminal"/);
   assert.match(indexHtml, /id="windowSettings"/);
@@ -53,7 +53,7 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /function renderMessageContent/);
   assert.match(appJs, /code-copy-button/);
   assert.match(appJs, /function persistProviderChoice/);
-  assert.match(appJs, /function updateChatStatusPill/);
+  assert.match(appJs, /function renderChatModelSelect/);
   assert.match(appJs, /const WINDOW_LAYOUT/);
   assert.match(appJs, /function normalizeWindowPosition/);
   assert.match(appJs, /savedPositionIsStale/);
@@ -107,7 +107,7 @@ test('setup wizard uses provider cards and device-login copy', async () => {
   assert.match(stylesCss, /\.dock-item::before/);
   assert.match(stylesCss, /\.apps-window/);
   assert.match(stylesCss, /\.app-launch-card/);
-  assert.match(stylesCss, /\.chat-status-pill/);
+  assert.match(stylesCss, /\.chat-model-select/);
   assert.match(stylesCss, /\.messages \.message:first-child\.system/);
   assert.match(stylesCss, /\.app-window::before/);
   assert.match(stylesCss, /#windowSettings/);

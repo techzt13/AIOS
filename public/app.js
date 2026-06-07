@@ -25,7 +25,7 @@ const messagesEl = document.getElementById('messages');
 const chatForm = document.getElementById('chatForm');
 const messageInput = document.getElementById('messageInput');
 const newChatButton = document.getElementById('newChatButton');
-const chatStatusPill = document.getElementById('chatStatusPill');
+const chatModelSelect = document.getElementById('chatModelSelect');
 
 const filesPathInput = document.getElementById('filesPathInput');
 const filesUpButton = document.getElementById('filesUpButton');
@@ -596,6 +596,60 @@ function renderProviderSetupList() {
   });
 }
 
+function renderChatModelSelect() {
+  const currentSelection = chatModelSelect.value;
+  chatModelSelect.innerHTML = '';
+  
+  const groups = new Map();
+  let hasUsable = false;
+
+  providers.forEach((provider) => {
+    if (!isProviderUsable(provider) || !provider.models?.length) return;
+    hasUsable = true;
+
+    if (!groups.has(provider.category)) {
+      const group = document.createElement('optgroup');
+      group.label = provider.category;
+      groups.set(provider.category, group);
+      chatModelSelect.appendChild(group);
+    }
+
+    provider.models.forEach((model) => {
+      const option = document.createElement('option');
+      option.value = `${provider.id}|${model}`;
+      const modelName = model.replace(/^github-copilot\//, '');
+      option.textContent = `${provider.name} - ${modelName}`;
+      groups.get(provider.category).appendChild(option);
+    });
+  });
+
+  if (!hasUsable) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No providers configured';
+    chatModelSelect.appendChild(option);
+    return;
+  }
+  
+  if (currentSelection && chatModelSelect.querySelector(`option[value="${currentSelection}"]`)) {
+    chatModelSelect.value = currentSelection;
+  } else {
+    const prefProvider = shellState.preferences?.providerId;
+    if (prefProvider) {
+       const p = providers.find(p => p.id === prefProvider);
+       const prefModel = preferredModelForProvider(p);
+       if (p && prefModel) {
+          const val = `${prefProvider}|${prefModel}`;
+          if (chatModelSelect.querySelector(`option[value="${val}"]`)) {
+             chatModelSelect.value = val;
+             return;
+          }
+       }
+    }
+    chatModelSelect.value = chatModelSelect.querySelector('option:not([value=""])').value;
+  }
+}
+
 function updateModelOptions() {
   const provider = selectedProvider();
   const models = provider?.models || [];
@@ -608,19 +662,6 @@ function updateModelOptions() {
   providerApiSecretInput.placeholder = provider?.hasStoredApiSecret ? 'Stored secret is configured' : 'secret';
 
   renderAuthState(provider);
-  providerStatusBadge.textContent = `Provider: ${provider?.name || 'not selected'}`;
-  updateChatStatusPill(provider, modelSelect.value);
-  persistProviderChoice(provider, modelSelect.value);
-}
-
-function updateChatStatusPill(provider = selectedProvider(), model = modelSelect.value) {
-  const modelName = String(model || provider?.defaultModel || provider?.models?.[0] || 'No model')
-    .replace(/^github-copilot\//, '')
-    .replace(/^(.{42}).+$/, '$1...');
-  const status = provider?.configured || provider?.authMethod === 'none' ? 'Ready' : statusLabel(provider || {});
-  chatStatusPill.textContent = provider
-    ? `${status} - ${provider.name} / ${modelName}`
-    : 'No provider selected';
 }
 
 function updateWizardModelOptions() {
@@ -837,10 +878,8 @@ async function loadProviders() {
   const provider = selectedProvider();
   selectValidModel(modelSelect, provider?.models || [], preferredModelForProvider(provider, currentModel));
   renderAuthState(provider);
-  providerStatusBadge.textContent = `Provider: ${provider?.name || 'not selected'}`;
-  updateChatStatusPill(provider, modelSelect.value);
-  persistProviderChoice(provider, modelSelect.value);
   renderProviderSetupList();
+  renderChatModelSelect();
 }
 
 function stopCopilotPolling() {
@@ -1113,9 +1152,9 @@ async function finishWizard() {
   providerSelect.value = provider.id;
   const selected = selectedProvider();
   selectValidModel(modelSelect, selected?.models || [], preferredModelForProvider(selected, wizardModelSelect.value));
-  persistProviderChoice(selected, modelSelect.value);
+  persistProviderChoice(selected, wizardModelSelect.value);
   renderAuthState(selected);
-  updateChatStatusPill(selected, modelSelect.value);
+  await loadProviders();
 
   closeWizard();
   openWindow('chat');
@@ -1403,20 +1442,23 @@ wizardFinishButton.addEventListener('click', () => {
   finishWizard().catch((error) => setFeedback(wizardFinishStatus, error.message, 'error'));
 });
 
+chatModelSelect.addEventListener('change', () => {
+  const [providerId, model] = (chatModelSelect.value || '').split('|');
+  const provider = providers.find(p => p.id === providerId);
+  if (provider) persistProviderChoice(provider, model);
+});
+
 chatForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const text = messageInput.value.trim();
   if (!text) return;
 
-  const provider = selectedProvider();
-  if (!provider) return;
-  const model = provider.models?.includes(modelSelect.value) ? modelSelect.value : provider.models?.[0];
-  if (!model) {
-    renderMessage('system', `No model is available for ${provider.name}.`);
+  const [providerId, model] = (chatModelSelect.value || '').split('|');
+  const provider = providers.find(p => p.id === providerId);
+  
+  if (!provider || !model) {
+    renderMessage('system', 'No chat provider selected or configured.');
     return;
-  }
-  if (modelSelect.value !== model) {
-    modelSelect.value = model;
   }
 
   renderMessage('user', text);
