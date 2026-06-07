@@ -1067,7 +1067,7 @@ button.secondary {
   height: calc(100% - 24px);
   resize: none;
   background: transparent;
-  color: #e8f2ff;
+  color: #152038;
   border: none;
   outline: none;
   font-family: inherit;
@@ -1076,9 +1076,13 @@ button.secondary {
   padding: 8px 12px;
 }
 
+.notes-textarea::placeholder {
+  color: rgba(21, 32, 56, 0.4);
+}
+
 .notes-status {
   font-size: 0.75rem;
-  color: #7b99c6;
+  color: rgba(21, 32, 56, 0.6);
   text-align: right;
   padding: 4px 8px;
 }
