@@ -414,6 +414,9 @@ body {
 }
 
 .chat-window {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background:
     radial-gradient(circle at 12% 4%, rgba(255, 255, 255, 0.62), transparent 28%),
     radial-gradient(circle at 84% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 34%),
@@ -421,8 +424,10 @@ body {
 }
 
 .messages {
-  height: calc(100% - 52px);
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -432,6 +437,7 @@ body {
 .message {
   position: relative;
   isolation: isolate;
+  min-width: 0;
   overflow: hidden;
   border-radius: 18px;
   padding: 12px 14px;
@@ -564,6 +570,7 @@ body {
 .composer {
   position: relative;
   isolation: isolate;
+  flex: 0 0 auto;
   overflow: hidden;
   margin-top: 8px;
   padding: 8px;
