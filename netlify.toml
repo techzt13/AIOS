@@ -1,3 +1,6 @@
+[build]
+  publish = "landing"
+
 [[headers]]
   for = "/*"
   [headers.values]
