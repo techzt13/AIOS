@@ -6,6 +6,8 @@ AIOS runs as a macOS-inspired **web OS shell** served directly by the AIOS app o
 ## Quick start
 
 ```bash
+git clone https://github.com/techzt13/AIOS.git
+cd AIOS
 npm install
 npm start
 ```
