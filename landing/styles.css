@@ -702,3 +702,9 @@ a {
   .app-chat { left: 16px; }
   .window-body { height: 380px; }
 }
+
+/* Fallback for disabled JS */
+noscript .reveal {
+  opacity: 1;
+  transform: none;
+}
