@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <noscript><style>.reveal { opacity: 1; transform: none; }</style></noscript>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AIOS — The OS built for AI users and nerds</title>
-  <meta name="description" content="AIOS is a macOS-inspired web OS shell built for AI users and nerds. Windowed apps, AI chat, provider integrations, and a private local-first data model." />
+  <meta name="description" content="AIOS is a macOS-inspired web OS shell built for AI users and nerds. Windowed apps, AI chat, a built-in browser, notes, terminal, and a private local-first data model." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="stylesheet" href="styles.css?v=3" />
+  <noscript><style>.reveal { opacity: 1; transform: none; }</style></noscript>
 </head>
 <body>
   <!-- Nav -->
@@ -19,6 +19,7 @@
         <a href="#apps">Apps</a>
         <a href="#privacy">Privacy</a>
         <a href="#providers">Providers</a>
+        <a href="#how">How it works</a>
         <a href="#start">Get started</a>
       </nav>
       <a class="nav-cta" href="https://github.com/techzt13/AIOS" target="_blank" rel="noopener">GitHub ↗</a>
@@ -72,8 +73,9 @@
             <span class="dock-icon" style="--c:#ff5f6d">◎</span>
             <span class="dock-icon" style="--c:#2bb3ff">▤</span>
             <span class="dock-icon" style="--c:#34c759">›_</span>
+            <span class="dock-icon" style="--c:#ffd60a">✎</span>
+            <span class="dock-icon" style="--c:#0a84ff">◍</span>
             <span class="dock-icon" style="--c:#ffb020">⚙</span>
-            <span class="dock-icon" style="--c:#a06bff">✦</span>
           </div>
         </div>
       </div>
@@ -84,7 +86,7 @@
   <section class="statement" id="overview">
     <h2 class="reveal">Your desktop. Your apps.<br /><span class="muted">All in the browser, on port 8080.</span></h2>
     <div class="stat-grid">
-      <div class="stat reveal"><span class="stat-num">5</span><span class="stat-label">Built-in apps</span></div>
+      <div class="stat reveal"><span class="stat-num">6</span><span class="stat-label">Built-in apps</span></div>
       <div class="stat reveal"><span class="stat-num">0</span><span class="stat-label">Containers required</span></div>
       <div class="stat reveal"><span class="stat-num">100%</span><span class="stat-label">Local-first data</span></div>
       <div class="stat reveal"><span class="stat-num">∞</span><span class="stat-label">Nerd energy</span></div>
@@ -99,32 +101,37 @@
       <article class="card reveal">
         <div class="card-icon" style="--c:#ff5f6d">◎</div>
         <h3>AI Chat</h3>
-        <p>Talk to your providers right from the desktop. Multi-provider, ready out of the box.</p>
+        <p>Talk to any provider right from the desktop. Switch models on the fly, with markdown and code blocks built in.</p>
       </article>
       <article class="card reveal">
         <div class="card-icon" style="--c:#2bb3ff">▤</div>
         <h3>Files</h3>
-        <p>Browse, read, and write inside a sandboxed workspace. No traversal escapes allowed.</p>
+        <p>Browse, read, and write inside a sandboxed workspace. Path traversal escapes are blocked by design.</p>
       </article>
       <article class="card reveal">
         <div class="card-icon" style="--c:#34c759">›_</div>
         <h3>Terminal</h3>
-        <p>A real shell experience, guarded by an opt-in exec API for safe command execution.</p>
+        <p>A real shell experience with command history, guarded by an opt-in exec API for safe execution.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card-icon" style="--c:#ffd60a">✎</div>
+        <h3>Notes</h3>
+        <p>A multi-note editor with a sidebar, instant autosave, and a local cache fallback so nothing is lost.</p>
+      </article>
+      <article class="card reveal">
+        <div class="card-icon" style="--c:#0a84ff">◍</div>
+        <h3>Browser</h3>
+        <p>A built-in web browser with an address bar and back, forward, and reload — all in a sandboxed frame.</p>
       </article>
       <article class="card reveal">
         <div class="card-icon" style="--c:#ffb020">⚙</div>
         <h3>Settings</h3>
-        <p>Manage providers, keys, and preferences with a clean, focused control center.</p>
-      </article>
-      <article class="card reveal">
-        <div class="card-icon" style="--c:#a06bff">✦</div>
-        <h3>Setup Assistant</h3>
-        <p>A guided first-run flow: select, connect, test, finish. You're online in minutes.</p>
+        <p>Manage providers, API keys, and preferences with a clean, focused control center.</p>
       </article>
       <article class="card reveal card-wide">
         <div class="card-icon" style="--c:#8e8e93">🖥</div>
-        <h3>Desktop shell</h3>
-        <p>Wallpaper, top menu bar, and a dock — the macOS-inspired feel you already know.</p>
+        <h3>The desktop shell</h3>
+        <p>Wallpaper, a top menu bar, draggable windows with snap and zoom, and a magnifying dock — the macOS-inspired feel you already know, in the browser.</p>
       </article>
     </div>
   </section>
@@ -148,14 +155,73 @@
   <section class="providers" id="providers">
     <p class="eyebrow center reveal">Providers</p>
     <h2 class="section-title reveal">Bring your own AI.</h2>
-    <p class="section-sub reveal">A flexible provider catalog with first-class GitHub Copilot integration — device login or environment token.</p>
+    <p class="section-sub reveal">A flexible catalog of 20+ providers across frontier labs, regional models, local runtimes, and gateways — with first-class GitHub Copilot device login or environment-token auth.</p>
     <div class="pill-row reveal">
       <span class="pill">Anthropic</span>
       <span class="pill">OpenAI</span>
       <span class="pill">Gemini</span>
+      <span class="pill">DeepSeek</span>
+      <span class="pill">xAI Grok</span>
+      <span class="pill">Mistral</span>
       <span class="pill">GitHub Copilot</span>
-      <span class="pill">Baidu</span>
+      <span class="pill">Qwen</span>
+      <span class="pill">Moonshot Kimi</span>
+      <span class="pill">Zhipu GLM</span>
+      <span class="pill">MiniMax</span>
+      <span class="pill">Baidu ERNIE</span>
+      <span class="pill">Xiaomi MiMo</span>
+      <span class="pill">Ollama</span>
+      <span class="pill">LM Studio</span>
+      <span class="pill">OpenRouter</span>
+      <span class="pill">Hugging Face</span>
+      <span class="pill">NVIDIA NIM</span>
+      <span class="pill">Vercel AI Gateway</span>
+      <span class="pill pill-muted">+ any OpenAI-compatible API</span>
     </div>
+  </section>
+
+  <!-- How it works / tutorial -->
+  <section class="how" id="how">
+    <p class="eyebrow center reveal">How it works</p>
+    <h2 class="section-title reveal">From zero to chatting in five steps.</h2>
+    <p class="section-sub reveal">The first time you open AIOS, the Setup Assistant walks you through everything. No config files to hand-edit.</p>
+    <ol class="steps">
+      <li class="step reveal">
+        <span class="step-num">1</span>
+        <div class="step-body">
+          <h3>Start</h3>
+          <p>Run <code>npm install &amp;&amp; npm start</code> and open <code>localhost:8080</code>. The Setup Assistant launches automatically on first run.</p>
+        </div>
+      </li>
+      <li class="step reveal">
+        <span class="step-num">2</span>
+        <div class="step-body">
+          <h3>Pick a provider</h3>
+          <p>Choose from 20+ providers — frontier labs, regional models, local runtimes like Ollama, or GitHub Copilot — then select the model you want as your default.</p>
+        </div>
+      </li>
+      <li class="step reveal">
+        <span class="step-num">3</span>
+        <div class="step-body">
+          <h3>Connect</h3>
+          <p>Sign in with the GitHub device flow for Copilot, or paste an API key. Secrets are stored server-side and never returned raw to the browser.</p>
+        </div>
+      </li>
+      <li class="step reveal">
+        <span class="step-num">4</span>
+        <div class="step-body">
+          <h3>Test</h3>
+          <p>One click runs a minimal round-trip against your provider so you know the connection works before you rely on it.</p>
+        </div>
+      </li>
+      <li class="step reveal">
+        <span class="step-num">5</span>
+        <div class="step-body">
+          <h3>Finish</h3>
+          <p>You land on the desktop. Open AI Chat, the Browser, Notes, Files, or the Terminal — and get to work.</p>
+        </div>
+      </li>
+    </ol>
   </section>
 
   <!-- Get started -->
@@ -189,6 +255,6 @@
     </div>
   </footer>
 
-  <script src="script.js?v=2"></script>
+  <script src="script.js?v=3"></script>
 </body>
 </html>
