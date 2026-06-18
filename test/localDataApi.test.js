@@ -160,10 +160,10 @@ test('third-party app APIs persist safe web app launchers locally', async () => 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'Linear',
+          short_name: 'LN',
           url: 'https://linear.app',
-          glyph: 'LN',
           description: 'Project tracker',
-          version: '1.2.3'
+          manifestUrl: 'https://linear.app/manifest.webmanifest'
         })
       });
       payload = await response.json();
@@ -173,8 +173,8 @@ test('third-party app APIs persist safe web app launchers locally', async () => 
       assert.equal(payload.app.url, 'https://linear.app/');
       assert.equal(payload.app.glyph, 'LN');
       assert.equal(payload.app.description, 'Project tracker');
-      assert.equal(payload.app.version, '1.2.3');
-      assert.equal(payload.app.format, 'aiosapp');
+      assert.equal(payload.app.format, 'web-manifest');
+      assert.equal(payload.app.manifestUrl, 'https://linear.app/manifest.webmanifest');
 
       const appId = payload.app.id;
       response = await fetch(`${baseUrl}/api/apps`);
@@ -204,6 +204,72 @@ test('third-party app APIs persist safe web app launchers locally', async () => 
       payload = await response.json();
       assert.equal(response.ok, true);
       assert.deepEqual(payload.apps, []);
+    });
+  } finally {
+    if (originalDataDir === undefined) {
+      delete process.env.AIOS_DATA_DIR;
+    } else {
+      process.env.AIOS_DATA_DIR = originalDataDir;
+    }
+  }
+});
+
+test('third-party app API can import a standard web app manifest from a site URL', async () => {
+  const originalDataDir = process.env.AIOS_DATA_DIR;
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'aios-pwa-data-'));
+  process.env.AIOS_DATA_DIR = tempDir;
+
+  const responses = new Map([
+    ['https://example.test/', {
+      ok: true,
+      status: 200,
+      headers: new Map(),
+      body: '<html><head><link rel="manifest" href="/manifest.webmanifest"></head></html>'
+    }],
+    ['https://example.test/manifest.webmanifest', {
+      ok: true,
+      status: 200,
+      headers: new Map([['content-length', '120']]),
+      body: JSON.stringify({
+        name: 'Example PWA',
+        short_name: 'EX',
+        start_url: '/app',
+        description: 'Imported from a standard Web App Manifest'
+      })
+    }]
+  ]);
+
+  try {
+    const app = createApp({
+      getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null }),
+      fetch: async (url) => {
+        const fixture = responses.get(url);
+        assert.ok(fixture, `unexpected fetch ${url}`);
+        return {
+          ok: fixture.ok,
+          status: fixture.status,
+          headers: {
+            get: (key) => fixture.headers.get(key.toLowerCase()) || null
+          },
+          text: async () => fixture.body
+        };
+      }
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/apps/import-web-manifest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'https://example.test/' })
+      });
+      const payload = await response.json();
+      assert.equal(response.status, 201);
+      assert.equal(payload.ok, true);
+      assert.equal(payload.app.name, 'Example PWA');
+      assert.equal(payload.app.url, 'https://example.test/app');
+      assert.equal(payload.app.glyph, 'EX');
+      assert.equal(payload.app.format, 'web-manifest');
+      assert.equal(payload.manifestUrl, 'https://example.test/manifest.webmanifest');
     });
   } finally {
     if (originalDataDir === undefined) {

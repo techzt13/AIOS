@@ -59,6 +59,7 @@ const installAppForm = document.getElementById('installAppForm');
 const installAppName = document.getElementById('installAppName');
 const installAppUrl = document.getElementById('installAppUrl');
 const installAppGlyph = document.getElementById('installAppGlyph');
+const installFromPwaButton = document.getElementById('installFromPwaButton');
 const installAppManifestFile = document.getElementById('installAppManifestFile');
 const installAppManifestButton = document.getElementById('installAppManifestButton');
 const installAppStatus = document.getElementById('installAppStatus');
@@ -1505,20 +1506,21 @@ async function installThirdPartyApp({ name, url, glyph }) {
   });
 }
 
-function readAiosAppManifest(value) {
+function readWebAppManifest(value) {
   const manifest = value && typeof value === 'object' ? value : {};
   const app = manifest.app && typeof manifest.app === 'object' ? manifest.app : manifest;
   return {
     name: app.name,
-    url: app.url || app.startUrl,
-    glyph: app.glyph || app.iconText,
+    short_name: app.short_name,
+    url: app.url || app.start_url || app.startUrl,
+    glyph: app.glyph || app.iconText || app.short_name,
     description: app.description,
-    version: app.version
+    manifestUrl: app.manifestUrl
   };
 }
 
 async function installAppManifest(manifest) {
-  const appManifest = readAiosAppManifest(manifest);
+  const appManifest = readWebAppManifest(manifest);
   const response = await fetch('/api/apps', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1540,7 +1542,7 @@ async function installAppManifest(manifest) {
 async function installSelectedManifestFile() {
   const file = installAppManifestFile.files?.[0];
   if (!file) {
-    setFeedback(installAppStatus, 'Choose a .aiosapp JSON file first.', 'error');
+    setFeedback(installAppStatus, 'Choose a manifest.webmanifest or manifest.json file first.', 'error');
     return;
   }
 
@@ -1549,10 +1551,34 @@ async function installSelectedManifestFile() {
   try {
     manifest = JSON.parse(raw);
   } catch {
-    throw new Error('Selected .aiosapp file is not valid JSON.');
+    throw new Error('Selected web app manifest file is not valid JSON.');
   }
 
   await installAppManifest(manifest);
+}
+
+async function installFromPwaUrl() {
+  const url = installAppUrl.value.trim();
+  if (!url) {
+    setFeedback(installAppStatus, 'Enter a website or manifest URL first.', 'error');
+    return;
+  }
+
+  const response = await fetch('/api/apps/import-web-manifest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url })
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to import web app manifest.');
+  }
+
+  installAppName.value = '';
+  installAppUrl.value = '';
+  installAppGlyph.value = '';
+  setFeedback(installAppStatus, `${payload.app.name} installed from Web App Manifest.`, 'success');
+  await loadInstalledApps();
 }
 
 async function removeInstalledApp(appId) {
@@ -2004,6 +2030,10 @@ installAppForm.addEventListener('submit', (event) => {
 
 installAppManifestButton.addEventListener('click', () => {
   installSelectedManifestFile().catch((error) => setFeedback(installAppStatus, error.message, 'error'));
+});
+
+installFromPwaButton.addEventListener('click', () => {
+  installFromPwaUrl().catch((error) => setFeedback(installAppStatus, error.message, 'error'));
 });
 
 document.querySelectorAll('[data-window-action]').forEach((button) => {

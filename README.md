@@ -117,22 +117,24 @@ Exec commands are tracked as AIOS processes so the desktop can show command life
 - `GET /api/settings/provider-audit`
 - `GET /api/apps`
 - `POST /api/apps`
+- `POST /api/apps/import-web-manifest`
 - `DELETE /api/apps/:appId`
 
 ## Third-party app format
 
-AIOS installs third-party apps as local web-app launchers, either from the Apps window form or from a `.aiosapp` JSON manifest. For now, AIOS does not run arbitrary downloaded code or native packages like `.dmg`, `.deb`, or `.tar.gz`; apps are HTTPS/HTTP web apps opened through the AIOS Browser or, when a site blocks embedding, the system browser.
+AIOS installs third-party apps using the standard **PWA/Web App Manifest** format (`manifest.webmanifest` or `manifest.json`). You can install by entering a website URL and asking AIOS to find `<link rel="manifest">`, or by importing a manifest file directly.
 
-Example `.aiosapp` file:
+For now, AIOS does not run arbitrary downloaded code or native packages like `.dmg`, `.deb`, or `.tar.gz`; apps are HTTPS/HTTP web apps opened through the AIOS Browser or, when a site blocks embedding, the system browser.
+
+Example `manifest.webmanifest`:
 
 ```json
 {
-  "aiosApp": 1,
-  "name": "YouTube",
-  "url": "https://youtube.com",
-  "glyph": "YT",
-  "description": "Video app",
-  "version": "1.0.0"
+  "name": "Example App",
+  "short_name": "EX",
+  "start_url": "https://example.com",
+  "display": "standalone",
+  "description": "Standard Web App Manifest"
 }
 ```
 

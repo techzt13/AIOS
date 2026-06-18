@@ -35,7 +35,9 @@ test('web shell desktop markup includes menu bar, dock, and app windows', async 
   assert.match(indexHtml, /id="browserOpenExternalButton"/);
   assert.match(indexHtml, /id="browserBlockedNotice"/);
   assert.match(indexHtml, /id="performanceModeToggle"/);
+  assert.match(indexHtml, /id="installFromPwaButton"/);
   assert.match(indexHtml, /id="installAppManifestFile"/);
+  assert.match(indexHtml, /\.webmanifest/);
   assert.match(indexHtml, /id="openSetupAssistant"/);
   assert.match(indexHtml, /data-launch-app="chat"/);
   assert.match(indexHtml, /data-launch-app="settings"/);
@@ -54,6 +56,7 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /\/api\/local-data\/imports/);
   assert.match(appJs, /\/api\/settings\/provider-audit/);
   assert.match(appJs, /\/api\/apps/);
+  assert.match(appJs, /\/api\/apps\/import-web-manifest/);
   assert.match(appJs, /function startNewChat/);
   assert.match(appJs, /apps: 'windowApps'/);
   assert.match(appJs, /data-launch-app/);
@@ -81,7 +84,9 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /preferredModelForProvider/);
   assert.match(appJs, /function renderInstalledApps/);
   assert.match(appJs, /function installThirdPartyApp/);
+  assert.match(appJs, /function readWebAppManifest/);
   assert.match(appJs, /function installSelectedManifestFile/);
+  assert.match(appJs, /function installFromPwaUrl/);
   assert.match(appJs, /openBrowserUrl\(app\.url\)/);
   assert.match(appJs, /openCurrentBrowserUrlExternally/);
   assert.match(appJs, /performanceMode/);

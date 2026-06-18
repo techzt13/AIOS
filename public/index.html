@@ -320,7 +320,7 @@
                   <p class="wizard-kicker">Third-party apps</p>
                   <h3>Install web apps</h3>
                 </div>
-                <p class="status-text">AIOS stores app launchers locally and opens them in the Browser sandbox.</p>
+                <p class="status-text">AIOS installs standard PWA/Web App Manifest launchers and opens them in the Browser sandbox.</p>
               </div>
               <form id="installAppForm" class="install-app-form">
                 <input id="installAppName" type="text" placeholder="App name" maxlength="80" required />
@@ -329,18 +329,18 @@
                 <button type="submit">Install</button>
               </form>
               <div class="toolbar app-package-toolbar">
-                <input id="installAppManifestFile" type="file" accept=".aiosapp,.json,application/json" />
-                <button id="installAppManifestButton" type="button" class="secondary">Install .aiosapp file</button>
+                <button id="installFromPwaButton" type="button" class="secondary">Find PWA manifest from URL</button>
+                <input id="installAppManifestFile" type="file" accept=".webmanifest,.json,application/manifest+json,application/json" />
+                <button id="installAppManifestButton" type="button" class="secondary">Install manifest file</button>
               </div>
               <details class="app-format-help">
-                <summary>AIOS app package format</summary>
+                <summary>Supported app format</summary>
                 <pre>{
-  "aiosApp": 1,
-  "name": "YouTube",
-  "url": "https://youtube.com",
-  "glyph": "YT",
-  "description": "Video app",
-  "version": "1.0.0"
+  "name": "Example App",
+  "short_name": "EX",
+  "start_url": "https://example.com",
+  "display": "standalone",
+  "description": "Standard Web App Manifest"
 }</pre>
               </details>
               <p id="installAppStatus" class="status-text"></p>

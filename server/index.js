@@ -53,6 +53,106 @@ const ENABLE_EXEC_API = String(process.env.ENABLE_EXEC_API || '').toLowerCase() 
 const EXEC_TIMEOUT_MS = Number(process.env.EXEC_TIMEOUT_MS || 15000);
 const EXEC_MAX_OUTPUT_BYTES = Number(process.env.EXEC_MAX_OUTPUT_BYTES || 256000);
 const FS_READ_MAX_BYTES = Number(process.env.FS_READ_MAX_BYTES || 1048576);
+const WEB_APP_MANIFEST_MAX_BYTES = Number(process.env.WEB_APP_MANIFEST_MAX_BYTES || 524288);
+
+function resolveHttpUrl(value, baseUrl = undefined) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) {
+    throw new Error('A valid http:// or https:// URL is required.');
+  }
+
+  let url;
+  try {
+    url = new URL(raw, baseUrl);
+  } catch {
+    throw new Error('A valid http:// or https:// URL is required.');
+  }
+
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('Only http:// and https:// URLs are supported.');
+  }
+
+  return url.toString();
+}
+
+function parseManifestLink(html, pageUrl) {
+  const linkPattern = /<link\b[^>]*>/gi;
+  let match;
+  while ((match = linkPattern.exec(html)) !== null) {
+    const tag = match[0];
+    const relMatch = tag.match(/\brel\s*=\s*["']?([^"'\s>]+)/i);
+    if (!relMatch || !relMatch[1].split(/\s+/).some((value) => value.toLowerCase() === 'manifest')) {
+      continue;
+    }
+
+    const hrefMatch = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i) || tag.match(/\bhref\s*=\s*([^\s>]+)/i);
+    if (hrefMatch?.[1]) {
+      return resolveHttpUrl(hrefMatch[1], pageUrl);
+    }
+  }
+
+  return null;
+}
+
+async function fetchTextWithinLimit(fetchImpl, url) {
+  const response = await fetchImpl(url, {
+    headers: {
+      Accept: 'application/manifest+json, application/json, text/html;q=0.9, */*;q=0.8',
+      'User-Agent': 'AIOS'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url} (HTTP ${response.status}).`);
+  }
+
+  const contentLength = Number(response.headers?.get?.('content-length') || 0);
+  if (contentLength > WEB_APP_MANIFEST_MAX_BYTES) {
+    throw new Error('Response is too large to inspect as a web app manifest.');
+  }
+
+  const text = await response.text();
+  if (Buffer.byteLength(text, 'utf8') > WEB_APP_MANIFEST_MAX_BYTES) {
+    throw new Error('Response is too large to inspect as a web app manifest.');
+  }
+
+  return text;
+}
+
+async function resolveWebAppManifest({ url, fetchImpl = fetch }) {
+  const inputUrl = resolveHttpUrl(url);
+  const firstText = await fetchTextWithinLimit(fetchImpl, inputUrl);
+
+  try {
+    return {
+      manifest: JSON.parse(firstText),
+      manifestUrl: inputUrl
+    };
+  } catch {
+    const manifestUrl = parseManifestLink(firstText, inputUrl);
+    if (!manifestUrl) {
+      throw new Error('No <link rel="manifest"> was found at that site.');
+    }
+
+    const manifestText = await fetchTextWithinLimit(fetchImpl, manifestUrl);
+    return {
+      manifest: JSON.parse(manifestText),
+      manifestUrl
+    };
+  }
+}
+
+function appFromWebManifest(manifest, manifestUrl) {
+  const startUrl = resolveHttpUrl(manifest.start_url || manifest.startUrl || '/', manifestUrl);
+  return {
+    name: manifest.name || manifest.short_name,
+    short_name: manifest.short_name,
+    url: startUrl,
+    glyph: manifest.short_name,
+    description: manifest.description,
+    manifestUrl
+  };
+}
 
 function createApp(deps = {}) {
   const app = express();
@@ -67,6 +167,7 @@ function createApp(deps = {}) {
   const upsertProviderSettingsImpl = deps.upsertProviderSettings || upsertProviderSettings;
   const clearProviderSettingsImpl = deps.clearProviderSettings || clearProviderSettings;
   const processRegistry = deps.processRegistry || new ProcessRegistry();
+  const fetchImpl = deps.fetch || fetch;
 
   const apiLimiter = rateLimit({
     windowMs: RATE_LIMIT_WINDOW_MS,
@@ -224,12 +325,29 @@ function createApp(deps = {}) {
     try {
       const app = await installApp({
         name: req.body?.name,
+        short_name: req.body?.short_name,
         url: req.body?.url,
+        start_url: req.body?.start_url,
+        startUrl: req.body?.startUrl,
         glyph: req.body?.glyph,
         description: req.body?.description,
-        version: req.body?.version
+        version: req.body?.version,
+        manifestUrl: req.body?.manifestUrl
       });
       return res.status(201).json({ ok: true, app });
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post('/api/apps/import-web-manifest', async (req, res) => {
+    try {
+      const { manifest, manifestUrl } = await resolveWebAppManifest({
+        url: req.body?.url,
+        fetchImpl
+      });
+      const app = await installApp(appFromWebManifest(manifest, manifestUrl));
+      return res.status(201).json({ ok: true, app, manifestUrl });
     } catch (error) {
       return res.status(400).json({ ok: false, error: error.message });
     }

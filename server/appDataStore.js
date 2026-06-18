@@ -280,16 +280,25 @@ function normalizeInstalledApp(app) {
     return null;
   }
 
-  const name = sanitizeAppName(app.name);
+  const name = sanitizeAppName(app.name || app.short_name);
   if (!name) {
     return null;
   }
 
   let url;
   try {
-    url = normalizeAppUrl(app.url);
+    url = normalizeAppUrl(app.url || app.start_url || app.startUrl);
   } catch {
     return null;
+  }
+
+  let manifestUrl = '';
+  if (typeof app.manifestUrl === 'string' && app.manifestUrl.trim()) {
+    try {
+      manifestUrl = normalizeAppUrl(app.manifestUrl);
+    } catch {
+      manifestUrl = '';
+    }
   }
 
   const timestamp = new Date().toISOString();
@@ -297,10 +306,11 @@ function normalizeInstalledApp(app) {
     id: typeof app.id === 'string' && app.id.trim() ? app.id : crypto.randomUUID(),
     name,
     url,
-    glyph: normalizeAppGlyph(app.glyph, name),
+    glyph: normalizeAppGlyph(app.glyph || app.short_name, name),
     description: sanitizeAppDescription(app.description),
     version: sanitizeAppVersion(app.version),
-    format: 'aiosapp',
+    format: 'web-manifest',
+    manifestUrl,
     installedAt: typeof app.installedAt === 'string' ? app.installedAt : timestamp,
     updatedAt: typeof app.updatedAt === 'string' ? app.updatedAt : timestamp
   };
@@ -318,8 +328,18 @@ async function listInstalledApps() {
   return store.apps;
 }
 
-async function installApp({ name, url, glyph, description, version }) {
-  const app = normalizeInstalledApp({ name, url, glyph, description, version });
+async function installApp({ name, short_name, url, start_url, startUrl, glyph, description, version, manifestUrl }) {
+  const app = normalizeInstalledApp({
+    name,
+    short_name,
+    url,
+    start_url,
+    startUrl,
+    glyph,
+    description,
+    version,
+    manifestUrl
+  });
   if (!app) {
     throw new Error('A valid app name and URL are required.');
   }
