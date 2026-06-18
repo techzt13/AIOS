@@ -836,7 +836,11 @@ function createApp(deps = {}) {
     }
   });
 
-  app.use(apiLimiter, (_req, res) => {
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ ok: false, error: 'Unknown AIOS API endpoint.' });
+  });
+
+  app.use((_req, res) => {
     res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
   });
 

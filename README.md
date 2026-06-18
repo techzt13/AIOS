@@ -128,7 +128,11 @@ Exec commands are tracked as AIOS processes so the desktop can show command life
 
 AIOS installs third-party apps using the standard **PWA/Web App Manifest** format (`manifest.webmanifest` or `manifest.json`). You can install by entering a website URL and asking AIOS to find `<link rel="manifest">`, or by importing a manifest file directly.
 
-For now, AIOS does not run arbitrary downloaded code or native packages like `.dmg`, `.deb`, or `.tar.gz`; apps are HTTPS/HTTP web apps opened through the AIOS Browser or, when a site blocks embedding, the system browser.
+For now, AIOS does not run arbitrary downloaded code or native packages like `.dmg`, `.deb`, or `.tar.gz`; apps are HTTPS/HTTP web apps opened through the AIOS Browser or, when a site blocks embedding, a real top-level browser tab.
+
+## Browser behavior
+
+AIOS uses an embedded browser frame for sites that allow embedding. Protected sites such as YouTube, Google, GitHub, and major social apps intentionally block iframe browsers with browser security headers. AIOS detects those hosts and opens them as real top-level browser tabs automatically so video playback, login, popups, and navigation can work normally instead of showing a broken embedded page.
 
 Example `manifest.webmanifest`:
 
@@ -146,7 +150,7 @@ Example `manifest.webmanifest`:
 
 AIOS can import `.tar.gz`, `.tgz`, and `.tar` Linux archives into the local app library. These packages are stored locally under the AIOS data directory and marked `stored-for-linux-runtime`. For direct archive URLs, AIOS can download with a Linux desktop user-agent so servers that choose files based on user-agent have a better chance of returning the Linux package.
 
-They do **not** execute yet. Running Linux binaries on macOS requires the planned AIOS Linux runtime/container layer. The browser iframe also cannot make every website detect your Mac as Linux; websites see the real browser unless AIOS fetches a direct download URL server-side or later runs a Linux browser/runtime.
+They do **not** execute yet. Running Linux binaries on macOS requires the planned AIOS Linux runtime/container layer. The embedded browser frame also cannot make every website detect your Mac as Linux; websites see the real browser unless AIOS fetches a direct download URL server-side or later runs a Linux browser/runtime.
 
 ## Project structure
 

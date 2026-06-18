@@ -128,6 +128,20 @@ test('first-run settings API supports get, set, and reset', async () => {
   });
 });
 
+test('unknown API endpoints return JSON instead of the web shell', async () => {
+  const app = createApp();
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/unknown-endpoint`);
+    const payload = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.match(response.headers.get('content-type') || '', /application\/json/);
+    assert.equal(payload.ok, false);
+    assert.match(payload.error, /Unknown AIOS API endpoint/);
+  });
+});
+
 test('provider connection test endpoint uses stored settings and minimal chat round-trip', async () => {
   let receivedRequest = null;
   const app = createApp({

@@ -50,11 +50,18 @@ const terminalRunButton = document.getElementById('terminalRunButton');
 const terminalOutput = document.getElementById('terminalOutput');
 
 const browserToolbar = document.getElementById('browserToolbar');
+const browserBackButton = document.getElementById('browserBackButton');
+const browserForwardButton = document.getElementById('browserForwardButton');
+const browserRefreshButton = document.getElementById('browserRefreshButton');
 const browserUrlInput = document.getElementById('browserUrlInput');
 const browserFrame = document.getElementById('browserFrame');
 const browserOpenExternalButton = document.getElementById('browserOpenExternalButton');
 const browserBlockedNotice = document.getElementById('browserBlockedNotice');
 const browserNoticeExternalButton = document.getElementById('browserNoticeExternalButton');
+const browserExternalPage = document.getElementById('browserExternalPage');
+const browserExternalDetail = document.getElementById('browserExternalDetail');
+const browserExternalLink = document.getElementById('browserExternalLink');
+const browserTryEmbedButton = document.getElementById('browserTryEmbedButton');
 const installAppForm = document.getElementById('installAppForm');
 const installAppName = document.getElementById('installAppName');
 const installAppUrl = document.getElementById('installAppUrl');
@@ -161,6 +168,8 @@ let installedApps = [];
 let linuxPackages = [];
 let browserLoadTimer = null;
 let currentBrowserUrl = '';
+let browserHistory = [];
+let browserHistoryIndex = -1;
 
 const IFRAME_BLOCKED_HOSTS = [
   'google.com',
@@ -395,13 +404,48 @@ function hostLikelyBlocksEmbedding(urlValue) {
   }
 }
 
-function showBrowserBlockedNotice(url) {
+function updateBrowserNavigationControls() {
+  browserBackButton.disabled = browserHistoryIndex <= 0;
+  browserForwardButton.disabled = browserHistoryIndex < 0 || browserHistoryIndex >= browserHistory.length - 1;
+}
+
+function rememberBrowserHistory(url) {
+  if (browserHistory[browserHistoryIndex] === url) {
+    updateBrowserNavigationControls();
+    return;
+  }
+
+  browserHistory = browserHistory.slice(0, browserHistoryIndex + 1);
+  browserHistory.push(url);
+  browserHistoryIndex = browserHistory.length - 1;
+  updateBrowserNavigationControls();
+}
+
+function showBrowserEmbeddedFrame() {
+  browserExternalPage.classList.add('hidden');
+  browserFrame.classList.remove('hidden');
+}
+
+function showBrowserExternalPage(url) {
+  browserFrame.classList.add('hidden');
+  browserExternalPage.classList.remove('hidden');
+  browserExternalLink.href = url;
+  browserExternalDetail.textContent = hostLikelyBlocksEmbedding(url)
+    ? 'Protected sites like YouTube block iframe browsers. AIOS opened this page as a top-level tab so video, login, and navigation work normally.'
+    : 'AIOS opened this page as a top-level tab. If the tab did not appear, use the button below to open it again.';
+}
+
+function showBrowserBlockedNotice(url, mode = 'blocked') {
   browserBlockedNotice.classList.remove('hidden');
   const detail = browserBlockedNotice.querySelector('span');
   if (detail) {
-    detail.textContent = hostLikelyBlocksEmbedding(url)
-      ? 'This site is known to block iframe browsers. Use Open outside AIOS, or use direct Linux package download links in the Linux packages installer.'
-      : 'If the page stays blank, this site may block embedded browsers. Use Open outside AIOS.';
+    if (mode === 'real-tab') {
+      detail.textContent = 'AIOS opened this protected site as a real top-level browser tab instead of a blocked iframe.';
+    } else {
+      detail.textContent = hostLikelyBlocksEmbedding(url)
+        ? 'This site is known to block embedded browsers. AIOS can open it as a real tab, or you can try embedded mode anyway.'
+        : 'If the page stays blank, this site may block embedded browsers. Open it as a real tab.';
+    }
   }
 }
 
@@ -409,13 +453,31 @@ function hideBrowserBlockedNotice() {
   browserBlockedNotice.classList.add('hidden');
 }
 
-function openBrowserUrl(rawValue) {
+function openRealBrowserTab(url) {
+  window.open(url, '_blank', 'noopener,noreferrer');
+  showBrowserExternalPage(url);
+  showBrowserBlockedNotice(url, 'real-tab');
+}
+
+function openBrowserUrl(rawValue, options = {}) {
   const url = normalizeBrowserUrl(rawValue);
   if (!url) return;
   if (browserLoadTimer) clearTimeout(browserLoadTimer);
+  if (options.recordHistory !== false) {
+    rememberBrowserHistory(url);
+  }
   currentBrowserUrl = url;
   hideBrowserBlockedNotice();
   browserUrlInput.value = url;
+
+  if (!options.forceEmbed && hostLikelyBlocksEmbedding(url)) {
+    browserFrame.src = 'about:blank';
+    openRealBrowserTab(url);
+    openWindow('browser');
+    return;
+  }
+
+  showBrowserEmbeddedFrame();
   browserFrame.src = url;
   if (hostLikelyBlocksEmbedding(url)) {
     showBrowserBlockedNotice(url);
@@ -428,7 +490,21 @@ function openBrowserUrl(rawValue) {
 function openCurrentBrowserUrlExternally() {
   const url = normalizeBrowserUrl(browserUrlInput.value || browserFrame.src);
   if (!url || url === 'about:blank') return;
-  window.open(url, '_blank', 'noopener,noreferrer');
+  openRealBrowserTab(url);
+}
+
+function navigateBrowserHistory(delta) {
+  const nextIndex = browserHistoryIndex + delta;
+  if (nextIndex < 0 || nextIndex >= browserHistory.length) return;
+  browserHistoryIndex = nextIndex;
+  updateBrowserNavigationControls();
+  openBrowserUrl(browserHistory[browserHistoryIndex], { recordHistory: false });
+}
+
+function refreshBrowserUrl() {
+  const url = normalizeBrowserUrl(currentBrowserUrl || browserUrlInput.value || browserFrame.src);
+  if (!url || url === 'about:blank') return;
+  openBrowserUrl(url, { recordHistory: false });
 }
 
 function formatPathUp(pathValue) {
@@ -2000,26 +2076,28 @@ browserToolbar.addEventListener('submit', (event) => {
   openBrowserUrl(browserUrlInput.value);
 });
 
-document.getElementById('browserBackButton').addEventListener('click', () => {
-  try { browserFrame.contentWindow.history.back(); } catch { /* ignore cross-origin */ }
-});
-document.getElementById('browserForwardButton').addEventListener('click', () => {
-  try { browserFrame.contentWindow.history.forward(); } catch { /* ignore cross-origin */ }
-});
-document.getElementById('browserRefreshButton').addEventListener('click', () => {
-  try { browserFrame.contentWindow.location.reload(); } catch { browserFrame.src = browserFrame.src; }
-});
+browserBackButton.addEventListener('click', () => navigateBrowserHistory(-1));
+browserForwardButton.addEventListener('click', () => navigateBrowserHistory(1));
+browserRefreshButton.addEventListener('click', refreshBrowserUrl);
 browserOpenExternalButton.addEventListener('click', openCurrentBrowserUrlExternally);
 browserNoticeExternalButton.addEventListener('click', openCurrentBrowserUrlExternally);
+browserTryEmbedButton.addEventListener('click', () => openBrowserUrl(currentBrowserUrl || browserUrlInput.value, {
+  forceEmbed: true,
+  recordHistory: false
+}));
 browserFrame.addEventListener('load', () => {
   if (browserLoadTimer) {
     clearTimeout(browserLoadTimer);
     browserLoadTimer = null;
   }
+  if (!browserExternalPage.classList.contains('hidden')) {
+    return;
+  }
   if (hostLikelyBlocksEmbedding(currentBrowserUrl)) {
     showBrowserBlockedNotice(currentBrowserUrl);
   }
 });
+updateBrowserNavigationControls();
 
 chatModelSelect.addEventListener('change', () => {
   const [providerId, model] = (chatModelSelect.value || '').split('|');

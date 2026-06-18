@@ -713,6 +713,34 @@ button.secondary {
     rgba(244, 246, 255, 0.68);
 }
 
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(123, 143, 179, 0.42);
+  border-radius: 12px;
+  color: #183252;
+  background:
+    radial-gradient(circle at 30% 5%, rgba(255, 255, 255, 0.82), transparent 35%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(237, 243, 255, 0.72));
+  box-shadow:
+    0 10px 22px rgba(31, 48, 77, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.button-link:hover {
+  border-color: var(--accent);
+  box-shadow:
+    0 12px 26px rgba(31, 48, 77, 0.12),
+    0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
 .split-layout {
   display: grid;
   grid-template-columns: 220px 1fr;
@@ -1267,6 +1295,59 @@ button.secondary {
 .browser-notice button {
   grid-column: 2;
   grid-row: 1 / span 2;
+}
+
+.browser-external-page {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.9), transparent 36%),
+    linear-gradient(135deg, rgba(232, 241, 255, 0.92), rgba(248, 250, 255, 0.78));
+}
+
+.browser-external-card {
+  width: min(560px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 24px;
+  color: #183252;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 24px 70px rgba(31, 48, 77, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  text-align: center;
+}
+
+.browser-external-card strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 1.1rem;
+}
+
+.browser-external-card p {
+  margin: 10px 0 18px;
+  color: #405274;
+  line-height: 1.5;
+}
+
+.browser-external-icon {
+  display: inline-grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 18px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.38), transparent 34%),
+    linear-gradient(135deg, var(--accent), #4f5bd5);
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--accent) 26%, transparent);
+  font-size: 1.4rem;
+}
+
+.browser-external-card .toolbar {
+  justify-content: center;
 }
 
 .browser-frame {

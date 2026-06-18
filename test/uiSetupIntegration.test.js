@@ -34,6 +34,10 @@ test('web shell desktop markup includes menu bar, dock, and app windows', async 
   assert.match(indexHtml, /id="windowBrowser"/);
   assert.match(indexHtml, /id="browserOpenExternalButton"/);
   assert.match(indexHtml, /id="browserBlockedNotice"/);
+  assert.match(indexHtml, /id="browserExternalPage"/);
+  assert.match(indexHtml, /id="browserTryEmbedButton"/);
+  assert.match(indexHtml, /Open real tab/);
+  assert.match(indexHtml, /allow-popups-to-escape-sandbox/);
   assert.match(indexHtml, /id="performanceModeToggle"/);
   assert.match(indexHtml, /id="installFromPwaButton"/);
   assert.match(indexHtml, /id="installAppManifestFile"/);
@@ -96,6 +100,10 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /function installSelectedLinuxPackage/);
   assert.match(appJs, /function downloadLinuxPackageFromUrl/);
   assert.match(appJs, /hostLikelyBlocksEmbedding/);
+  assert.match(appJs, /function openRealBrowserTab/);
+  assert.match(appJs, /function navigateBrowserHistory/);
+  assert.match(appJs, /browserBackButton\.addEventListener\('click', \(\) => navigateBrowserHistory\(-1\)\)/);
+  assert.match(appJs, /forceEmbed: true/);
   assert.match(appJs, /openBrowserUrl\(app\.url\)/);
   assert.match(appJs, /openCurrentBrowserUrlExternally/);
   assert.match(appJs, /performanceMode/);

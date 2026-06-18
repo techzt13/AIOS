@@ -136,14 +136,25 @@
               <button type="button" id="browserRefreshButton" class="icon-button" title="Reload" aria-label="Reload">↻</button>
               <input id="browserUrlInput" type="text" placeholder="Search the web or enter URL..." />
               <button type="submit" id="browserGoButton">Go</button>
-              <button type="button" id="browserOpenExternalButton" class="secondary">Open outside AIOS</button>
+              <button type="button" id="browserOpenExternalButton" class="secondary">Open real tab</button>
             </form>
             <div id="browserBlockedNotice" class="browser-notice hidden">
-              <strong>This site may block embedded browsers.</strong>
-              <span>Sites like YouTube often refuse iframes. Open it outside AIOS, or install/open direct embed-friendly web apps.</span>
-              <button type="button" id="browserNoticeExternalButton">Open outside AIOS</button>
+              <strong>This site needs a real browser tab.</strong>
+              <span>Protected sites like YouTube block embedded browser frames, so AIOS opens them as top-level pages.</span>
+              <button type="button" id="browserNoticeExternalButton">Open real tab</button>
             </div>
-            <iframe id="browserFrame" class="browser-frame" src="about:blank" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+            <div id="browserExternalPage" class="browser-external-page hidden" aria-live="polite">
+              <div class="browser-external-card">
+                <span class="browser-external-icon">↗</span>
+                <strong>Opened in a real browser tab</strong>
+                <p id="browserExternalDetail">Protected sites block iframe browsers. AIOS opened this page as a top-level tab so video, login, and navigation can work normally.</p>
+                <div class="toolbar">
+                  <a id="browserExternalLink" class="button-link" href="about:blank" target="_blank" rel="noopener noreferrer">Open tab again</a>
+                  <button type="button" id="browserTryEmbedButton" class="secondary">Try embedded anyway</button>
+                </div>
+              </div>
+            </div>
+            <iframe id="browserFrame" class="browser-frame" src="about:blank" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals allow-presentation"></iframe>
           </div>
         </section>
 
