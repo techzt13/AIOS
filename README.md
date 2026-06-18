@@ -166,3 +166,7 @@ Example `manifest.webmanifest`:
 ```bash
 npm test
 ```
+
+## License
+
+Copyright (c) 2026 Zack Tudor. All rights reserved. See `LICENSE` for the full proprietary notice.
