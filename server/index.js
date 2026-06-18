@@ -37,9 +37,12 @@ const {
   saveShellState
 } = require('./appDataStore');
 const { resolveSandboxPath } = require('./sandbox');
-const { validateExecCommand, runExecCommand } = require('./exec');
+const { validateExecCommand, runExecCommand, startExecCommand } = require('./exec');
+const { ProcessRegistry } = require('./processRegistry');
+const { getRuntimeInfo } = require('./runtime');
 
 const PORT = Number(process.env.PORT || 8080);
+const HOST = process.env.AIOS_HOST || process.env.HOST || '127.0.0.1';
 const WORKSPACE_ROOT = path.resolve(process.env.WORKSPACE_ROOT || process.env.SANDBOX_DIR || path.join(process.cwd(), 'workspace'));
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 60000);
 const RATE_LIMIT_MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX_REQUESTS || 120);
@@ -60,6 +63,7 @@ function createApp(deps = {}) {
   const loadProviderSettingsImpl = deps.loadProviderSettings || loadProviderSettings;
   const upsertProviderSettingsImpl = deps.upsertProviderSettings || upsertProviderSettings;
   const clearProviderSettingsImpl = deps.clearProviderSettings || clearProviderSettings;
+  const processRegistry = deps.processRegistry || new ProcessRegistry();
 
   const apiLimiter = rateLimit({
     windowMs: RATE_LIMIT_WINDOW_MS,
@@ -112,6 +116,70 @@ function createApp(deps = {}) {
 
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, app: 'AIOS' });
+  });
+
+  app.get('/api/runtime', (_req, res) => {
+    res.json({
+      ok: true,
+      runtime: getRuntimeInfo({
+        host: HOST,
+        port: PORT,
+        workspaceRoot: WORKSPACE_ROOT,
+        dataDir: getDataDir(),
+        configDir: getConfigDir(),
+        execEnabled: ENABLE_EXEC_API,
+        execTimeoutMs: EXEC_TIMEOUT_MS,
+        execMaxOutputBytes: EXEC_MAX_OUTPUT_BYTES,
+        processRegistry
+      })
+    });
+  });
+
+  app.get('/api/processes', (_req, res) => {
+    res.json({ ok: true, processes: processRegistry.listProcesses() });
+  });
+
+  app.post('/api/processes/exec', apiLimiter, async (req, res) => {
+    if (!ENABLE_EXEC_API) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Command execution is disabled. Set ENABLE_EXEC_API=true to enable in trusted environments.'
+      });
+    }
+
+    const validation = validateExecCommand(req.body?.command);
+    if (!validation.ok) {
+      return res.status(400).json({ ok: false, error: validation.error });
+    }
+
+    try {
+      const { process: trackedProcess, done } = startExecCommand({
+        command: validation.command,
+        cwd: WORKSPACE_ROOT,
+        timeoutMs: EXEC_TIMEOUT_MS,
+        maxBuffer: EXEC_MAX_OUTPUT_BYTES,
+        processRegistry
+      });
+      done.catch((error) => processRegistry.failProcess(trackedProcess.id, error));
+
+      return res.status(202).json({ ok: true, process: trackedProcess });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: `Failed to start command: ${error.message}` });
+    }
+  });
+
+  app.get('/api/processes/:processId', (req, res) => {
+    const trackedProcess = processRegistry.getProcess(req.params.processId);
+    if (!trackedProcess) {
+      return res.status(404).json({ ok: false, error: 'Process not found.' });
+    }
+
+    return res.json({ ok: true, process: trackedProcess });
+  });
+
+  app.delete('/api/processes/:processId', (req, res) => {
+    const result = processRegistry.cancelProcess(req.params.processId);
+    return res.status(result.ok ? 200 : 400).json(result);
   });
 
   app.get('/api/local-data/info', async (_req, res) => {
@@ -410,7 +478,8 @@ function createApp(deps = {}) {
         command: validation.command,
         cwd: WORKSPACE_ROOT,
         timeoutMs: EXEC_TIMEOUT_MS,
-        maxBuffer: EXEC_MAX_OUTPUT_BYTES
+        maxBuffer: EXEC_MAX_OUTPUT_BYTES,
+        processRegistry
       });
 
       return res.json(result);
@@ -506,8 +575,10 @@ function createApp(deps = {}) {
 
 if (require.main === module) {
   const app = createApp();
-  app.listen(PORT, () => {
-    console.log(`AIOS running on http://localhost:${PORT}`);
+  app.listen(PORT, HOST, () => {
+    const displayHost = HOST === '0.0.0.0' ? 'localhost' : HOST;
+    console.log(`AIOS running on http://${displayHost}:${PORT}`);
+    console.log(`Runtime mode: local-daemon (${HOST === '127.0.0.1' || HOST === 'localhost' ? 'local-only' : `bound to ${HOST}`})`);
     console.log(`Workspace root: ${WORKSPACE_ROOT}`);
   });
 }

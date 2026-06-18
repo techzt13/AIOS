@@ -193,6 +193,27 @@
 
             <div class="settings-right-col">
               <section class="control-group">
+                <p class="group-title">AIOS runtime</p>
+                <p class="status-text">This browser is connected to the local AIOS daemon.</p>
+                <div class="runtime-grid" aria-label="AIOS runtime details">
+                  <span>Mode</span>
+                  <code id="runtimeModeValue">loading...</code>
+                  <span>URL</span>
+                  <code id="runtimeUrlValue">loading...</code>
+                  <span>Workspace</span>
+                  <code id="runtimeWorkspaceValue">loading...</code>
+                  <span>Execution</span>
+                  <code id="runtimeExecValue">loading...</code>
+                  <span>Processes</span>
+                  <code id="runtimeProcessCountValue">loading...</code>
+                </div>
+                <div class="toolbar">
+                  <button id="refreshRuntimeButton" type="button" class="secondary">Refresh runtime</button>
+                </div>
+                <ul id="processList" class="process-list"></ul>
+              </section>
+
+              <section class="control-group">
                 <p class="group-title">Desktop preferences</p>
                 <label for="accentSelect">Accent</label>
                 <select id="accentSelect">

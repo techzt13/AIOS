@@ -1,7 +1,7 @@
 # AIOS
 Zack and Richard have made an operating system called AIOS. Built for AI users and nerds.
 
-AIOS runs as a macOS-inspired **web OS shell** served directly by the AIOS app on port `8080`.
+AIOS runs as a local **AI-native OS runtime** with a macOS-inspired browser desktop served by the AIOS daemon on port `8080`.
 
 ## Quick start
 
@@ -14,12 +14,15 @@ npm start
 
 Open: <http://localhost:8080>
 
+By default AIOS binds to `127.0.0.1` so the OS runtime is local-only. Set `AIOS_HOST=0.0.0.0` only if you intentionally want to expose it on your network.
+
 No Docker, XFCE desktop, VNC, or container runtime is part of the supported app path.
 
 ## What you get on port 8080
 
 - Desktop wallpaper + top menu bar + dock
 - Windowed apps: **AI Chat**, **Files**, **Terminal**, **Settings**, **Setup Assistant**
+- Local AIOS runtime status, process history, and workspace identity
 - First-run setup flow (provider select/connect/test/finish)
 - Provider status and GitHub Copilot integration (browser device login or env token)
 
@@ -91,11 +94,17 @@ If you prefer environment tokens, set `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GI
 
 - `POST /api/chat`
 - `POST /api/exec` (guarded by `ENABLE_EXEC_API=true`)
+- `GET /api/runtime`
+- `GET /api/processes`
+- `GET /api/processes/:processId`
+- `POST /api/processes/exec` (guarded by `ENABLE_EXEC_API=true`)
+- `DELETE /api/processes/:processId`
 - `POST /api/fs/list`
 - `POST /api/fs/read`
 - `POST /api/fs/write`
 
 Sandbox protections reject absolute paths and traversal escapes for FS APIs.
+Exec commands are tracked as AIOS processes so the desktop can show command lifecycle, output, status, and cancellation state.
 
 ## Web shell local-data APIs
 

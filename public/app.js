@@ -21,6 +21,14 @@ const copilotPollButton = document.getElementById('copilotPollButton');
 const copilotCode = document.getElementById('copilotCode');
 const copilotLink = document.getElementById('copilotLink');
 const runSetupAgainButton = document.getElementById('runSetupAgainButton');
+const runtimeBadge = document.getElementById('runtimeBadge');
+const runtimeModeValue = document.getElementById('runtimeModeValue');
+const runtimeUrlValue = document.getElementById('runtimeUrlValue');
+const runtimeWorkspaceValue = document.getElementById('runtimeWorkspaceValue');
+const runtimeExecValue = document.getElementById('runtimeExecValue');
+const runtimeProcessCountValue = document.getElementById('runtimeProcessCountValue');
+const refreshRuntimeButton = document.getElementById('refreshRuntimeButton');
+const processList = document.getElementById('processList');
 
 const messagesEl = document.getElementById('messages');
 const chatForm = document.getElementById('chatForm');
@@ -1288,10 +1296,84 @@ async function callExec(command) {
 
 function formatExecResult(result) {
   const parts = [`Exit code: ${result.code}`];
+  if (result.processId) parts.push(`AIOS process: ${result.processId}`);
   if (result.stdout) parts.push(`stdout:\n${result.stdout}`);
   if (result.stderr) parts.push(`stderr:\n${result.stderr}`);
   if (result.timedOut) parts.push('Command timed out.');
   return parts.join('\n\n');
+}
+
+function formatRuntimeMode(runtime) {
+  if (!runtime) return 'unavailable';
+  return `${runtime.mode}${runtime.localOnly ? ' • local-only' : ''}`;
+}
+
+function renderProcessList(processes = []) {
+  if (!processList) return;
+  processList.innerHTML = '';
+
+  if (processes.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'process-empty';
+    empty.textContent = 'No AIOS processes yet.';
+    processList.appendChild(empty);
+    return;
+  }
+
+  processes.slice(0, 8).forEach((process) => {
+    const item = document.createElement('li');
+    item.className = 'process-item';
+    item.dataset.status = process.status;
+
+    const title = document.createElement('strong');
+    title.textContent = process.title || process.type || process.id;
+
+    const meta = document.createElement('small');
+    const code = typeof process.code === 'number' ? ` • exit ${process.code}` : '';
+    meta.textContent = `${process.status}${code} • ${new Date(process.updatedAt || process.createdAt).toLocaleTimeString()}`;
+
+    item.appendChild(title);
+    item.appendChild(meta);
+    processList.appendChild(item);
+  });
+}
+
+async function loadProcesses() {
+  const response = await fetch('/api/processes');
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to load AIOS processes.');
+  }
+
+  renderProcessList(payload.processes || []);
+  return payload.processes || [];
+}
+
+async function loadRuntimeInfo() {
+  try {
+    const response = await fetch('/api/runtime');
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || 'Failed to load AIOS runtime.');
+    }
+
+    const runtime = payload.runtime;
+    runtimeBadge.textContent = runtime.localOnly ? 'AIOS: local' : 'AIOS: network';
+    runtimeModeValue.textContent = formatRuntimeMode(runtime);
+    runtimeUrlValue.textContent = runtime.displayUrl;
+    runtimeWorkspaceValue.textContent = runtime.workspaceRoot;
+    runtimeExecValue.textContent = runtime.exec.enabled ? 'enabled' : 'disabled';
+    runtimeProcessCountValue.textContent = `${runtime.processes.running} running / ${runtime.processes.total} total`;
+    await loadProcesses();
+  } catch (error) {
+    runtimeBadge.textContent = 'AIOS: offline';
+    runtimeModeValue.textContent = 'unavailable';
+    runtimeUrlValue.textContent = 'unavailable';
+    runtimeWorkspaceValue.textContent = 'unavailable';
+    runtimeExecValue.textContent = 'unavailable';
+    runtimeProcessCountValue.textContent = 'unavailable';
+    renderProcessList([]);
+  }
 }
 
 async function listWorkspace(path = '.') {
@@ -1480,6 +1562,9 @@ clearProviderSettingsButton.addEventListener('click', () => {
 runSetupAgainButton.addEventListener('click', () => {
   resetFirstRunAndOpenWizard().catch((error) => renderMessage('system', `Setup reset failed: ${error.message}`));
 });
+refreshRuntimeButton.addEventListener('click', () => {
+  loadRuntimeInfo().catch((error) => renderMessage('system', `Runtime refresh failed: ${error.message}`));
+});
 openSetupAssistant.addEventListener('click', openWizard);
 newChatButton.addEventListener('click', () => startNewChat());
 
@@ -1647,8 +1732,10 @@ terminalRunButton.addEventListener('click', async () => {
   try {
     const result = await callExec(command);
     terminalOutput.textContent += `${formatExecResult(result)}\n`;
+    loadRuntimeInfo().catch(() => {});
   } catch (error) {
     terminalOutput.textContent += `Error: ${error.message}\n`;
+    loadRuntimeInfo().catch(() => {});
   }
   terminalOutput.scrollTop = terminalOutput.scrollHeight;
 });
@@ -1750,6 +1837,7 @@ loadShellState()
     loadProviders(),
     loadWizardProviders(),
     loadDataDirInfo(),
+    loadRuntimeInfo(),
     loadImports(),
     loadApiAudit()
   ]))

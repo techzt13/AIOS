@@ -12,9 +12,44 @@ function validateExecCommand(command) {
   return { ok: true, command: command.trim() };
 }
 
-function runExecCommand({ command, cwd, timeoutMs, maxBuffer }) {
-  return new Promise((resolve) => {
-    exec(
+function buildExecResult({ error, stdout, stderr }) {
+  if (error) {
+    const exitCode = typeof error.code === 'number' ? error.code : -1;
+    return {
+      ok: false,
+      stdout: String(stdout || ''),
+      stderr: String(stderr || ''),
+      code: exitCode,
+      signal: error.signal || null,
+      timedOut: error.killed === true
+    };
+  }
+
+  return {
+    ok: true,
+    stdout: String(stdout || ''),
+    stderr: String(stderr || ''),
+    code: 0,
+    signal: null,
+    timedOut: false
+  };
+}
+
+function startExecCommand({ command, cwd, timeoutMs, maxBuffer, processRegistry }) {
+  const trackedProcess = processRegistry?.startProcess({
+    type: 'exec',
+    title: command,
+    command,
+    cwd,
+    metadata: {
+      timeoutMs,
+      maxOutputBytes: maxBuffer
+    }
+  });
+
+  let child = null;
+  const done = new Promise((resolve) => {
+    child = exec(
       command,
       {
         cwd,
@@ -23,30 +58,55 @@ function runExecCommand({ command, cwd, timeoutMs, maxBuffer }) {
         shell: '/bin/bash'
       },
       (error, stdout, stderr) => {
-        if (error) {
-          const exitCode = typeof error.code === 'number' ? error.code : -1;
-          return resolve({
-            ok: false,
-            stdout: String(stdout || ''),
-            stderr: String(stderr || ''),
-            code: exitCode,
-            timedOut: error.killed === true
-          });
-        }
+        const result = buildExecResult({ error, stdout, stderr });
+        const currentProcess = trackedProcess ? processRegistry.getProcess(trackedProcess.id) : null;
+        const completedProcess = trackedProcess
+          ? processRegistry.completeProcess(trackedProcess.id, {
+              ...result,
+              status: currentProcess?.status === 'cancelled'
+                ? 'cancelled'
+                : (result.ok ? 'completed' : 'failed')
+            })
+          : null;
 
-        return resolve({
-          ok: true,
-          stdout: String(stdout || ''),
-          stderr: String(stderr || ''),
-          code: 0,
-          timedOut: false
+        resolve({
+          ...result,
+          processId: trackedProcess?.id || null,
+          process: completedProcess
         });
       }
     );
+  });
+
+  if (trackedProcess) {
+    processRegistry.attachRuntime(trackedProcess.id, {
+      pid: child?.pid || null,
+      cancel: () => child?.kill('SIGTERM') === true
+    });
+  }
+
+  return {
+    process: trackedProcess ? processRegistry.getProcess(trackedProcess.id) : null,
+    done
+  };
+}
+
+function runExecCommand({ command, cwd, timeoutMs, maxBuffer, processRegistry }) {
+  return new Promise((resolve) => {
+    const { done } = startExecCommand({
+      command,
+      cwd,
+      timeoutMs,
+      maxBuffer,
+      processRegistry
+    });
+
+    done.then(resolve);
   });
 }
 
 module.exports = {
   validateExecCommand,
-  runExecCommand
+  runExecCommand,
+  startExecCommand
 };

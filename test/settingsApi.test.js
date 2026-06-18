@@ -62,75 +62,6 @@ test('/api/chat uses persisted provider settings before env fallback', async () 
     }
   });
 
-  test('first-run settings API supports get, set, and reset', async () => {
-    let completed = false;
-    const app = createApp({
-      loadFirstRunState: async () => ({ firstRunCompleted: completed }),
-      setFirstRunCompleted: async (nextValue) => {
-        completed = Boolean(nextValue);
-        return { firstRunCompleted: completed };
-      },
-      getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null })
-    });
-
-    await withServer(app, async (baseUrl) => {
-      let response = await fetch(`${baseUrl}/api/settings/first-run`);
-      let payload = await response.json();
-      assert.equal(response.ok, true);
-      assert.equal(payload.completed, false);
-
-      response = await fetch(`${baseUrl}/api/settings/first-run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: true })
-      });
-      payload = await response.json();
-      assert.equal(response.ok, true);
-      assert.equal(payload.completed, true);
-
-      response = await fetch(`${baseUrl}/api/settings/first-run`, { method: 'DELETE' });
-      payload = await response.json();
-      assert.equal(response.ok, true);
-      assert.equal(payload.completed, false);
-    });
-  });
-
-  test('provider connection test endpoint uses stored settings and minimal chat round-trip', async () => {
-    let receivedRequest = null;
-    const app = createApp({
-      loadProviderSettings: async () => ({
-        providers: {
-          openai: {
-            apiKey: 'stored-key',
-            baseUrl: 'https://stored.openai/v1'
-          }
-        }
-      }),
-      dispatchChat: async (request) => {
-        receivedRequest = request;
-        return { ok: true, message: 'AIOS connection OK', raw: { providerReachable: true } };
-      },
-      getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null })
-    });
-
-    await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/settings/providers/openai/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'gpt-4o' })
-      });
-      const payload = await response.json();
-
-      assert.equal(response.ok, true);
-      assert.equal(payload.ok, true);
-      assert.equal(payload.model, 'gpt-4o');
-      assert.equal(receivedRequest.auth.apiKey, 'stored-key');
-      assert.equal(receivedRequest.auth.baseUrl, 'https://stored.openai/v1');
-      assert.equal(receivedRequest.messages.length, 2);
-      assert.match(receivedRequest.messages[1].content, /connection/i);
-    });
-  });
-
   try {
     await withServer(app, async (baseUrl) => {
       const response = await fetch(`${baseUrl}/api/chat`, {
@@ -162,4 +93,73 @@ test('/api/chat uses persisted provider settings before env fallback', async () 
       process.env.OPENAI_BASE_URL = originalBaseUrl;
     }
   }
+});
+
+test('first-run settings API supports get, set, and reset', async () => {
+  let completed = false;
+  const app = createApp({
+    loadFirstRunState: async () => ({ firstRunCompleted: completed }),
+    setFirstRunCompleted: async (nextValue) => {
+      completed = Boolean(nextValue);
+      return { firstRunCompleted: completed };
+    },
+    getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null })
+  });
+
+  await withServer(app, async (baseUrl) => {
+    let response = await fetch(`${baseUrl}/api/settings/first-run`);
+    let payload = await response.json();
+    assert.equal(response.ok, true);
+    assert.equal(payload.completed, false);
+
+    response = await fetch(`${baseUrl}/api/settings/first-run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed: true })
+    });
+    payload = await response.json();
+    assert.equal(response.ok, true);
+    assert.equal(payload.completed, true);
+
+    response = await fetch(`${baseUrl}/api/settings/first-run`, { method: 'DELETE' });
+    payload = await response.json();
+    assert.equal(response.ok, true);
+    assert.equal(payload.completed, false);
+  });
+});
+
+test('provider connection test endpoint uses stored settings and minimal chat round-trip', async () => {
+  let receivedRequest = null;
+  const app = createApp({
+    loadProviderSettings: async () => ({
+      providers: {
+        openai: {
+          apiKey: 'stored-key',
+          baseUrl: 'https://stored.openai/v1'
+        }
+      }
+    }),
+    dispatchChat: async (request) => {
+      receivedRequest = request;
+      return { ok: true, message: 'AIOS connection OK', raw: { providerReachable: true } };
+    },
+    getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null })
+  });
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/settings/providers/openai/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o' })
+    });
+    const payload = await response.json();
+
+    assert.equal(response.ok, true);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.model, 'gpt-4o');
+    assert.equal(receivedRequest.auth.apiKey, 'stored-key');
+    assert.equal(receivedRequest.auth.baseUrl, 'https://stored.openai/v1');
+    assert.equal(receivedRequest.messages.length, 2);
+    assert.match(receivedRequest.messages[1].content, /connection/i);
+  });
 });
