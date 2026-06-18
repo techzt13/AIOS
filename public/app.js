@@ -64,6 +64,12 @@ const installAppManifestFile = document.getElementById('installAppManifestFile')
 const installAppManifestButton = document.getElementById('installAppManifestButton');
 const installAppStatus = document.getElementById('installAppStatus');
 const thirdPartyAppsGrid = document.getElementById('thirdPartyAppsGrid');
+const linuxPackageFile = document.getElementById('linuxPackageFile');
+const linuxPackageUrl = document.getElementById('linuxPackageUrl');
+const installLinuxPackageButton = document.getElementById('installLinuxPackageButton');
+const downloadLinuxPackageButton = document.getElementById('downloadLinuxPackageButton');
+const linuxPackageStatus = document.getElementById('linuxPackageStatus');
+const linuxPackagesGrid = document.getElementById('linuxPackagesGrid');
 
 const accentSelect = document.getElementById('accentSelect');
 const wallpaperSelect = document.getElementById('wallpaperSelect');
@@ -152,7 +158,20 @@ let wizardTestSucceeded = false;
 let shellState = { windows: {}, preferences: {} };
 let zCounter = 10;
 let installedApps = [];
+let linuxPackages = [];
 let browserLoadTimer = null;
+let currentBrowserUrl = '';
+
+const IFRAME_BLOCKED_HOSTS = [
+  'google.com',
+  'youtube.com',
+  'youtu.be',
+  'github.com',
+  'instagram.com',
+  'facebook.com',
+  'x.com',
+  'twitter.com'
+];
 
 function renderMessageContent(container, content) {
   const text = String(content ?? '');
@@ -367,16 +386,42 @@ function normalizeBrowserUrl(rawValue) {
   return `https://www.google.com/search?igu=1&q=${encodeURIComponent(raw)}`;
 }
 
+function hostLikelyBlocksEmbedding(urlValue) {
+  try {
+    const hostname = new URL(urlValue).hostname.replace(/^www\./, '').toLowerCase();
+    return IFRAME_BLOCKED_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+}
+
+function showBrowserBlockedNotice(url) {
+  browserBlockedNotice.classList.remove('hidden');
+  const detail = browserBlockedNotice.querySelector('span');
+  if (detail) {
+    detail.textContent = hostLikelyBlocksEmbedding(url)
+      ? 'This site is known to block iframe browsers. Use Open outside AIOS, or use direct Linux package download links in the Linux packages installer.'
+      : 'If the page stays blank, this site may block embedded browsers. Use Open outside AIOS.';
+  }
+}
+
+function hideBrowserBlockedNotice() {
+  browserBlockedNotice.classList.add('hidden');
+}
+
 function openBrowserUrl(rawValue) {
   const url = normalizeBrowserUrl(rawValue);
   if (!url) return;
   if (browserLoadTimer) clearTimeout(browserLoadTimer);
-  browserBlockedNotice.classList.add('hidden');
+  currentBrowserUrl = url;
+  hideBrowserBlockedNotice();
   browserUrlInput.value = url;
   browserFrame.src = url;
-  browserLoadTimer = setTimeout(() => {
-    browserBlockedNotice.classList.remove('hidden');
-  }, 3500);
+  if (hostLikelyBlocksEmbedding(url)) {
+    showBrowserBlockedNotice(url);
+  } else {
+    browserLoadTimer = setTimeout(() => showBrowserBlockedNotice(url), 3500);
+  }
   openWindow('browser');
 }
 
@@ -1592,6 +1637,128 @@ async function removeInstalledApp(appId) {
   await loadInstalledApps();
 }
 
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function renderLinuxPackages() {
+  linuxPackagesGrid.innerHTML = '';
+
+  if (linuxPackages.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'status-text app-empty-state';
+    empty.textContent = 'No Linux packages imported yet.';
+    linuxPackagesGrid.appendChild(empty);
+    return;
+  }
+
+  linuxPackages.forEach((linuxPackage) => {
+    const card = document.createElement('article');
+    card.className = 'app-launch-card third-party-app-card';
+
+    const glyph = document.createElement('span');
+    glyph.className = 'app-launch-icon';
+    glyph.textContent = 'LX';
+
+    const title = document.createElement('strong');
+    title.textContent = linuxPackage.name;
+
+    const detail = document.createElement('small');
+    detail.textContent = `${linuxPackage.filename} • ${formatBytes(linuxPackage.sizeBytes)} • waiting for Linux runtime`;
+
+    const actions = document.createElement('div');
+    actions.className = 'third-party-app-actions';
+
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'secondary';
+    removeButton.textContent = 'Remove';
+    removeButton.addEventListener('click', () => {
+      removeLinuxPackage(linuxPackage.id).catch((error) => setFeedback(linuxPackageStatus, error.message, 'error'));
+    });
+
+    actions.appendChild(removeButton);
+    card.appendChild(glyph);
+    card.appendChild(title);
+    card.appendChild(detail);
+    card.appendChild(actions);
+    linuxPackagesGrid.appendChild(card);
+  });
+}
+
+async function loadLinuxPackages() {
+  const response = await fetch('/api/linux-apps');
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to load Linux packages.');
+  }
+
+  linuxPackages = payload.packages || [];
+  renderLinuxPackages();
+}
+
+async function installSelectedLinuxPackage() {
+  const file = linuxPackageFile.files?.[0];
+  if (!file) {
+    setFeedback(linuxPackageStatus, 'Choose a .tar.gz, .tgz, or .tar file first.', 'error');
+    return;
+  }
+
+  const response = await fetch('/api/linux-apps', {
+    method: 'POST',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+      'x-aios-package-name': file.name.replace(/\.tar\.gz$|\.tgz$|\.tar$/i, ''),
+      'x-aios-package-filename': file.name
+    },
+    body: file
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to import Linux package.');
+  }
+
+  linuxPackageFile.value = '';
+  setFeedback(linuxPackageStatus, `${payload.package.name} imported. Linux runtime required before it can run.`, 'success');
+  await loadLinuxPackages();
+}
+
+async function downloadLinuxPackageFromUrl() {
+  const url = linuxPackageUrl.value.trim();
+  if (!url) {
+    setFeedback(linuxPackageStatus, 'Enter a direct .tar.gz, .tgz, or .tar URL first.', 'error');
+    return;
+  }
+
+  const response = await fetch('/api/linux-apps/import-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url })
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to download Linux package.');
+  }
+
+  linuxPackageUrl.value = '';
+  setFeedback(linuxPackageStatus, `${payload.package.name} downloaded with Linux UA. Linux runtime required before it can run.`, 'success');
+  await loadLinuxPackages();
+}
+
+async function removeLinuxPackage(packageId) {
+  const response = await fetch(`/api/linux-apps/${encodeURIComponent(packageId)}`, { method: 'DELETE' });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to remove Linux package.');
+  }
+
+  setFeedback(linuxPackageStatus, 'Linux package removed.', 'success');
+  await loadLinuxPackages();
+}
+
 async function listWorkspace(path = '.') {
   const response = await fetch('/api/fs/list', {
     method: 'POST',
@@ -1849,6 +2016,9 @@ browserFrame.addEventListener('load', () => {
     clearTimeout(browserLoadTimer);
     browserLoadTimer = null;
   }
+  if (hostLikelyBlocksEmbedding(currentBrowserUrl)) {
+    showBrowserBlockedNotice(currentBrowserUrl);
+  }
 });
 
 chatModelSelect.addEventListener('change', () => {
@@ -2036,6 +2206,14 @@ installFromPwaButton.addEventListener('click', () => {
   installFromPwaUrl().catch((error) => setFeedback(installAppStatus, error.message, 'error'));
 });
 
+installLinuxPackageButton.addEventListener('click', () => {
+  installSelectedLinuxPackage().catch((error) => setFeedback(linuxPackageStatus, error.message, 'error'));
+});
+
+downloadLinuxPackageButton.addEventListener('click', () => {
+  downloadLinuxPackageFromUrl().catch((error) => setFeedback(linuxPackageStatus, error.message, 'error'));
+});
+
 document.querySelectorAll('[data-window-action]').forEach((button) => {
   button.addEventListener('click', () => {
     const app = button.dataset.app;
@@ -2073,6 +2251,7 @@ loadShellState()
     loadDataDirInfo(),
     loadRuntimeInfo(),
     loadInstalledApps(),
+    loadLinuxPackages(),
     loadImports(),
     loadApiAudit()
   ]))

@@ -8,6 +8,8 @@ const IMPORTS_FILE = 'imports.json';
 const API_KEY_AUDIT_FILE = 'api-key-audit.json';
 const NOTES_FILE = 'notes.json';
 const INSTALLED_APPS_FILE = 'installed-apps.json';
+const LINUX_APPS_FILE = 'linux-apps.json';
+const LINUX_PACKAGES_DIR = 'linux-packages';
 
 function getDataDir() {
   return path.resolve(process.env.AIOS_DATA_DIR || path.join(process.cwd(), 'workspace', DATA_DIR_NAME));
@@ -31,6 +33,14 @@ function getNotesPath() {
 
 function getInstalledAppsPath() {
   return path.join(getDataDir(), INSTALLED_APPS_FILE);
+}
+
+function getLinuxAppsPath() {
+  return path.join(getDataDir(), LINUX_APPS_FILE);
+}
+
+function getLinuxPackagesDir() {
+  return path.join(getDataDir(), LINUX_PACKAGES_DIR);
 }
 
 async function ensureDataDir() {
@@ -61,6 +71,17 @@ async function writeJson(filePath, value) {
   await fs.writeFile(filePath, JSON.stringify(value, null, 2), { mode: 0o600 });
   try {
     await fs.chmod(filePath, 0o600);
+  } catch {
+    // Best effort.
+  }
+}
+
+async function ensureLinuxPackagesDir() {
+  await ensureDataDir();
+  const packagesDir = getLinuxPackagesDir();
+  await fs.mkdir(packagesDir, { recursive: true, mode: 0o700 });
+  try {
+    await fs.chmod(packagesDir, 0o700);
   } catch {
     // Best effort.
   }
@@ -374,6 +395,135 @@ async function removeInstalledApp(appId) {
   return { id };
 }
 
+function sanitizePackageFilename(value) {
+  const filename = path.basename(typeof value === 'string' ? value.trim() : '');
+  return filename.replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 160);
+}
+
+function linuxPackageType(filename) {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.tar.gz')) return 'tar.gz';
+  if (lower.endsWith('.tgz')) return 'tgz';
+  if (lower.endsWith('.tar')) return 'tar';
+  return '';
+}
+
+function assertLinuxPackageBuffer({ filename, buffer }) {
+  const packageType = linuxPackageType(filename);
+  if (!packageType) {
+    throw new Error('Linux package must be a .tar.gz, .tgz, or .tar archive.');
+  }
+
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new Error('Linux package file is empty.');
+  }
+
+  if ((packageType === 'tar.gz' || packageType === 'tgz') && (buffer[0] !== 0x1f || buffer[1] !== 0x8b)) {
+    throw new Error('Linux package does not look like a gzip archive.');
+  }
+
+  return packageType;
+}
+
+function sanitizeLinuxPackageName(value, filename) {
+  const explicitName = sanitizeAppName(value);
+  if (explicitName) {
+    return explicitName;
+  }
+
+  return sanitizePackageFilename(filename)
+    .replace(/\.tar\.gz$/i, '')
+    .replace(/\.tgz$/i, '')
+    .replace(/\.tar$/i, '')
+    .slice(0, 80) || 'Linux package';
+}
+
+async function loadLinuxAppsStore() {
+  const parsed = await readJson(getLinuxAppsPath(), { packages: [] });
+  return {
+    packages: Array.isArray(parsed.packages) ? parsed.packages.filter((item) => item && typeof item === 'object') : []
+  };
+}
+
+async function listLinuxPackages() {
+  const store = await loadLinuxAppsStore();
+  return store.packages.map((item) => ({
+    id: item.id,
+    name: item.name,
+    filename: item.filename,
+    packageType: item.packageType,
+    sizeBytes: Number(item.sizeBytes) || 0,
+    status: item.status || 'stored-for-linux-runtime',
+    installedAt: item.installedAt,
+    updatedAt: item.updatedAt
+  }));
+}
+
+async function installLinuxPackage({ name, filename, buffer }) {
+  const safeFilename = sanitizePackageFilename(filename);
+  const packageType = assertLinuxPackageBuffer({ filename: safeFilename, buffer });
+  const id = crypto.randomUUID();
+  const timestamp = new Date().toISOString();
+  const storedFilename = `${id}.${packageType === 'tar.gz' ? 'tar.gz' : packageType}`;
+
+  await ensureLinuxPackagesDir();
+  await fs.writeFile(path.join(getLinuxPackagesDir(), storedFilename), buffer, { mode: 0o600 });
+
+  const item = {
+    id,
+    name: sanitizeLinuxPackageName(name, safeFilename),
+    filename: safeFilename,
+    storedFilename,
+    packageType,
+    sizeBytes: buffer.length,
+    status: 'stored-for-linux-runtime',
+    installedAt: timestamp,
+    updatedAt: timestamp
+  };
+
+  const store = await loadLinuxAppsStore();
+  store.packages.unshift(item);
+  await writeJson(getLinuxAppsPath(), store);
+  return {
+    id: item.id,
+    name: item.name,
+    filename: item.filename,
+    packageType: item.packageType,
+    sizeBytes: item.sizeBytes,
+    status: item.status,
+    installedAt: item.installedAt,
+    updatedAt: item.updatedAt
+  };
+}
+
+async function removeLinuxPackage(packageId) {
+  const id = typeof packageId === 'string' ? packageId.trim() : '';
+  if (!id) {
+    throw new Error('Linux package id is required.');
+  }
+
+  const store = await loadLinuxAppsStore();
+  const item = store.packages.find((entry) => entry.id === id);
+  if (!item) {
+    return null;
+  }
+
+  store.packages = store.packages.filter((entry) => entry.id !== id);
+  await writeJson(getLinuxAppsPath(), store);
+
+  if (item.storedFilename) {
+    try {
+      await fs.unlink(path.join(getLinuxPackagesDir(), item.storedFilename));
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+
+  return { id };
+}
+
 module.exports = {
   appendApiKeyAuditEvent,
   appendImportRecord,
@@ -382,16 +532,21 @@ module.exports = {
   getDataDir,
   getInstalledAppsPath,
   getImportsPath,
+  getLinuxAppsPath,
+  getLinuxPackagesDir,
   getNotesPath,
   getShellStatePath,
   installApp,
+  installLinuxPackage,
   listImports,
   listInstalledApps,
+  listLinuxPackages,
   loadApiKeyAuditEvents,
   loadNotes,
   loadShellState,
   maskSecret,
   removeInstalledApp,
+  removeLinuxPackage,
   saveNotes,
   saveShellState
 };

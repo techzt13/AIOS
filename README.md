@@ -119,6 +119,10 @@ Exec commands are tracked as AIOS processes so the desktop can show command life
 - `POST /api/apps`
 - `POST /api/apps/import-web-manifest`
 - `DELETE /api/apps/:appId`
+- `GET /api/linux-apps`
+- `POST /api/linux-apps`
+- `POST /api/linux-apps/import-url`
+- `DELETE /api/linux-apps/:packageId`
 
 ## Third-party app format
 
@@ -137,6 +141,12 @@ Example `manifest.webmanifest`:
   "description": "Standard Web App Manifest"
 }
 ```
+
+## Linux app packages
+
+AIOS can import `.tar.gz`, `.tgz`, and `.tar` Linux archives into the local app library. These packages are stored locally under the AIOS data directory and marked `stored-for-linux-runtime`. For direct archive URLs, AIOS can download with a Linux desktop user-agent so servers that choose files based on user-agent have a better chance of returning the Linux package.
+
+They do **not** execute yet. Running Linux binaries on macOS requires the planned AIOS Linux runtime/container layer. The browser iframe also cannot make every website detect your Mac as Linux; websites see the real browser unless AIOS fetches a direct download URL server-side or later runs a Linux browser/runtime.
 
 ## Project structure
 

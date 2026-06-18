@@ -279,3 +279,117 @@ test('third-party app API can import a standard web app manifest from a site URL
     }
   }
 });
+
+test('linux package APIs store tar.gz archives for the future Linux runtime', async () => {
+  const originalDataDir = process.env.AIOS_DATA_DIR;
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'aios-linux-package-data-'));
+  process.env.AIOS_DATA_DIR = tempDir;
+
+  try {
+    const app = createApp({
+      getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null })
+    });
+
+    await withServer(app, async (baseUrl) => {
+      let response = await fetch(`${baseUrl}/api/linux-apps`);
+      let payload = await response.json();
+      assert.equal(response.ok, true);
+      assert.deepEqual(payload.packages, []);
+      assert.deepEqual(payload.supportedArchives, ['.tar.gz', '.tgz', '.tar']);
+
+      response = await fetch(`${baseUrl}/api/linux-apps`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/gzip',
+          'x-aios-package-name': 'Example Linux App',
+          'x-aios-package-filename': 'example-linux-app.tar.gz'
+        },
+        body: Buffer.from([0x1f, 0x8b, 0x08, 0x00])
+      });
+      payload = await response.json();
+      assert.equal(response.status, 201);
+      assert.equal(payload.ok, true);
+      assert.equal(payload.package.name, 'Example Linux App');
+      assert.equal(payload.package.packageType, 'tar.gz');
+      assert.equal(payload.package.status, 'stored-for-linux-runtime');
+
+      const packageId = payload.package.id;
+      response = await fetch(`${baseUrl}/api/linux-apps`);
+      payload = await response.json();
+      assert.equal(response.ok, true);
+      assert.equal(payload.packages.length, 1);
+      assert.equal(payload.packages[0].id, packageId);
+
+      response = await fetch(`${baseUrl}/api/linux-apps`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/gzip',
+          'x-aios-package-filename': 'bad.zip'
+        },
+        body: Buffer.from([0x50, 0x4b])
+      });
+      payload = await response.json();
+      assert.equal(response.status, 400);
+      assert.equal(payload.ok, false);
+
+      response = await fetch(`${baseUrl}/api/linux-apps/${encodeURIComponent(packageId)}`, { method: 'DELETE' });
+      payload = await response.json();
+      assert.equal(response.ok, true);
+      assert.equal(payload.ok, true);
+    });
+  } finally {
+    if (originalDataDir === undefined) {
+      delete process.env.AIOS_DATA_DIR;
+    } else {
+      process.env.AIOS_DATA_DIR = originalDataDir;
+    }
+  }
+});
+
+test('linux package API downloads direct archives with Linux user agent', async () => {
+  const originalDataDir = process.env.AIOS_DATA_DIR;
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'aios-linux-download-data-'));
+  process.env.AIOS_DATA_DIR = tempDir;
+  let receivedUserAgent = '';
+
+  try {
+    const app = createApp({
+      getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null }),
+      fetch: async (_url, options = {}) => {
+        receivedUserAgent = options.headers['User-Agent'];
+        return {
+          ok: true,
+          status: 200,
+          headers: {
+            get: (key) => {
+              if (key.toLowerCase() === 'content-length') return '4';
+              if (key.toLowerCase() === 'content-disposition') return 'attachment; filename="downloaded-app.tar.gz"';
+              return null;
+            }
+          },
+          arrayBuffer: async () => Uint8Array.from([0x1f, 0x8b, 0x08, 0x00]).buffer
+        };
+      }
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/linux-apps/import-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'https://downloads.example/app' })
+      });
+      const payload = await response.json();
+      assert.equal(response.status, 201);
+      assert.equal(payload.ok, true);
+      assert.equal(payload.package.filename, 'downloaded-app.tar.gz');
+      assert.equal(payload.package.packageType, 'tar.gz');
+      assert.match(receivedUserAgent, /Linux x86_64/);
+    });
+  } finally {
+    if (originalDataDir === undefined) {
+      delete process.env.AIOS_DATA_DIR;
+    } else {
+      process.env.AIOS_DATA_DIR = originalDataDir;
+    }
+  }
+});

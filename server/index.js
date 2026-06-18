@@ -29,13 +29,16 @@ const {
   ensureDataDir,
   getDataDir,
   installApp,
+  installLinuxPackage,
   listImports,
   listInstalledApps,
+  listLinuxPackages,
   loadApiKeyAuditEvents,
   loadNotes,
   loadShellState,
   maskSecret,
   removeInstalledApp,
+  removeLinuxPackage,
   saveNotes,
   saveShellState
 } = require('./appDataStore');
@@ -54,6 +57,9 @@ const EXEC_TIMEOUT_MS = Number(process.env.EXEC_TIMEOUT_MS || 15000);
 const EXEC_MAX_OUTPUT_BYTES = Number(process.env.EXEC_MAX_OUTPUT_BYTES || 256000);
 const FS_READ_MAX_BYTES = Number(process.env.FS_READ_MAX_BYTES || 1048576);
 const WEB_APP_MANIFEST_MAX_BYTES = Number(process.env.WEB_APP_MANIFEST_MAX_BYTES || 524288);
+const LINUX_APP_PACKAGE_MAX_BYTES = Number(process.env.LINUX_APP_PACKAGE_MAX_BYTES || 104857600);
+const LINUX_DOWNLOAD_USER_AGENT = process.env.LINUX_DOWNLOAD_USER_AGENT
+  || 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) AIOS/1.0 Chrome/120 Safari/537.36';
 
 function resolveHttpUrl(value, baseUrl = undefined) {
   const raw = typeof value === 'string' ? value.trim() : '';
@@ -151,6 +157,47 @@ function appFromWebManifest(manifest, manifestUrl) {
     glyph: manifest.short_name,
     description: manifest.description,
     manifestUrl
+  };
+}
+
+function filenameFromDownloadResponse(response, url) {
+  const disposition = response.headers?.get?.('content-disposition') || '';
+  const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i) || disposition.match(/filename="?([^";]+)"?/i);
+  if (filenameMatch?.[1]) {
+    return decodeURIComponent(filenameMatch[1]).trim();
+  }
+
+  const pathname = new URL(url).pathname;
+  return path.basename(pathname) || 'linux-package.tar.gz';
+}
+
+async function fetchLinuxPackage({ url, fetchImpl = fetch }) {
+  const packageUrl = resolveHttpUrl(url);
+  const response = await fetchImpl(packageUrl, {
+    headers: {
+      Accept: 'application/gzip, application/x-gzip, application/x-tar, application/octet-stream, */*',
+      'User-Agent': LINUX_DOWNLOAD_USER_AGENT
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download Linux package (HTTP ${response.status}).`);
+  }
+
+  const contentLength = Number(response.headers?.get?.('content-length') || 0);
+  if (contentLength > LINUX_APP_PACKAGE_MAX_BYTES) {
+    throw new Error('Linux package is too large.');
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  if (buffer.length > LINUX_APP_PACKAGE_MAX_BYTES) {
+    throw new Error('Linux package is too large.');
+  }
+
+  return {
+    filename: filenameFromDownloadResponse(response, packageUrl),
+    buffer
   };
 }
 
@@ -358,6 +405,75 @@ function createApp(deps = {}) {
       const removed = await removeInstalledApp(req.params.appId);
       if (!removed) {
         return res.status(404).json({ ok: false, error: 'App not found.' });
+      }
+
+      return res.json({ ok: true, removed });
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get('/api/linux-apps', async (_req, res) => {
+    const packages = await listLinuxPackages();
+    res.json({
+      ok: true,
+      packages,
+      runtime: 'pending-linux-runtime',
+      supportedArchives: ['.tar.gz', '.tgz', '.tar']
+    });
+  });
+
+  app.post(
+    '/api/linux-apps',
+    express.raw({
+      type: ['application/gzip', 'application/x-gzip', 'application/x-tar', 'application/octet-stream'],
+      limit: LINUX_APP_PACKAGE_MAX_BYTES
+    }),
+    async (req, res) => {
+      try {
+        const app = await installLinuxPackage({
+          name: req.get('x-aios-package-name'),
+          filename: req.get('x-aios-package-filename'),
+          buffer: req.body
+        });
+        return res.status(201).json({
+          ok: true,
+          package: app,
+          message: 'Linux package stored. Running it will require the AIOS Linux runtime.'
+        });
+      } catch (error) {
+        return res.status(400).json({ ok: false, error: error.message });
+      }
+    }
+  );
+
+  app.post('/api/linux-apps/import-url', async (req, res) => {
+    try {
+      const downloaded = await fetchLinuxPackage({
+        url: req.body?.url,
+        fetchImpl
+      });
+      const app = await installLinuxPackage({
+        name: req.body?.name,
+        filename: downloaded.filename,
+        buffer: downloaded.buffer
+      });
+      return res.status(201).json({
+        ok: true,
+        package: app,
+        linuxUserAgent: LINUX_DOWNLOAD_USER_AGENT,
+        message: 'Linux package downloaded with a Linux user-agent and stored. Running it will require the AIOS Linux runtime.'
+      });
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.delete('/api/linux-apps/:packageId', async (req, res) => {
+    try {
+      const removed = await removeLinuxPackage(req.params.packageId);
+      if (!removed) {
+        return res.status(404).json({ ok: false, error: 'Linux package not found.' });
       }
 
       return res.json({ ok: true, removed });

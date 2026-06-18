@@ -346,6 +346,25 @@
               <p id="installAppStatus" class="status-text"></p>
               <div id="thirdPartyAppsGrid" class="apps-grid third-party-app-grid" aria-label="Installed third-party apps"></div>
             </section>
+            <section class="third-party-apps linux-package-apps">
+              <div class="apps-section-header">
+                <div>
+                  <p class="wizard-kicker">Linux packages</p>
+                  <h3>Import .tar.gz apps</h3>
+                </div>
+                <p class="status-text">AIOS can store Linux archives now. Running them needs the upcoming Linux runtime/container layer.</p>
+              </div>
+              <div class="toolbar app-package-toolbar">
+                <input id="linuxPackageFile" type="file" accept=".tar.gz,.tgz,.tar,application/gzip,application/x-tar" />
+                <button id="installLinuxPackageButton" type="button">Import Linux package</button>
+              </div>
+              <div class="toolbar app-package-toolbar">
+                <input id="linuxPackageUrl" type="url" placeholder="Direct .tar.gz/.tgz/.tar download URL" />
+                <button id="downloadLinuxPackageButton" type="button" class="secondary">Download with Linux UA</button>
+              </div>
+              <p id="linuxPackageStatus" class="status-text"></p>
+              <div id="linuxPackagesGrid" class="apps-grid third-party-app-grid" aria-label="Imported Linux packages"></div>
+            </section>
           </div>
         </section>
       </main>
