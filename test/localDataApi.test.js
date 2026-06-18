@@ -138,3 +138,78 @@ test('provider audit endpoint returns masked key metadata only', async () => {
     }
   }
 });
+
+test('third-party app APIs persist safe web app launchers locally', async () => {
+  const originalDataDir = process.env.AIOS_DATA_DIR;
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'aios-app-data-'));
+  process.env.AIOS_DATA_DIR = tempDir;
+
+  try {
+    const app = createApp({
+      getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null })
+    });
+
+    await withServer(app, async (baseUrl) => {
+      let response = await fetch(`${baseUrl}/api/apps`);
+      let payload = await response.json();
+      assert.equal(response.ok, true);
+      assert.deepEqual(payload.apps, []);
+
+      response = await fetch(`${baseUrl}/api/apps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Linear',
+          url: 'https://linear.app',
+          glyph: 'LN',
+          description: 'Project tracker',
+          version: '1.2.3'
+        })
+      });
+      payload = await response.json();
+      assert.equal(response.status, 201);
+      assert.equal(payload.ok, true);
+      assert.equal(payload.app.name, 'Linear');
+      assert.equal(payload.app.url, 'https://linear.app/');
+      assert.equal(payload.app.glyph, 'LN');
+      assert.equal(payload.app.description, 'Project tracker');
+      assert.equal(payload.app.version, '1.2.3');
+      assert.equal(payload.app.format, 'aiosapp');
+
+      const appId = payload.app.id;
+      response = await fetch(`${baseUrl}/api/apps`);
+      payload = await response.json();
+      assert.equal(response.ok, true);
+      assert.equal(payload.apps.length, 1);
+      assert.equal(payload.apps[0].id, appId);
+
+      response = await fetch(`${baseUrl}/api/apps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Bad',
+          url: 'javascript:alert(1)'
+        })
+      });
+      payload = await response.json();
+      assert.equal(response.status, 400);
+      assert.equal(payload.ok, false);
+
+      response = await fetch(`${baseUrl}/api/apps/${encodeURIComponent(appId)}`, { method: 'DELETE' });
+      payload = await response.json();
+      assert.equal(response.ok, true);
+      assert.equal(payload.ok, true);
+
+      response = await fetch(`${baseUrl}/api/apps`);
+      payload = await response.json();
+      assert.equal(response.ok, true);
+      assert.deepEqual(payload.apps, []);
+    });
+  } finally {
+    if (originalDataDir === undefined) {
+      delete process.env.AIOS_DATA_DIR;
+    } else {
+      process.env.AIOS_DATA_DIR = originalDataDir;
+    }
+  }
+});

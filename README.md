@@ -23,6 +23,7 @@ No Docker, XFCE desktop, VNC, or container runtime is part of the supported app 
 - Desktop wallpaper + top menu bar + dock
 - Windowed apps: **AI Chat**, **Files**, **Terminal**, **Settings**, **Setup Assistant**
 - Local AIOS runtime status, process history, and workspace identity
+- Third-party web app launchers stored locally and opened through the AIOS Browser
 - First-run setup flow (provider select/connect/test/finish)
 - Provider status and GitHub Copilot integration (browser device login or env token)
 
@@ -114,6 +115,26 @@ Exec commands are tracked as AIOS processes so the desktop can show command life
 - `GET /api/local-data/imports`
 - `POST /api/local-data/imports`
 - `GET /api/settings/provider-audit`
+- `GET /api/apps`
+- `POST /api/apps`
+- `DELETE /api/apps/:appId`
+
+## Third-party app format
+
+AIOS installs third-party apps as local web-app launchers, either from the Apps window form or from a `.aiosapp` JSON manifest. For now, AIOS does not run arbitrary downloaded code or native packages like `.dmg`, `.deb`, or `.tar.gz`; apps are HTTPS/HTTP web apps opened through the AIOS Browser or, when a site blocks embedding, the system browser.
+
+Example `.aiosapp` file:
+
+```json
+{
+  "aiosApp": 1,
+  "name": "YouTube",
+  "url": "https://youtube.com",
+  "glyph": "YT",
+  "description": "Video app",
+  "version": "1.0.0"
+}
+```
 
 ## Project structure
 

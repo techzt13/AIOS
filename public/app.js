@@ -52,9 +52,21 @@ const terminalOutput = document.getElementById('terminalOutput');
 const browserToolbar = document.getElementById('browserToolbar');
 const browserUrlInput = document.getElementById('browserUrlInput');
 const browserFrame = document.getElementById('browserFrame');
+const browserOpenExternalButton = document.getElementById('browserOpenExternalButton');
+const browserBlockedNotice = document.getElementById('browserBlockedNotice');
+const browserNoticeExternalButton = document.getElementById('browserNoticeExternalButton');
+const installAppForm = document.getElementById('installAppForm');
+const installAppName = document.getElementById('installAppName');
+const installAppUrl = document.getElementById('installAppUrl');
+const installAppGlyph = document.getElementById('installAppGlyph');
+const installAppManifestFile = document.getElementById('installAppManifestFile');
+const installAppManifestButton = document.getElementById('installAppManifestButton');
+const installAppStatus = document.getElementById('installAppStatus');
+const thirdPartyAppsGrid = document.getElementById('thirdPartyAppsGrid');
 
 const accentSelect = document.getElementById('accentSelect');
 const wallpaperSelect = document.getElementById('wallpaperSelect');
+const performanceModeToggle = document.getElementById('performanceModeToggle');
 const dataDirValue = document.getElementById('dataDirValue');
 const importTypeSelect = document.getElementById('importTypeSelect');
 const importFileInput = document.getElementById('importFileInput');
@@ -138,6 +150,8 @@ let currentWizardStep = 0;
 let wizardTestSucceeded = false;
 let shellState = { windows: {}, preferences: {} };
 let zCounter = 10;
+let installedApps = [];
+let browserLoadTimer = null;
 
 function renderMessageContent(container, content) {
   const text = String(content ?? '');
@@ -329,6 +343,48 @@ function providerGlyph(provider) {
   return (provider?.name || '?').trim().slice(0, 1).toUpperCase();
 }
 
+function appGlyphFromName(name) {
+  return String(name || 'APP')
+    .trim()
+    .replace(/[^a-z0-9]/gi, '')
+    .slice(0, 2)
+    .toUpperCase() || 'APP';
+}
+
+function normalizeBrowserUrl(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) return '';
+
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+
+  if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(raw) || raw.startsWith('localhost:')) {
+    return `https://${raw}`;
+  }
+
+  return `https://www.google.com/search?igu=1&q=${encodeURIComponent(raw)}`;
+}
+
+function openBrowserUrl(rawValue) {
+  const url = normalizeBrowserUrl(rawValue);
+  if (!url) return;
+  if (browserLoadTimer) clearTimeout(browserLoadTimer);
+  browserBlockedNotice.classList.add('hidden');
+  browserUrlInput.value = url;
+  browserFrame.src = url;
+  browserLoadTimer = setTimeout(() => {
+    browserBlockedNotice.classList.remove('hidden');
+  }, 3500);
+  openWindow('browser');
+}
+
+function openCurrentBrowserUrlExternally() {
+  const url = normalizeBrowserUrl(browserUrlInput.value || browserFrame.src);
+  if (!url || url === 'about:blank') return;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 function formatPathUp(pathValue) {
   if (!pathValue || pathValue === '.') return '.';
   const parts = pathValue.split('/').filter(Boolean);
@@ -481,10 +537,13 @@ function closeWindow(app) {
 function applyPreferences() {
   const accent = shellState.preferences.accent || 'blue';
   const wallpaper = shellState.preferences.wallpaper || 'aurora';
+  const performanceMode = shellState.preferences.performanceMode === true;
   root.dataset.accent = accent;
   root.dataset.wallpaper = wallpaper;
+  root.dataset.performance = performanceMode ? 'fast' : 'visual';
   accentSelect.value = accent;
   wallpaperSelect.value = wallpaper;
+  performanceModeToggle.checked = performanceMode;
 }
 
 function initWindowDrag(windowEl) {
@@ -1376,6 +1435,137 @@ async function loadRuntimeInfo() {
   }
 }
 
+function renderInstalledApps() {
+  thirdPartyAppsGrid.innerHTML = '';
+
+  if (installedApps.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'status-text app-empty-state';
+    empty.textContent = 'No third-party apps installed yet.';
+    thirdPartyAppsGrid.appendChild(empty);
+    return;
+  }
+
+  installedApps.forEach((app) => {
+    const card = document.createElement('article');
+    card.className = 'app-launch-card third-party-app-card';
+
+    const glyph = document.createElement('span');
+    glyph.className = 'app-launch-icon';
+    glyph.textContent = app.glyph || appGlyphFromName(app.name);
+
+    const title = document.createElement('strong');
+    title.textContent = app.name;
+
+    const url = document.createElement('small');
+    url.textContent = app.description || app.url;
+
+    const actions = document.createElement('div');
+    actions.className = 'third-party-app-actions';
+
+    const openButton = document.createElement('button');
+    openButton.type = 'button';
+    openButton.textContent = 'Open';
+    openButton.addEventListener('click', () => openBrowserUrl(app.url));
+
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'secondary';
+    removeButton.textContent = 'Remove';
+    removeButton.addEventListener('click', () => {
+      removeInstalledApp(app.id).catch((error) => setFeedback(installAppStatus, error.message, 'error'));
+    });
+
+    actions.appendChild(openButton);
+    actions.appendChild(removeButton);
+    card.appendChild(glyph);
+    card.appendChild(title);
+    card.appendChild(url);
+    card.appendChild(actions);
+    thirdPartyAppsGrid.appendChild(card);
+  });
+}
+
+async function loadInstalledApps() {
+  const response = await fetch('/api/apps');
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to load installed apps.');
+  }
+
+  installedApps = payload.apps || [];
+  renderInstalledApps();
+}
+
+async function installThirdPartyApp({ name, url, glyph }) {
+  return installAppManifest({
+    name,
+    url,
+    glyph
+  });
+}
+
+function readAiosAppManifest(value) {
+  const manifest = value && typeof value === 'object' ? value : {};
+  const app = manifest.app && typeof manifest.app === 'object' ? manifest.app : manifest;
+  return {
+    name: app.name,
+    url: app.url || app.startUrl,
+    glyph: app.glyph || app.iconText,
+    description: app.description,
+    version: app.version
+  };
+}
+
+async function installAppManifest(manifest) {
+  const appManifest = readAiosAppManifest(manifest);
+  const response = await fetch('/api/apps', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(appManifest)
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to install app.');
+  }
+
+  installAppName.value = '';
+  installAppUrl.value = '';
+  installAppGlyph.value = '';
+  if (installAppManifestFile) installAppManifestFile.value = '';
+  setFeedback(installAppStatus, `${payload.app.name} installed.`, 'success');
+  await loadInstalledApps();
+}
+
+async function installSelectedManifestFile() {
+  const file = installAppManifestFile.files?.[0];
+  if (!file) {
+    setFeedback(installAppStatus, 'Choose a .aiosapp JSON file first.', 'error');
+    return;
+  }
+
+  const raw = await file.text();
+  let manifest;
+  try {
+    manifest = JSON.parse(raw);
+  } catch {
+    throw new Error('Selected .aiosapp file is not valid JSON.');
+  }
+
+  await installAppManifest(manifest);
+}
+
+async function removeInstalledApp(appId) {
+  const response = await fetch(`/api/apps/${encodeURIComponent(appId)}`, { method: 'DELETE' });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to remove app.');
+  }
+
+  setFeedback(installAppStatus, 'App removed.', 'success');
+  await loadInstalledApps();
+}
+
 async function listWorkspace(path = '.') {
   const response = await fetch('/api/fs/list', {
     method: 'POST',
@@ -1614,20 +1804,7 @@ wizardFinishButton.addEventListener('click', () => {
 
 browserToolbar.addEventListener('submit', (event) => {
   event.preventDefault();
-  const raw = browserUrlInput.value.trim();
-  if (!raw) return;
-
-  let url = raw;
-  if (!/^https?:\/\//i.test(url)) {
-    if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(url) || url.startsWith('localhost:')) {
-      url = `https://${url}`;
-    } else {
-      url = `https://www.google.com/search?igu=1&q=${encodeURIComponent(url)}`;
-    }
-  }
-
-  browserUrlInput.value = url;
-  browserFrame.src = url;
+  openBrowserUrl(browserUrlInput.value);
 });
 
 document.getElementById('browserBackButton').addEventListener('click', () => {
@@ -1638,6 +1815,14 @@ document.getElementById('browserForwardButton').addEventListener('click', () => 
 });
 document.getElementById('browserRefreshButton').addEventListener('click', () => {
   try { browserFrame.contentWindow.location.reload(); } catch { browserFrame.src = browserFrame.src; }
+});
+browserOpenExternalButton.addEventListener('click', openCurrentBrowserUrlExternally);
+browserNoticeExternalButton.addEventListener('click', openCurrentBrowserUrlExternally);
+browserFrame.addEventListener('load', () => {
+  if (browserLoadTimer) {
+    clearTimeout(browserLoadTimer);
+    browserLoadTimer = null;
+  }
 });
 
 chatModelSelect.addEventListener('change', () => {
@@ -1775,6 +1960,12 @@ wallpaperSelect.addEventListener('change', () => {
   persistShellState();
 });
 
+performanceModeToggle.addEventListener('change', () => {
+  shellState.preferences.performanceMode = performanceModeToggle.checked;
+  applyPreferences();
+  persistShellState();
+});
+
 dockAppButtons.forEach((button) => {
   button.addEventListener('click', () => {
     openWindow(button.dataset.openApp);
@@ -1800,6 +1991,19 @@ document.querySelectorAll('[data-launch-app]').forEach((button) => {
       refreshFileList().catch((error) => setFeedback(fileReadStatus, error.message, 'error'));
     }
   });
+});
+
+installAppForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  installThirdPartyApp({
+    name: installAppName.value,
+    url: installAppUrl.value,
+    glyph: installAppGlyph.value
+  }).catch((error) => setFeedback(installAppStatus, error.message, 'error'));
+});
+
+installAppManifestButton.addEventListener('click', () => {
+  installSelectedManifestFile().catch((error) => setFeedback(installAppStatus, error.message, 'error'));
 });
 
 document.querySelectorAll('[data-window-action]').forEach((button) => {
@@ -1838,6 +2042,7 @@ loadShellState()
     loadWizardProviders(),
     loadDataDirInfo(),
     loadRuntimeInfo(),
+    loadInstalledApps(),
     loadImports(),
     loadApiAudit()
   ]))

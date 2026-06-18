@@ -43,6 +43,12 @@
     linear-gradient(180deg, #1f2733 0%, #161d28 52%, #11161e 100%);
 }
 
+:root[data-performance='fast'] {
+  --liquid-glass-bg: rgba(246, 249, 255, 0.88);
+  --liquid-glass-shadow: 0 12px 28px rgba(8, 16, 36, 0.2);
+  --window-bg: rgba(249, 251, 255, 0.92);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -79,6 +85,34 @@ body {
   pointer-events: none;
   z-index: 0;
   filter: blur(8px);
+}
+
+:root[data-performance='fast'] .desktop-shell::before,
+:root[data-performance='fast'] .desktop-shell::after,
+:root[data-performance='fast'] .menu-bar::before,
+:root[data-performance='fast'] .app-window::before,
+:root[data-performance='fast'] .dock::before,
+:root[data-performance='fast'] .wizard-card::before,
+:root[data-performance='fast'] .wizard-hero-panel::before,
+:root[data-performance='fast'] .control-group::before,
+:root[data-performance='fast'] .auth-card::before,
+:root[data-performance='fast'] .provider-card::before,
+:root[data-performance='fast'] .model-picker-card::before,
+:root[data-performance='fast'] .composer::before,
+:root[data-performance='fast'] .message::before {
+  display: none;
+}
+
+:root[data-performance='fast'] .menu-bar,
+:root[data-performance='fast'] .app-window,
+:root[data-performance='fast'] .dock,
+:root[data-performance='fast'] .control-group,
+:root[data-performance='fast'] .auth-card,
+:root[data-performance='fast'] .composer,
+:root[data-performance='fast'] input,
+:root[data-performance='fast'] select,
+:root[data-performance='fast'] textarea {
+  backdrop-filter: none;
 }
 
 .desktop-shell::before {
@@ -785,6 +819,62 @@ button.secondary {
   gap: 12px;
 }
 
+.third-party-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.apps-section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: end;
+}
+
+.apps-section-header h3 {
+  margin: 2px 0 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.045em;
+}
+
+.install-app-form {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(220px, 1.4fr) 78px auto;
+  gap: 8px;
+}
+
+.app-package-toolbar {
+  align-items: center;
+}
+
+.app-package-toolbar input {
+  flex: 1;
+}
+
+.app-format-help {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.34);
+  padding: 10px 12px;
+}
+
+.app-format-help summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.app-format-help pre {
+  margin: 10px 0 0;
+  overflow: auto;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.third-party-app-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
 .app-launch-card {
   position: relative;
   isolation: isolate;
@@ -831,6 +921,32 @@ button.secondary {
 .app-launch-card small {
   color: #526783;
   line-height: 1.35;
+}
+
+.third-party-app-card {
+  min-height: 190px;
+}
+
+.third-party-app-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.third-party-app-actions button {
+  flex: 1;
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.app-empty-state {
+  grid-column: 1 / -1;
+  min-height: 82px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  border: 1px dashed rgba(82, 103, 133, 0.26);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .app-launch-icon {
@@ -1128,11 +1244,48 @@ button.secondary {
   border-bottom: 1px solid rgba(255, 255, 255, 0.48);
 }
 
+.browser-toolbar .secondary {
+  white-space: nowrap;
+}
+
+.browser-notice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  color: #183252;
+  background: rgba(255, 244, 206, 0.92);
+  border-bottom: 1px solid rgba(111, 91, 26, 0.18);
+}
+
+.browser-notice span {
+  grid-column: 1;
+  font-size: 0.82rem;
+}
+
+.browser-notice button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
 .browser-frame {
   flex: 1;
   width: 100%;
   border: none;
   background: #fff;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.88rem;
+  color: #405274;
+}
+
+.checkbox-row input {
+  width: auto;
 }
 
 .notes-window {
@@ -1868,6 +2021,18 @@ button:focus-visible {
 
   .model-picker-card {
     grid-template-columns: 1fr;
+  }
+
+  .install-app-form,
+  .apps-section-header,
+  .browser-notice {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .browser-notice button {
+    grid-column: 1;
+    grid-row: auto;
   }
 }
 

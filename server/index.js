@@ -28,11 +28,14 @@ const {
   appendImportRecord,
   ensureDataDir,
   getDataDir,
+  installApp,
   listImports,
+  listInstalledApps,
   loadApiKeyAuditEvents,
   loadNotes,
   loadShellState,
   maskSecret,
+  removeInstalledApp,
   saveNotes,
   saveShellState
 } = require('./appDataStore');
@@ -210,6 +213,39 @@ function createApp(deps = {}) {
     const incoming = Array.isArray(req.body?.notes) ? req.body.notes : [];
     const { notes } = await saveNotes(incoming);
     res.json({ ok: true, notes });
+  });
+
+  app.get('/api/apps', async (_req, res) => {
+    const apps = await listInstalledApps();
+    res.json({ ok: true, apps });
+  });
+
+  app.post('/api/apps', async (req, res) => {
+    try {
+      const app = await installApp({
+        name: req.body?.name,
+        url: req.body?.url,
+        glyph: req.body?.glyph,
+        description: req.body?.description,
+        version: req.body?.version
+      });
+      return res.status(201).json({ ok: true, app });
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.delete('/api/apps/:appId', async (req, res) => {
+    try {
+      const removed = await removeInstalledApp(req.params.appId);
+      if (!removed) {
+        return res.status(404).json({ ok: false, error: 'App not found.' });
+      }
+
+      return res.json({ ok: true, removed });
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error.message });
+    }
   });
 
   app.get('/api/local-data/imports', async (_req, res) => {

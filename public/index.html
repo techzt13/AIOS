@@ -136,7 +136,13 @@
               <button type="button" id="browserRefreshButton" class="icon-button" title="Reload" aria-label="Reload">↻</button>
               <input id="browserUrlInput" type="text" placeholder="Search the web or enter URL..." />
               <button type="submit" id="browserGoButton">Go</button>
+              <button type="button" id="browserOpenExternalButton" class="secondary">Open outside AIOS</button>
             </form>
+            <div id="browserBlockedNotice" class="browser-notice hidden">
+              <strong>This site may block embedded browsers.</strong>
+              <span>Sites like YouTube often refuse iframes. Open it outside AIOS, or install/open direct embed-friendly web apps.</span>
+              <button type="button" id="browserNoticeExternalButton">Open outside AIOS</button>
+            </div>
             <iframe id="browserFrame" class="browser-frame" src="about:blank" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
           </div>
         </section>
@@ -227,6 +233,10 @@
                   <option value="dusk">Dusk</option>
                   <option value="graphite">Graphite</option>
                 </select>
+                <label class="checkbox-row" for="performanceModeToggle">
+                  <input id="performanceModeToggle" type="checkbox" />
+                  Reduce visual effects for performance
+                </label>
                 <p class="status-text">Local app data path: <code id="dataDirValue">loading...</code></p>
                 <button id="runSetupAgainButton" type="button" class="secondary">Run setup assistant again</button>
               </section>
@@ -304,6 +314,38 @@
                 <small>Search the web and view sites natively.</small>
               </button>
             </div>
+            <section class="third-party-apps">
+              <div class="apps-section-header">
+                <div>
+                  <p class="wizard-kicker">Third-party apps</p>
+                  <h3>Install web apps</h3>
+                </div>
+                <p class="status-text">AIOS stores app launchers locally and opens them in the Browser sandbox.</p>
+              </div>
+              <form id="installAppForm" class="install-app-form">
+                <input id="installAppName" type="text" placeholder="App name" maxlength="80" required />
+                <input id="installAppUrl" type="url" placeholder="https://example.com" required />
+                <input id="installAppGlyph" type="text" placeholder="Icon" maxlength="3" />
+                <button type="submit">Install</button>
+              </form>
+              <div class="toolbar app-package-toolbar">
+                <input id="installAppManifestFile" type="file" accept=".aiosapp,.json,application/json" />
+                <button id="installAppManifestButton" type="button" class="secondary">Install .aiosapp file</button>
+              </div>
+              <details class="app-format-help">
+                <summary>AIOS app package format</summary>
+                <pre>{
+  "aiosApp": 1,
+  "name": "YouTube",
+  "url": "https://youtube.com",
+  "glyph": "YT",
+  "description": "Video app",
+  "version": "1.0.0"
+}</pre>
+              </details>
+              <p id="installAppStatus" class="status-text"></p>
+              <div id="thirdPartyAppsGrid" class="apps-grid third-party-app-grid" aria-label="Installed third-party apps"></div>
+            </section>
           </div>
         </section>
       </main>

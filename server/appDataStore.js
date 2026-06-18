@@ -7,6 +7,7 @@ const SHELL_STATE_FILE = 'shell-state.json';
 const IMPORTS_FILE = 'imports.json';
 const API_KEY_AUDIT_FILE = 'api-key-audit.json';
 const NOTES_FILE = 'notes.json';
+const INSTALLED_APPS_FILE = 'installed-apps.json';
 
 function getDataDir() {
   return path.resolve(process.env.AIOS_DATA_DIR || path.join(process.cwd(), 'workspace', DATA_DIR_NAME));
@@ -26,6 +27,10 @@ function getApiKeyAuditPath() {
 
 function getNotesPath() {
   return path.join(getDataDir(), NOTES_FILE);
+}
+
+function getInstalledAppsPath() {
+  return path.join(getDataDir(), INSTALLED_APPS_FILE);
 }
 
 async function ensureDataDir() {
@@ -211,20 +216,162 @@ async function saveNotes(nextNotes) {
   return { notes };
 }
 
+function sanitizeAppName(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim().slice(0, 80);
+}
+
+function normalizeAppGlyph(value, name) {
+  const glyph = typeof value === 'string' ? value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+  if (glyph) {
+    return glyph.slice(0, 3);
+  }
+
+  return sanitizeAppName(name).slice(0, 2).toUpperCase() || 'APP';
+}
+
+function sanitizeAppDescription(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim().slice(0, 240);
+}
+
+function sanitizeAppVersion(value) {
+  if (typeof value !== 'string') {
+    return '1.0.0';
+  }
+
+  const version = value.trim().slice(0, 40);
+  return version || '1.0.0';
+}
+
+function normalizeAppUrl(value) {
+  if (typeof value !== 'string') {
+    throw new Error('App URL is required.');
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error('App URL is required.');
+  }
+
+  let url;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error('App URL must be a valid http:// or https:// URL.');
+  }
+
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error('App URL must use http:// or https://.');
+  }
+
+  url.hash = url.hash.slice(0, 512);
+  return url.toString().slice(0, 2048);
+}
+
+function normalizeInstalledApp(app) {
+  if (!app || typeof app !== 'object') {
+    return null;
+  }
+
+  const name = sanitizeAppName(app.name);
+  if (!name) {
+    return null;
+  }
+
+  let url;
+  try {
+    url = normalizeAppUrl(app.url);
+  } catch {
+    return null;
+  }
+
+  const timestamp = new Date().toISOString();
+  return {
+    id: typeof app.id === 'string' && app.id.trim() ? app.id : crypto.randomUUID(),
+    name,
+    url,
+    glyph: normalizeAppGlyph(app.glyph, name),
+    description: sanitizeAppDescription(app.description),
+    version: sanitizeAppVersion(app.version),
+    format: 'aiosapp',
+    installedAt: typeof app.installedAt === 'string' ? app.installedAt : timestamp,
+    updatedAt: typeof app.updatedAt === 'string' ? app.updatedAt : timestamp
+  };
+}
+
+async function loadInstalledAppsStore() {
+  const parsed = await readJson(getInstalledAppsPath(), { apps: [] });
+  return {
+    apps: Array.isArray(parsed.apps) ? parsed.apps.map(normalizeInstalledApp).filter(Boolean) : []
+  };
+}
+
+async function listInstalledApps() {
+  const store = await loadInstalledAppsStore();
+  return store.apps;
+}
+
+async function installApp({ name, url, glyph, description, version }) {
+  const app = normalizeInstalledApp({ name, url, glyph, description, version });
+  if (!app) {
+    throw new Error('A valid app name and URL are required.');
+  }
+
+  const store = await loadInstalledAppsStore();
+  const existingIndex = store.apps.findIndex((item) => item.url === app.url || item.name.toLowerCase() === app.name.toLowerCase());
+  if (existingIndex >= 0) {
+    app.id = store.apps[existingIndex].id;
+    app.installedAt = store.apps[existingIndex].installedAt;
+    store.apps.splice(existingIndex, 1);
+  }
+
+  app.updatedAt = new Date().toISOString();
+  store.apps.unshift(app);
+  await writeJson(getInstalledAppsPath(), store);
+  return app;
+}
+
+async function removeInstalledApp(appId) {
+  const id = typeof appId === 'string' ? appId.trim() : '';
+  if (!id) {
+    throw new Error('App id is required.');
+  }
+
+  const store = await loadInstalledAppsStore();
+  const nextApps = store.apps.filter((app) => app.id !== id);
+  if (nextApps.length === store.apps.length) {
+    return null;
+  }
+
+  await writeJson(getInstalledAppsPath(), { apps: nextApps });
+  return { id };
+}
+
 module.exports = {
   appendApiKeyAuditEvent,
   appendImportRecord,
   ensureDataDir,
   getApiKeyAuditPath,
   getDataDir,
+  getInstalledAppsPath,
   getImportsPath,
   getNotesPath,
   getShellStatePath,
+  installApp,
   listImports,
+  listInstalledApps,
   loadApiKeyAuditEvents,
   loadNotes,
   loadShellState,
   maskSecret,
+  removeInstalledApp,
   saveNotes,
   saveShellState
 };
