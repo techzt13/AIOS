@@ -44,6 +44,7 @@ const {
 } = require('./appDataStore');
 const { resolveSandboxPath } = require('./sandbox');
 const { validateExecCommand, runExecCommand, startExecCommand } = require('./exec');
+const { openNativeBrowserUrl } = require('./browserLauncher');
 const { ProcessRegistry } = require('./processRegistry');
 const { getRuntimeInfo } = require('./runtime');
 
@@ -215,6 +216,7 @@ function createApp(deps = {}) {
   const clearProviderSettingsImpl = deps.clearProviderSettings || clearProviderSettings;
   const processRegistry = deps.processRegistry || new ProcessRegistry();
   const fetchImpl = deps.fetch || fetch;
+  const openNativeBrowserUrlImpl = deps.openNativeBrowserUrl || openNativeBrowserUrl;
 
   const apiLimiter = rateLimit({
     windowMs: RATE_LIMIT_WINDOW_MS,
@@ -464,6 +466,15 @@ function createApp(deps = {}) {
         linuxUserAgent: LINUX_DOWNLOAD_USER_AGENT,
         message: 'Linux package downloaded with a Linux user-agent and stored. Running it will require the AIOS Linux runtime.'
       });
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post('/api/browser/open', async (req, res) => {
+    try {
+      const result = await openNativeBrowserUrlImpl(req.body?.url);
+      return res.json(result);
     } catch (error) {
       return res.status(400).json({ ok: false, error: error.message });
     }

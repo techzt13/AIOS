@@ -388,7 +388,11 @@ function normalizeBrowserUrl(rawValue) {
     return raw;
   }
 
-  if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(raw) || raw.startsWith('localhost:')) {
+  if (/^localhost(?::\d+)?(\/.*)?$/i.test(raw)) {
+    return `http://${raw}`;
+  }
+
+  if (/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(raw)) {
     return `https://${raw}`;
   }
 
@@ -430,9 +434,7 @@ function showBrowserExternalPage(url) {
   browserFrame.classList.add('hidden');
   browserExternalPage.classList.remove('hidden');
   browserExternalLink.href = url;
-  browserExternalDetail.textContent = hostLikelyBlocksEmbedding(url)
-    ? 'Protected sites like YouTube block iframe browsers. AIOS opened this page as a top-level tab so video, login, and navigation work normally.'
-    : 'AIOS opened this page as a top-level tab. If the tab did not appear, use the button below to open it again.';
+  browserExternalDetail.textContent = 'Opening a native browser session from the AIOS runtime...';
 }
 
 function showBrowserBlockedNotice(url, mode = 'blocked') {
@@ -440,11 +442,11 @@ function showBrowserBlockedNotice(url, mode = 'blocked') {
   const detail = browserBlockedNotice.querySelector('span');
   if (detail) {
     if (mode === 'real-tab') {
-      detail.textContent = 'AIOS opened this protected site as a real top-level browser tab instead of a blocked iframe.';
+      detail.textContent = 'AIOS opened this page through the native runtime instead of the iframe sandbox.';
     } else {
       detail.textContent = hostLikelyBlocksEmbedding(url)
-        ? 'This site is known to block embedded browsers. AIOS can open it as a real tab, or you can try embedded mode anyway.'
-        : 'If the page stays blank, this site may block embedded browsers. Open it as a real tab.';
+        ? 'This site is known to block embedded browser frames. Use the native browser session, or try embedded mode anyway.'
+        : 'If the page stays blank, this site may block embedded browser frames. Open it through the native runtime.';
     }
   }
 }
@@ -453,10 +455,51 @@ function hideBrowserBlockedNotice() {
   browserBlockedNotice.classList.add('hidden');
 }
 
+async function launchNativeBrowserUrl(url) {
+  if (window.aiosNative?.openBrowserUrl) {
+    return window.aiosNative.openBrowserUrl(url);
+  }
+
+  const response = await fetch('/api/browser/open', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url })
+  });
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error('AIOS native browser API is unavailable. Restart npm start or run npm run desktop.');
+  }
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to open native browser session.');
+  }
+  return payload;
+}
+
+function describeNativeBrowserResult(result) {
+  if (result?.mode === 'electron-browser-window') {
+    return 'AIOS opened this page in an Electron BrowserWindow owned by the AIOS desktop runtime. This is a real browser engine, not an iframe.';
+  }
+
+  if (result?.mode) {
+    return 'AIOS asked the local OS runtime to open this page in your native browser so video, login, popups, and navigation can work normally.';
+  }
+
+  return 'AIOS opened this page outside the iframe sandbox so video, login, popups, and navigation can work normally.';
+}
+
 function openRealBrowserTab(url) {
-  window.open(url, '_blank', 'noopener,noreferrer');
   showBrowserExternalPage(url);
   showBrowserBlockedNotice(url, 'real-tab');
+  launchNativeBrowserUrl(url)
+    .then((result) => {
+      browserExternalDetail.textContent = describeNativeBrowserResult(result);
+    })
+    .catch((error) => {
+      browserExternalDetail.textContent = `Native browser launch failed: ${error.message}. Use "Open again" to open it in a regular browser tab.`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    });
 }
 
 function openBrowserUrl(rawValue, options = {}) {
@@ -470,7 +513,7 @@ function openBrowserUrl(rawValue, options = {}) {
   hideBrowserBlockedNotice();
   browserUrlInput.value = url;
 
-  if (!options.forceEmbed && hostLikelyBlocksEmbedding(url)) {
+  if (!options.forceEmbed) {
     browserFrame.src = 'about:blank';
     openRealBrowserTab(url);
     openWindow('browser');

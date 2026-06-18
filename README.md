@@ -1,18 +1,30 @@
 # AIOS
 Zack and Richard have made an operating system called AIOS. Built for AI users and nerds.
 
-AIOS runs as a local **AI-native OS runtime** with a macOS-inspired browser desktop served by the AIOS daemon on port `8080`.
+AIOS runs as a local **AI-native OS runtime** with a macOS-inspired desktop. Use desktop mode when you want AIOS to own native app windows instead of being trapped inside a normal browser tab.
 
 ## Quick start
+
+OS desktop mode:
 
 ```bash
 git clone https://github.com/techzt13/AIOS.git
 cd AIOS
 npm install
+npm run desktop
+```
+
+Localhost web-shell mode:
+
+```bash
 npm start
 ```
 
 Open: <http://localhost:8080>
+
+In desktop mode, AIOS starts its own local daemon and opens a native desktop shell. The AIOS Browser opens real Electron browser windows for sites like YouTube, so pages are not loaded through an iframe.
+
+In web-shell mode, AIOS still runs on `localhost:8080`; the local daemon can launch your OS browser through `POST /api/browser/open`, but the page itself remains inside your existing browser.
 
 By default AIOS binds to `127.0.0.1` so the OS runtime is local-only. Set `AIOS_HOST=0.0.0.0` only if you intentionally want to expose it on your network.
 
@@ -21,9 +33,9 @@ No Docker, XFCE desktop, VNC, or container runtime is part of the supported app 
 ## What you get on port 8080
 
 - Desktop wallpaper + top menu bar + dock
-- Windowed apps: **AI Chat**, **Files**, **Terminal**, **Settings**, **Setup Assistant**
+- Windowed apps: **AI Chat**, **Browser**, **Files**, **Terminal**, **Settings**, **Setup Assistant**
 - Local AIOS runtime status, process history, and workspace identity
-- Third-party web app launchers stored locally and opened through the AIOS Browser
+- Third-party web app launchers stored locally and opened through the native AIOS Browser path
 - First-run setup flow (provider select/connect/test/finish)
 - Provider status and GitHub Copilot integration (browser device login or env token)
 
@@ -123,16 +135,19 @@ Exec commands are tracked as AIOS processes so the desktop can show command life
 - `POST /api/linux-apps`
 - `POST /api/linux-apps/import-url`
 - `DELETE /api/linux-apps/:packageId`
+- `POST /api/browser/open`
 
 ## Third-party app format
 
 AIOS installs third-party apps using the standard **PWA/Web App Manifest** format (`manifest.webmanifest` or `manifest.json`). You can install by entering a website URL and asking AIOS to find `<link rel="manifest">`, or by importing a manifest file directly.
 
-For now, AIOS does not run arbitrary downloaded code or native packages like `.dmg`, `.deb`, or `.tar.gz`; apps are HTTPS/HTTP web apps opened through the AIOS Browser or, when a site blocks embedding, a real top-level browser tab.
+For now, AIOS does not run arbitrary downloaded code or native packages like `.dmg`, `.deb`, or `.tar.gz`; apps are HTTPS/HTTP web apps opened through the AIOS native browser path.
 
 ## Browser behavior
 
-AIOS uses an embedded browser frame for sites that allow embedding. Protected sites such as YouTube, Google, GitHub, and major social apps intentionally block iframe browsers with browser security headers. AIOS detects those hosts and opens them as real top-level browser tabs automatically so video playback, login, popups, and navigation can work normally instead of showing a broken embedded page.
+AIOS Browser is native-first because a webpage iframe is not a real browser. In `npm run desktop`, AIOS opens sites in Electron `BrowserWindow` instances owned by the AIOS desktop runtime. YouTube and other protected sites load there as top-level browser pages, not embedded frames.
+
+When running only `npm start`, AIOS is still a localhost web shell, so it cannot embed a full browser engine inside the page. In that mode, the local daemon uses `POST /api/browser/open` to ask the host OS to open the URL in a native browser. The old iframe path remains available only through **Try embedded anyway** for simple pages that allow embedding.
 
 Example `manifest.webmanifest`:
 

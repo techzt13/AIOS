@@ -36,7 +36,7 @@ test('web shell desktop markup includes menu bar, dock, and app windows', async 
   assert.match(indexHtml, /id="browserBlockedNotice"/);
   assert.match(indexHtml, /id="browserExternalPage"/);
   assert.match(indexHtml, /id="browserTryEmbedButton"/);
-  assert.match(indexHtml, /Open real tab/);
+  assert.match(indexHtml, /Open native browser/);
   assert.match(indexHtml, /allow-popups-to-escape-sandbox/);
   assert.match(indexHtml, /id="performanceModeToggle"/);
   assert.match(indexHtml, /id="installFromPwaButton"/);
@@ -67,6 +67,7 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /\/api\/apps\/import-web-manifest/);
   assert.match(appJs, /\/api\/linux-apps/);
   assert.match(appJs, /\/api\/linux-apps\/import-url/);
+  assert.match(appJs, /\/api\/browser\/open/);
   assert.match(appJs, /function startNewChat/);
   assert.match(appJs, /apps: 'windowApps'/);
   assert.match(appJs, /data-launch-app/);
@@ -100,6 +101,8 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /function installSelectedLinuxPackage/);
   assert.match(appJs, /function downloadLinuxPackageFromUrl/);
   assert.match(appJs, /hostLikelyBlocksEmbedding/);
+  assert.match(appJs, /window\.aiosNative\?\.openBrowserUrl/);
+  assert.match(appJs, /function launchNativeBrowserUrl/);
   assert.match(appJs, /function openRealBrowserTab/);
   assert.match(appJs, /function navigateBrowserHistory/);
   assert.match(appJs, /browserBackButton\.addEventListener\('click', \(\) => navigateBrowserHistory\(-1\)\)/);
@@ -110,6 +113,21 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /github-copilot\/gpt-4o/);
   assert.match(appJs, /loadWizardProviders\(preferredProviderId = ''\)/);
   assert.match(appJs, /await loadWizardProviders\(wizardProviderId\)/);
+});
+
+test('native desktop runtime exposes Electron browser windows', async () => {
+  const packageJson = await fs.readFile(path.join(repoRoot, 'package.json'), 'utf8');
+  const desktopMain = await fs.readFile(path.join(repoRoot, 'desktop', 'main.js'), 'utf8');
+  const preload = await fs.readFile(path.join(repoRoot, 'desktop', 'preload.js'), 'utf8');
+
+  assert.match(packageJson, /"desktop": "electron desktop\/main\.js"/);
+  assert.match(packageJson, /"electron"/);
+  assert.match(desktopMain, /new BrowserWindow/);
+  assert.match(desktopMain, /createBrowserWindow/);
+  assert.match(desktopMain, /electron-browser-window/);
+  assert.match(desktopMain, /createApp\(\)/);
+  assert.match(preload, /contextBridge\.exposeInMainWorld\('aiosNative'/);
+  assert.match(preload, /openBrowserUrl/);
 });
 
 test('copilot provider catalog includes OpenClaw-style model IDs', async () => {

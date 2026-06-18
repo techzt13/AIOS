@@ -5,6 +5,7 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
+    "desktop": "electron desktop/main.js",
     "build:site": "node scripts/build-site.js",
     "test": "node --test"
   },
@@ -25,5 +26,8 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2"
+  },
+  "devDependencies": {
+    "electron": "^42.4.1"
   }
 }

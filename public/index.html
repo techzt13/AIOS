@@ -136,20 +136,20 @@
               <button type="button" id="browserRefreshButton" class="icon-button" title="Reload" aria-label="Reload">↻</button>
               <input id="browserUrlInput" type="text" placeholder="Search the web or enter URL..." />
               <button type="submit" id="browserGoButton">Go</button>
-              <button type="button" id="browserOpenExternalButton" class="secondary">Open real tab</button>
+              <button type="button" id="browserOpenExternalButton" class="secondary">Open native browser</button>
             </form>
             <div id="browserBlockedNotice" class="browser-notice hidden">
-              <strong>This site needs a real browser tab.</strong>
-              <span>Protected sites like YouTube block embedded browser frames, so AIOS opens them as top-level pages.</span>
-              <button type="button" id="browserNoticeExternalButton">Open real tab</button>
+              <strong>AIOS is using a native browser session.</strong>
+              <span>Real sites need a real browser engine. Embedded mode is only a fallback for simple pages.</span>
+              <button type="button" id="browserNoticeExternalButton">Open native browser</button>
             </div>
             <div id="browserExternalPage" class="browser-external-page hidden" aria-live="polite">
               <div class="browser-external-card">
                 <span class="browser-external-icon">↗</span>
-                <strong>Opened in a real browser tab</strong>
-                <p id="browserExternalDetail">Protected sites block iframe browsers. AIOS opened this page as a top-level tab so video, login, and navigation can work normally.</p>
+                <strong>Opened in a native browser session</strong>
+                <p id="browserExternalDetail">AIOS opened this page outside the iframe sandbox so video, login, popups, and navigation can work normally.</p>
                 <div class="toolbar">
-                  <a id="browserExternalLink" class="button-link" href="about:blank" target="_blank" rel="noopener noreferrer">Open tab again</a>
+                  <a id="browserExternalLink" class="button-link" href="about:blank" target="_blank" rel="noopener noreferrer">Open again</a>
                   <button type="button" id="browserTryEmbedButton" class="secondary">Try embedded anyway</button>
                 </div>
               </div>
