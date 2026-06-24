@@ -22,7 +22,7 @@ npm start
 
 Open: <http://localhost:8080>
 
-In desktop mode, AIOS starts its own local daemon and opens a native desktop shell. The AIOS Browser opens real Electron browser windows for sites like YouTube, so pages are not loaded through an iframe.
+In desktop mode, AIOS starts its own local daemon and opens a native desktop shell. The AIOS Browser renders pages inside the Browser app using Electron `<webview>`, so sites like YouTube are not loaded through an iframe.
 
 In web-shell mode, AIOS still runs on `localhost:8080`; the local daemon can launch your OS browser through `POST /api/browser/open`, but the page itself remains inside your existing browser.
 
@@ -145,9 +145,9 @@ For now, AIOS does not run arbitrary downloaded code or native packages like `.d
 
 ## Browser behavior
 
-AIOS Browser is native-first because a webpage iframe is not a real browser. In `npm run desktop`, AIOS opens sites in Electron `BrowserWindow` instances owned by the AIOS desktop runtime. YouTube and other protected sites load there as top-level browser pages, not embedded frames.
+AIOS Browser is native-first because a webpage iframe is not a real browser. In `npm run desktop`, AIOS renders sites inside the Browser window using Electron `<webview>`, which gives AIOS a real Chromium browser surface instead of an iframe placeholder. YouTube and other protected sites load there as real browser pages inside AIOS.
 
-When running only `npm start`, AIOS is still a localhost web shell, so it cannot embed a full browser engine inside the page. In that mode, the local daemon uses `POST /api/browser/open` to ask the host OS to open the URL in a native browser. The old iframe path remains available only through **Try embedded anyway** for simple pages that allow embedding.
+When running only `npm start`, AIOS is still a localhost web shell, so it cannot embed a full browser engine inside the page. In that mode, the local daemon uses `POST /api/browser/open` to ask the host OS to open the URL in a native browser. The iframe path remains available only through **Try embedded anyway** for simple pages that allow embedding.
 
 Example `manifest.webmanifest`:
 

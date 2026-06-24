@@ -1350,11 +1350,16 @@ button.secondary {
   justify-content: center;
 }
 
+.browser-webview,
 .browser-frame {
   flex: 1;
   width: 100%;
   border: none;
   background: #fff;
+}
+
+.browser-webview {
+  min-height: 0;
 }
 
 .checkbox-row {

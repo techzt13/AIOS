@@ -35,6 +35,8 @@ test('web shell desktop markup includes menu bar, dock, and app windows', async 
   assert.match(indexHtml, /id="browserOpenExternalButton"/);
   assert.match(indexHtml, /id="browserBlockedNotice"/);
   assert.match(indexHtml, /id="browserExternalPage"/);
+  assert.match(indexHtml, /id="browserWebview"/);
+  assert.match(indexHtml, /<webview/);
   assert.match(indexHtml, /id="browserTryEmbedButton"/);
   assert.match(indexHtml, /Open native browser/);
   assert.match(indexHtml, /allow-popups-to-escape-sandbox/);
@@ -102,6 +104,9 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /function downloadLinuxPackageFromUrl/);
   assert.match(appJs, /hostLikelyBlocksEmbedding/);
   assert.match(appJs, /window\.aiosNative\?\.openBrowserUrl/);
+  assert.match(appJs, /function canUseBrowserWebview/);
+  assert.match(appJs, /function loadBrowserWebview/);
+  assert.match(appJs, /browserWebview\.loadURL/);
   assert.match(appJs, /function launchNativeBrowserUrl/);
   assert.match(appJs, /function openRealBrowserTab/);
   assert.match(appJs, /function navigateBrowserHistory/);
@@ -123,6 +128,7 @@ test('native desktop runtime exposes Electron browser windows', async () => {
   assert.match(packageJson, /"desktop": "electron desktop\/main\.js"/);
   assert.match(packageJson, /"electron"/);
   assert.match(desktopMain, /new BrowserWindow/);
+  assert.match(desktopMain, /webviewTag: true/);
   assert.match(desktopMain, /createBrowserWindow/);
   assert.match(desktopMain, /electron-browser-window/);
   assert.match(desktopMain, /createApp\(\)/);

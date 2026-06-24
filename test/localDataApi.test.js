@@ -6,6 +6,14 @@ const path = require('path');
 
 const { createApp } = require('../server/index');
 
+function fakeGzipArchive(size = 2048) {
+  const buffer = Buffer.alloc(size, 0);
+  buffer[0] = 0x1f;
+  buffer[1] = 0x8b;
+  buffer[2] = 0x08;
+  return buffer;
+}
+
 async function withServer(app, run) {
   const server = await new Promise((resolve) => {
     const listener = app.listen(0, () => resolve(listener));
@@ -304,7 +312,7 @@ test('linux package APIs store tar.gz archives for the future Linux runtime', as
           'x-aios-package-name': 'Example Linux App',
           'x-aios-package-filename': 'example-linux-app.tar.gz'
         },
-        body: Buffer.from([0x1f, 0x8b, 0x08, 0x00])
+        body: fakeGzipArchive()
       });
       payload = await response.json();
       assert.equal(response.status, 201);
@@ -362,12 +370,12 @@ test('linux package API downloads direct archives with Linux user agent', async 
           status: 200,
           headers: {
             get: (key) => {
-              if (key.toLowerCase() === 'content-length') return '4';
+              if (key.toLowerCase() === 'content-length') return '2048';
               if (key.toLowerCase() === 'content-disposition') return 'attachment; filename="downloaded-app.tar.gz"';
               return null;
             }
           },
-          arrayBuffer: async () => Uint8Array.from([0x1f, 0x8b, 0x08, 0x00]).buffer
+          arrayBuffer: async () => fakeGzipArchive().buffer
         };
       }
     });
@@ -384,6 +392,61 @@ test('linux package API downloads direct archives with Linux user agent', async 
       assert.equal(payload.package.filename, 'downloaded-app.tar.gz');
       assert.equal(payload.package.packageType, 'tar.gz');
       assert.match(receivedUserAgent, /Linux x86_64/);
+    });
+  } finally {
+    if (originalDataDir === undefined) {
+      delete process.env.AIOS_DATA_DIR;
+    } else {
+      process.env.AIOS_DATA_DIR = originalDataDir;
+    }
+  }
+});
+
+test('linux package API rejects tiny fake archives', async () => {
+  const originalDataDir = process.env.AIOS_DATA_DIR;
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'aios-linux-tiny-package-data-'));
+  process.env.AIOS_DATA_DIR = tempDir;
+
+  try {
+    const app = createApp({
+      getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null }),
+      fetch: async () => ({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (key) => {
+            if (key.toLowerCase() === 'content-length') return '4';
+            if (key.toLowerCase() === 'content-disposition') return 'attachment; filename="tiny.tar.gz"';
+            return null;
+          }
+        },
+        arrayBuffer: async () => Uint8Array.from([0x1f, 0x8b, 0x08, 0x00]).buffer
+      })
+    });
+
+    await withServer(app, async (baseUrl) => {
+      let response = await fetch(`${baseUrl}/api/linux-apps`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/gzip',
+          'x-aios-package-filename': 'tiny.tar.gz'
+        },
+        body: Buffer.from([0x1f, 0x8b, 0x08, 0x00])
+      });
+      let payload = await response.json();
+      assert.equal(response.status, 400);
+      assert.equal(payload.ok, false);
+      assert.match(payload.error, /too small/);
+
+      response = await fetch(`${baseUrl}/api/linux-apps/import-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'https://downloads.example/tiny.tar.gz' })
+      });
+      payload = await response.json();
+      assert.equal(response.status, 400);
+      assert.equal(payload.ok, false);
+      assert.match(payload.error, /too small/);
     });
   } finally {
     if (originalDataDir === undefined) {

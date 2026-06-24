@@ -10,6 +10,7 @@ const NOTES_FILE = 'notes.json';
 const INSTALLED_APPS_FILE = 'installed-apps.json';
 const LINUX_APPS_FILE = 'linux-apps.json';
 const LINUX_PACKAGES_DIR = 'linux-packages';
+const LINUX_PACKAGE_MIN_BYTES = 1024;
 
 function getDataDir() {
   return path.resolve(process.env.AIOS_DATA_DIR || path.join(process.cwd(), 'workspace', DATA_DIR_NAME));
@@ -416,6 +417,10 @@ function assertLinuxPackageBuffer({ filename, buffer }) {
 
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw new Error('Linux package file is empty.');
+  }
+
+  if (buffer.length < LINUX_PACKAGE_MIN_BYTES) {
+    throw new Error('Linux package archive is too small to be valid.');
   }
 
   if ((packageType === 'tar.gz' || packageType === 'tgz') && (buffer[0] !== 0x1f || buffer[1] !== 0x8b)) {

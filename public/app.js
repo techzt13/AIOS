@@ -54,6 +54,7 @@ const browserBackButton = document.getElementById('browserBackButton');
 const browserForwardButton = document.getElementById('browserForwardButton');
 const browserRefreshButton = document.getElementById('browserRefreshButton');
 const browserUrlInput = document.getElementById('browserUrlInput');
+const browserWebview = document.getElementById('browserWebview');
 const browserFrame = document.getElementById('browserFrame');
 const browserOpenExternalButton = document.getElementById('browserOpenExternalButton');
 const browserBlockedNotice = document.getElementById('browserBlockedNotice');
@@ -408,7 +409,27 @@ function hostLikelyBlocksEmbedding(urlValue) {
   }
 }
 
+function canUseBrowserWebview() {
+  return window.aiosNative?.runtime === 'electron-desktop' && Boolean(browserWebview);
+}
+
+function browserWebviewIsVisible() {
+  return canUseBrowserWebview() && !browserWebview.classList.contains('hidden');
+}
+
 function updateBrowserNavigationControls() {
+  if (browserWebviewIsVisible() && typeof browserWebview.canGoBack === 'function') {
+    try {
+      browserBackButton.disabled = !browserWebview.canGoBack();
+      browserForwardButton.disabled = !browserWebview.canGoForward();
+      return;
+    } catch {
+      browserBackButton.disabled = true;
+      browserForwardButton.disabled = true;
+      return;
+    }
+  }
+
   browserBackButton.disabled = browserHistoryIndex <= 0;
   browserForwardButton.disabled = browserHistoryIndex < 0 || browserHistoryIndex >= browserHistory.length - 1;
 }
@@ -426,11 +447,19 @@ function rememberBrowserHistory(url) {
 }
 
 function showBrowserEmbeddedFrame() {
+  browserWebview.classList.add('hidden');
   browserExternalPage.classList.add('hidden');
   browserFrame.classList.remove('hidden');
 }
 
+function showBrowserWebview() {
+  browserExternalPage.classList.add('hidden');
+  browserFrame.classList.add('hidden');
+  browserWebview.classList.remove('hidden');
+}
+
 function showBrowserExternalPage(url) {
+  browserWebview.classList.add('hidden');
   browserFrame.classList.add('hidden');
   browserExternalPage.classList.remove('hidden');
   browserExternalLink.href = url;
@@ -502,6 +531,18 @@ function openRealBrowserTab(url) {
     });
 }
 
+function loadBrowserWebview(url) {
+  showBrowserWebview();
+  hideBrowserBlockedNotice();
+  browserExternalLink.href = url;
+  if (typeof browserWebview.loadURL === 'function') {
+    browserWebview.loadURL(url);
+  } else {
+    browserWebview.setAttribute('src', url);
+  }
+  updateBrowserNavigationControls();
+}
+
 function openBrowserUrl(rawValue, options = {}) {
   const url = normalizeBrowserUrl(rawValue);
   if (!url) return;
@@ -512,6 +553,12 @@ function openBrowserUrl(rawValue, options = {}) {
   currentBrowserUrl = url;
   hideBrowserBlockedNotice();
   browserUrlInput.value = url;
+
+  if (!options.forceEmbed && canUseBrowserWebview()) {
+    loadBrowserWebview(url);
+    openWindow('browser');
+    return;
+  }
 
   if (!options.forceEmbed) {
     browserFrame.src = 'about:blank';
@@ -537,6 +584,19 @@ function openCurrentBrowserUrlExternally() {
 }
 
 function navigateBrowserHistory(delta) {
+  if (browserWebviewIsVisible()) {
+    try {
+      if (delta < 0 && typeof browserWebview.goBack === 'function' && browserWebview.canGoBack()) {
+        browserWebview.goBack();
+      } else if (delta > 0 && typeof browserWebview.goForward === 'function' && browserWebview.canGoForward()) {
+        browserWebview.goForward();
+      }
+    } catch {
+      updateBrowserNavigationControls();
+    }
+    return;
+  }
+
   const nextIndex = browserHistoryIndex + delta;
   if (nextIndex < 0 || nextIndex >= browserHistory.length) return;
   browserHistoryIndex = nextIndex;
@@ -545,6 +605,11 @@ function navigateBrowserHistory(delta) {
 }
 
 function refreshBrowserUrl() {
+  if (browserWebviewIsVisible() && typeof browserWebview.reload === 'function') {
+    browserWebview.reload();
+    return;
+  }
+
   const url = normalizeBrowserUrl(currentBrowserUrl || browserUrlInput.value || browserFrame.src);
   if (!url || url === 'about:blank') return;
   openBrowserUrl(url, { recordHistory: false });
@@ -2128,6 +2193,29 @@ browserTryEmbedButton.addEventListener('click', () => openBrowserUrl(currentBrow
   forceEmbed: true,
   recordHistory: false
 }));
+if (browserWebview) {
+  browserWebview.addEventListener('did-start-loading', () => {
+    hideBrowserBlockedNotice();
+    updateBrowserNavigationControls();
+  });
+  browserWebview.addEventListener('did-navigate', (event) => {
+    currentBrowserUrl = event.url;
+    browserUrlInput.value = event.url;
+    updateBrowserNavigationControls();
+  });
+  browserWebview.addEventListener('did-navigate-in-page', (event) => {
+    currentBrowserUrl = event.url;
+    browserUrlInput.value = event.url;
+    updateBrowserNavigationControls();
+  });
+  browserWebview.addEventListener('did-stop-loading', updateBrowserNavigationControls);
+  browserWebview.addEventListener('new-window', (event) => {
+    const popupUrl = event.url;
+    if (popupUrl) {
+      openBrowserUrl(popupUrl);
+    }
+  });
+}
 browserFrame.addEventListener('load', () => {
   if (browserLoadTimer) {
     clearTimeout(browserLoadTimer);
