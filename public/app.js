@@ -2309,50 +2309,52 @@ chatForm.addEventListener('submit', async (event) => {
 let commandHistory = [];
 let historyIndex = -1;
 
-terminalCommandInput.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    terminalRunButton.click();
-  } else if (event.key === 'ArrowUp') {
-    if (historyIndex > 0) {
-      historyIndex--;
-      terminalCommandInput.value = commandHistory[historyIndex];
+if (terminalCommandInput && terminalRunButton && terminalOutput) {
+  terminalCommandInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
       event.preventDefault();
+      terminalRunButton.click();
+    } else if (event.key === 'ArrowUp') {
+      if (historyIndex > 0) {
+        historyIndex--;
+        terminalCommandInput.value = commandHistory[historyIndex];
+        event.preventDefault();
+      }
+    } else if (event.key === 'ArrowDown') {
+      if (historyIndex < commandHistory.length - 1) {
+        historyIndex++;
+        terminalCommandInput.value = commandHistory[historyIndex];
+        event.preventDefault();
+      } else {
+        historyIndex = commandHistory.length;
+        terminalCommandInput.value = '';
+        event.preventDefault();
+      }
     }
-  } else if (event.key === 'ArrowDown') {
-    if (historyIndex < commandHistory.length - 1) {
-      historyIndex++;
-      terminalCommandInput.value = commandHistory[historyIndex];
-      event.preventDefault();
-    } else {
-      historyIndex = commandHistory.length;
-      terminalCommandInput.value = '';
-      event.preventDefault();
+  });
+
+  terminalRunButton.addEventListener('click', async () => {
+    const command = terminalCommandInput.value.trim();
+    if (!command) return;
+
+    if (commandHistory[commandHistory.length - 1] !== command) {
+      commandHistory.push(command);
     }
-  }
-});
+    historyIndex = commandHistory.length;
+    terminalCommandInput.value = '';
 
-terminalRunButton.addEventListener('click', async () => {
-  const command = terminalCommandInput.value.trim();
-  if (!command) return;
-
-  if (commandHistory[commandHistory.length - 1] !== command) {
-    commandHistory.push(command);
-  }
-  historyIndex = commandHistory.length;
-  terminalCommandInput.value = '';
-
-  terminalOutput.textContent += `\n$ ${command}\n`;
-  try {
-    const result = await callExec(command);
-    terminalOutput.textContent += `${formatExecResult(result)}\n`;
-    loadRuntimeInfo().catch(() => {});
-  } catch (error) {
-    terminalOutput.textContent += `Error: ${error.message}\n`;
-    loadRuntimeInfo().catch(() => {});
-  }
-  terminalOutput.scrollTop = terminalOutput.scrollHeight;
-});
+    terminalOutput.textContent += `\n$ ${command}\n`;
+    try {
+      const result = await callExec(command);
+      terminalOutput.textContent += `${formatExecResult(result)}\n`;
+      loadRuntimeInfo().catch(() => {});
+    } catch (error) {
+      terminalOutput.textContent += `Error: ${error.message}\n`;
+      loadRuntimeInfo().catch(() => {});
+    }
+    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+  });
+}
 
 filesRefreshButton.addEventListener('click', () => refreshFileList(filesPathInput.value || '.'));
 filesUpButton.addEventListener('click', () => refreshFileList(formatPathUp(filesPathInput.value)));
