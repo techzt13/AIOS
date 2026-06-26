@@ -1,8 +1,7 @@
-const pty = require('node-pty');
+const { spawn } = require('child_process');
 const os = require('os');
 const { getLinuxPackage } = require('./appDataStore');
 const { extractArchive, findExecutables, commandExists } = require('./linuxRunner');
-const path = require('path');
 
 const LINUX_RUNTIME_IMAGE = process.env.LINUX_RUNTIME_IMAGE || 'ubuntu:24.04';
 
@@ -16,11 +15,11 @@ function setupPtySocket(wss, processRegistry) {
         const msg = JSON.parse(message);
         
         if (msg.type === 'init') {
-          // Initialize terminal
+          // Initialize terminal using fallback child_process spawn
           let command = 'bash';
           let args = [];
           let cwd = os.homedir();
-          let env = process.env;
+          let env = { ...process.env, TERM: 'xterm-256color' };
           
           if (msg.packageId) {
             // Interactive Linux Package mode
@@ -58,21 +57,25 @@ function setupPtySocket(wss, processRegistry) {
             cwd = extractDir;
           }
 
-          ptyProcess = pty.spawn(command, args, {
-            name: 'xterm-256color',
-            cols: msg.cols || 80,
-            rows: msg.rows || 24,
+          ptyProcess = spawn(command, args, {
             cwd: cwd,
-            env: env
+            env: env,
+            shell: command === 'bash' ? undefined : true // use shell true for docker to get better piping
           });
 
-          ptyProcess.onData((data) => {
+          ptyProcess.stdout.on('data', (data) => {
             if (ws.readyState === 1) {
-              ws.send(JSON.stringify({ type: 'data', data }));
+              ws.send(JSON.stringify({ type: 'data', data: data.toString() }));
             }
           });
 
-          ptyProcess.onExit(async ({ exitCode }) => {
+          ptyProcess.stderr.on('data', (data) => {
+            if (ws.readyState === 1) {
+              ws.send(JSON.stringify({ type: 'data', data: data.toString() }));
+            }
+          });
+
+          ptyProcess.on('exit', async (exitCode) => {
             if (ws.readyState === 1) {
               ws.send(JSON.stringify({ type: 'exit', code: exitCode }));
               ws.close();
@@ -87,11 +90,7 @@ function setupPtySocket(wss, processRegistry) {
         }
 
         if (msg.type === 'data' && ptyProcess) {
-          ptyProcess.write(msg.data);
-        }
-
-        if (msg.type === 'resize' && ptyProcess) {
-          ptyProcess.resize(msg.cols, msg.rows);
+          ptyProcess.stdin.write(msg.data);
         }
 
       } catch (err) {
