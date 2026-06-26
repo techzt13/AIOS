@@ -1883,19 +1883,11 @@ function renderLinuxPackages() {
 
 async function runLinuxPackage(packageId) {
   setFeedback(linuxPackageStatus, 'Starting Linux package...', 'info');
-  const response = await fetch(`/api/linux-apps/${encodeURIComponent(packageId)}/run`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ args: ['--version'] })
-  });
-  const payload = await response.json();
-  if (!response.ok || !payload.ok) {
-    throw new Error(payload.error || 'Failed to run Linux package.');
-  }
-
+  openAppWindow('terminal');
+  initTerminal({ packageId });
   setFeedback(
     linuxPackageStatus,
-    `${payload.executablePath} started in ${payload.runtime}. Check Settings > AIOS runtime processes for output.`,
+    'Linux package started in Terminal window.',
     'success'
   );
   await loadProcesses();

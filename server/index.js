@@ -1,3 +1,11 @@
+const { WebSocketServer } = require('ws');
+const { setupPtySocket } = require('./ptySocket');
+
+function attachWebSockets(server) {
+  const wss = new WebSocketServer({ server });
+  setupPtySocket(wss);
+}
+
 require('dotenv').config();
 
 const express = require('express');
@@ -882,12 +890,13 @@ function createApp(deps = {}) {
 
 if (require.main === module) {
   const app = createApp();
-  app.listen(PORT, HOST, () => {
+  const server = app.listen(PORT, HOST, () => {
     const displayHost = HOST === '0.0.0.0' ? 'localhost' : HOST;
     console.log(`AIOS running on http://${displayHost}:${PORT}`);
     console.log(`Runtime mode: local-daemon (${HOST === '127.0.0.1' || HOST === 'localhost' ? 'local-only' : `bound to ${HOST}`})`);
     console.log(`Workspace root: ${WORKSPACE_ROOT}`);
   });
+  attachWebSockets(server);
 }
 
-module.exports = { createApp };
+module.exports = { createApp, attachWebSockets };

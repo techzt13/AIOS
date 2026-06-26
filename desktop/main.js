@@ -1,6 +1,6 @@
 const path = require('path');
 const { app: electronApp, BrowserWindow, ipcMain, shell } = require('electron');
-const { createApp } = require('../server/index');
+const { createApp, attachWebSockets } = require('../server/index');
 const { normalizeBrowserUrl } = require('../server/browserLauncher');
 
 let server = null;
@@ -12,6 +12,7 @@ function startAiosServer() {
     const expressApp = createApp();
     const listener = expressApp.listen(0, '127.0.0.1', () => {
       server = listener;
+      attachWebSockets(server);
       const address = listener.address();
       resolve(`http://127.0.0.1:${address.port}`);
     });
