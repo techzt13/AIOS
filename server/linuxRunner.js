@@ -231,7 +231,7 @@ async function startLinuxPackage({
       stderr,
       timedOut
     });
-    await fs.rm(extractDir, { recursive: true, force: true });
+    try { await fs.rm(extractDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
   });
 
   processRegistry?.attachRuntime(trackedProcess.id, {
