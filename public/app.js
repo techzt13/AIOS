@@ -754,6 +754,9 @@ function openWindow(app) {
   if (app === 'notes' && typeof loadNotesApp === 'function') {
     loadNotesApp();
   }
+  if (app === 'terminal' && typeof initTerminal === 'function') {
+    setTimeout(() => initTerminal(), 100);
+  }
 }
 
 function closeWindow(app) {
@@ -1883,7 +1886,7 @@ function renderLinuxPackages() {
 
 async function runLinuxPackage(packageId) {
   setFeedback(linuxPackageStatus, 'Starting Linux package...', 'info');
-  openAppWindow('terminal');
+  openWindow('terminal');
   initTerminal({ packageId });
   setFeedback(
     linuxPackageStatus,
