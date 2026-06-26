@@ -260,6 +260,7 @@ async function startLinuxPackage({
 
 module.exports = {
   assertSafeArchiveEntries,
+  commandExists,
   extractArchive,
   findExecutables,
   runCommand,
