@@ -1,9 +1,48 @@
-const { spawn } = require('child_process');
+const pty = require('@homebridge/node-pty-prebuilt-multiarch');
+const fsSync = require('fs');
+const fs = require('fs/promises');
 const os = require('os');
 const { getLinuxPackage } = require('./appDataStore');
 const { extractArchive, findExecutables, commandExists } = require('./linuxRunner');
 
 const LINUX_RUNTIME_IMAGE = process.env.LINUX_RUNTIME_IMAGE || 'ubuntu:24.04';
+const DEFAULT_RUNTIME_PATHS = [
+  process.env.PATH,
+  '/opt/homebrew/bin',
+  '/usr/local/bin',
+  '/usr/bin',
+  '/bin',
+  '/usr/sbin',
+  '/sbin'
+].filter(Boolean);
+
+function runtimeEnv() {
+  return {
+    ...process.env,
+    PATH: Array.from(new Set(DEFAULT_RUNTIME_PATHS.join(':').split(':').filter(Boolean))).join(':'),
+    TERM: 'xterm-256color'
+  };
+}
+
+function resolveExecutable(command) {
+  if (command === 'bash') return '/bin/bash';
+
+  const candidates = [
+    process.env.AIOS_DOCKER_PATH,
+    '/usr/local/bin/docker',
+    '/opt/homebrew/bin/docker'
+  ].filter(Boolean);
+  return candidates.find((candidate) => fsSync.existsSync(candidate)) || command;
+}
+
+async function removeExtractDir(extractDir) {
+  if (!extractDir) return;
+  try {
+    await fs.rm(extractDir, { recursive: true, force: true });
+  } catch {
+    // Temporary runtime extraction cleanup is best-effort.
+  }
+}
 
 function setupPtySocket(wss, processRegistry) {
   wss.on('connection', (ws, req) => {
@@ -16,10 +55,10 @@ function setupPtySocket(wss, processRegistry) {
         
         if (msg.type === 'init') {
           // Initialize terminal using fallback child_process spawn
-          let command = 'bash';
-          let args = [];
+          let command = resolveExecutable('bash');
+          let args = ['-l'];
           let cwd = os.homedir();
-          let env = { ...process.env, TERM: 'xterm-256color' };
+          const env = runtimeEnv();
           
           if (msg.packageId) {
             // Interactive Linux Package mode
@@ -28,7 +67,8 @@ function setupPtySocket(wss, processRegistry) {
                ws.send(JSON.stringify({ type: 'error', data: 'Linux package not found' }));
                return ws.close();
             }
-            if (!(await commandExists('docker'))) {
+            const dockerCommand = resolveExecutable('docker');
+            if (!(await commandExists(dockerCommand))) {
                ws.send(JSON.stringify({ type: 'error', data: 'Docker not available' }));
                return ws.close();
             }
@@ -43,7 +83,7 @@ function setupPtySocket(wss, processRegistry) {
                return ws.close();
             }
 
-            command = 'docker';
+            command = dockerCommand;
             args = [
               'run', '-it', '--rm',
               '--network', 'none',
@@ -57,40 +97,37 @@ function setupPtySocket(wss, processRegistry) {
             cwd = extractDir;
           }
 
-          ptyProcess = spawn(command, args, {
-            cwd: cwd,
-            env: env,
-            shell: command === 'bash' ? undefined : true // use shell true for docker to get better piping
+          ptyProcess = pty.spawn(command, args, {
+            name: 'xterm-256color',
+            cols: msg.cols || 80,
+            rows: msg.rows || 24,
+            cwd,
+            env
           });
 
-          ptyProcess.stdout.on('data', (data) => {
+          ptyProcess.onData((data) => {
             if (ws.readyState === 1) {
-              ws.send(JSON.stringify({ type: 'data', data: data.toString() }));
+              ws.send(JSON.stringify({ type: 'data', data }));
             }
           });
 
-          ptyProcess.stderr.on('data', (data) => {
-            if (ws.readyState === 1) {
-              ws.send(JSON.stringify({ type: 'data', data: data.toString() }));
-            }
-          });
-
-          ptyProcess.on('exit', async (exitCode) => {
+          ptyProcess.onExit(async ({ exitCode }) => {
             if (ws.readyState === 1) {
               ws.send(JSON.stringify({ type: 'exit', code: exitCode }));
               ws.close();
             }
-            if (extractDir) {
-              const fs = require('fs/promises');
-              try { await fs.rm(extractDir, { recursive: true, force: true }); } catch (e) {}
-            }
+            await removeExtractDir(extractDir);
           });
 
           ws.send(JSON.stringify({ type: 'ready' }));
         }
 
         if (msg.type === 'data' && ptyProcess) {
-          ptyProcess.stdin.write(msg.data);
+          ptyProcess.write(msg.data);
+        }
+
+        if (msg.type === 'resize' && ptyProcess) {
+          ptyProcess.resize(msg.cols, msg.rows);
         }
 
       } catch (err) {
@@ -105,10 +142,7 @@ function setupPtySocket(wss, processRegistry) {
       if (ptyProcess) {
         ptyProcess.kill();
       }
-      if (extractDir) {
-        const fs = require('fs/promises');
-        try { await fs.rm(extractDir, { recursive: true, force: true }); } catch (e) {}
-      }
+      await removeExtractDir(extractDir);
     });
   });
 }

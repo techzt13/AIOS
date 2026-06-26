@@ -167,6 +167,7 @@ let shellState = { windows: {}, preferences: {} };
 let zCounter = 10;
 let installedApps = [];
 let linuxPackages = [];
+let pendingTerminalLaunch = null;
 let browserLoadTimer = null;
 let currentBrowserUrl = '';
 let browserHistory = [];
@@ -755,7 +756,9 @@ function openWindow(app) {
     loadNotesApp();
   }
   if (app === 'terminal' && typeof initTerminal === 'function') {
-    setTimeout(() => initTerminal(), 100);
+    const terminalLaunch = pendingTerminalLaunch || {};
+    pendingTerminalLaunch = null;
+    setTimeout(() => initTerminal(terminalLaunch), 100);
   }
 }
 
@@ -1886,8 +1889,8 @@ function renderLinuxPackages() {
 
 async function runLinuxPackage(packageId) {
   setFeedback(linuxPackageStatus, 'Starting Linux package...', 'info');
+  pendingTerminalLaunch = { packageId };
   openWindow('terminal');
-  initTerminal({ packageId });
   setFeedback(
     linuxPackageStatus,
     'Linux package started in Terminal window.',

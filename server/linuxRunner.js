@@ -6,11 +6,21 @@ const { spawn } = require('child_process');
 const LINUX_RUN_TIMEOUT_MS = Number(process.env.LINUX_RUN_TIMEOUT_MS || 30000);
 const LINUX_RUN_MAX_OUTPUT_BYTES = Number(process.env.LINUX_RUN_MAX_OUTPUT_BYTES || 256000);
 const LINUX_RUNTIME_IMAGE = process.env.LINUX_RUNTIME_IMAGE || 'ubuntu:24.04';
+const RUNTIME_PATH = [
+  process.env.PATH,
+  '/opt/homebrew/bin',
+  '/usr/local/bin',
+  '/usr/bin',
+  '/bin',
+  '/usr/sbin',
+  '/sbin'
+].filter(Boolean).join(':');
 
 function runCommand({ command, args = [], cwd, timeoutMs = LINUX_RUN_TIMEOUT_MS, maxOutputBytes = LINUX_RUN_MAX_OUTPUT_BYTES }) {
   return new Promise((resolve) => {
     const child = spawn(command, args, {
       cwd,
+      env: { ...process.env, PATH: RUNTIME_PATH },
       stdio: ['ignore', 'pipe', 'pipe']
     });
 
@@ -193,6 +203,7 @@ async function startLinuxPackage({
   const spawnImpl = deps.spawn || spawn;
   const child = spawnImpl('docker', commandArgs, {
     cwd: extractDir,
+    env: { ...process.env, PATH: RUNTIME_PATH },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   let stdout = '';

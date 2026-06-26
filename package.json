@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/techzt13/AIOS#readme",
   "dependencies": {
+    "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
