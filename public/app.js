@@ -1851,10 +1851,17 @@ function renderLinuxPackages() {
     title.textContent = linuxPackage.name;
 
     const detail = document.createElement('small');
-    detail.textContent = `${linuxPackage.filename} • ${formatBytes(linuxPackage.sizeBytes)} • waiting for Linux runtime`;
+    detail.textContent = `${linuxPackage.filename} • ${formatBytes(linuxPackage.sizeBytes)} • ready for Linux runtime`;
 
     const actions = document.createElement('div');
     actions.className = 'third-party-app-actions';
+
+    const runButton = document.createElement('button');
+    runButton.type = 'button';
+    runButton.textContent = 'Run';
+    runButton.addEventListener('click', () => {
+      runLinuxPackage(linuxPackage.id).catch((error) => setFeedback(linuxPackageStatus, error.message, 'error'));
+    });
 
     const removeButton = document.createElement('button');
     removeButton.type = 'button';
@@ -1864,6 +1871,7 @@ function renderLinuxPackages() {
       removeLinuxPackage(linuxPackage.id).catch((error) => setFeedback(linuxPackageStatus, error.message, 'error'));
     });
 
+    actions.appendChild(runButton);
     actions.appendChild(removeButton);
     card.appendChild(glyph);
     card.appendChild(title);
@@ -1871,6 +1879,27 @@ function renderLinuxPackages() {
     card.appendChild(actions);
     linuxPackagesGrid.appendChild(card);
   });
+}
+
+async function runLinuxPackage(packageId) {
+  setFeedback(linuxPackageStatus, 'Starting Linux package...', 'info');
+  const response = await fetch(`/api/linux-apps/${encodeURIComponent(packageId)}/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ args: ['--version'] })
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || 'Failed to run Linux package.');
+  }
+
+  setFeedback(
+    linuxPackageStatus,
+    `${payload.executablePath} started in ${payload.runtime}. Check Settings > AIOS runtime processes for output.`,
+    'success'
+  );
+  await loadProcesses();
+  await loadRuntimeInfo();
 }
 
 async function loadLinuxPackages() {

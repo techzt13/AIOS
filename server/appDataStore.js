@@ -452,16 +452,36 @@ async function loadLinuxAppsStore() {
 
 async function listLinuxPackages() {
   const store = await loadLinuxAppsStore();
-  return store.packages.map((item) => ({
-    id: item.id,
-    name: item.name,
-    filename: item.filename,
-    packageType: item.packageType,
-    sizeBytes: Number(item.sizeBytes) || 0,
-    status: item.status || 'stored-for-linux-runtime',
-    installedAt: item.installedAt,
-    updatedAt: item.updatedAt
-  }));
+  return store.packages
+    .filter((item) => Number(item.sizeBytes) >= LINUX_PACKAGE_MIN_BYTES)
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      filename: item.filename,
+      packageType: item.packageType,
+      sizeBytes: Number(item.sizeBytes) || 0,
+      status: item.status || 'stored-for-linux-runtime',
+      installedAt: item.installedAt,
+      updatedAt: item.updatedAt
+    }));
+}
+
+async function getLinuxPackage(packageId) {
+  const id = typeof packageId === 'string' ? packageId.trim() : '';
+  if (!id) {
+    throw new Error('Linux package id is required.');
+  }
+
+  const store = await loadLinuxAppsStore();
+  const item = store.packages.find((entry) => entry.id === id);
+  if (!item || Number(item.sizeBytes) < LINUX_PACKAGE_MIN_BYTES) {
+    return null;
+  }
+
+  return {
+    ...item,
+    archivePath: path.join(getLinuxPackagesDir(), item.storedFilename)
+  };
 }
 
 async function installLinuxPackage({ name, filename, buffer }) {
@@ -538,6 +558,7 @@ module.exports = {
   getInstalledAppsPath,
   getImportsPath,
   getLinuxAppsPath,
+  getLinuxPackage,
   getLinuxPackagesDir,
   getNotesPath,
   getShellStatePath,

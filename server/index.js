@@ -28,6 +28,7 @@ const {
   appendImportRecord,
   ensureDataDir,
   getDataDir,
+  getLinuxPackage,
   installApp,
   installLinuxPackage,
   listImports,
@@ -45,6 +46,7 @@ const {
 const { resolveSandboxPath } = require('./sandbox');
 const { validateExecCommand, runExecCommand, startExecCommand } = require('./exec');
 const { openNativeBrowserUrl } = require('./browserLauncher');
+const { startLinuxPackage } = require('./linuxRunner');
 const { ProcessRegistry } = require('./processRegistry');
 const { getRuntimeInfo } = require('./runtime');
 
@@ -217,6 +219,7 @@ function createApp(deps = {}) {
   const processRegistry = deps.processRegistry || new ProcessRegistry();
   const fetchImpl = deps.fetch || fetch;
   const openNativeBrowserUrlImpl = deps.openNativeBrowserUrl || openNativeBrowserUrl;
+  const startLinuxPackageImpl = deps.startLinuxPackage || startLinuxPackage;
 
   const apiLimiter = rateLimit({
     windowMs: RATE_LIMIT_WINDOW_MS,
@@ -475,6 +478,25 @@ function createApp(deps = {}) {
     try {
       const result = await openNativeBrowserUrlImpl(req.body?.url);
       return res.json(result);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post('/api/linux-apps/:packageId/run', async (req, res) => {
+    try {
+      const linuxPackage = await getLinuxPackage(req.params.packageId);
+      if (!linuxPackage) {
+        return res.status(404).json({ ok: false, error: 'Linux package not found.' });
+      }
+
+      const result = await startLinuxPackageImpl({
+        linuxPackage,
+        executablePath: req.body?.executablePath,
+        args: req.body?.args,
+        processRegistry
+      });
+      return res.status(202).json(result);
     } catch (error) {
       return res.status(400).json({ ok: false, error: error.message });
     }

@@ -6,11 +6,10 @@ const path = require('path');
 
 const { createApp } = require('../server/index');
 
-function fakeGzipArchive(size = 2048) {
-  const buffer = Buffer.alloc(size, 0);
-  buffer[0] = 0x1f;
-  buffer[1] = 0x8b;
-  buffer[2] = 0x08;
+function fakeGzipArchive() {
+  const data = Buffer.from('H4sIAAAAAAAAA+3BAQ0AAADCoPdPbQ8HFAAAAAAAAAAAAAAAAAAAAAAAAAB8Gw6O7/QAKAAA', 'base64');
+  const buffer = Buffer.alloc(2048, 0);
+  data.copy(buffer);
   return buffer;
 }
 
@@ -295,7 +294,10 @@ test('linux package APIs store tar.gz archives for the future Linux runtime', as
 
   try {
     const app = createApp({
-      getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null })
+      getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null }),
+      startLinuxPackage: async () => {
+        throw new Error('Linux runtime is not available. Install/start Docker Desktop or Colima, then try Run again.');
+      }
     });
 
     await withServer(app, async (baseUrl) => {
@@ -327,6 +329,16 @@ test('linux package APIs store tar.gz archives for the future Linux runtime', as
       assert.equal(response.ok, true);
       assert.equal(payload.packages.length, 1);
       assert.equal(payload.packages[0].id, packageId);
+
+      response = await fetch(`${baseUrl}/api/linux-apps/${encodeURIComponent(packageId)}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ args: ['--version'] })
+      });
+      payload = await response.json();
+      assert.equal(response.status, 400);
+      assert.equal(payload.ok, false);
+      assert.match(payload.error, /Linux runtime is not available|Docker|Colima/);
 
       response = await fetch(`${baseUrl}/api/linux-apps`, {
         method: 'POST',
@@ -424,6 +436,7 @@ test('linux package API rejects tiny fake archives', async () => {
       })
     });
 
+
     await withServer(app, async (baseUrl) => {
       let response = await fetch(`${baseUrl}/api/linux-apps`, {
         method: 'POST',
@@ -456,3 +469,74 @@ test('linux package API rejects tiny fake archives', async () => {
     }
   }
 });
+
+
+
+
+
+    test('linux package run endpoint starts tracked process through runtime helper', async () => {
+      const originalDataDir = process.env.AIOS_DATA_DIR;
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'aios-linux-run-data-'));
+      process.env.AIOS_DATA_DIR = tempDir;
+      let receivedPackage = null;
+
+      try {
+        const app = createApp({
+          getGitHubCopilotStatus: async () => ({ configured: false, login: null, connectedAt: null }),
+          startLinuxPackage: async ({ linuxPackage, processRegistry }) => {
+            receivedPackage = linuxPackage;
+            const process = processRegistry.startProcess({
+              type: 'linux-app',
+              title: linuxPackage.name,
+              command: 'docker run ./micro --version',
+              metadata: { packageId: linuxPackage.id, executablePath: 'micro' }
+            });
+            processRegistry.completeProcess(process.id, {
+              status: 'completed',
+              code: 0,
+              stdout: 'micro 2.0.15'
+            });
+            return {
+              ok: true,
+              process: processRegistry.getProcess(process.id),
+              executablePath: 'micro',
+              runtime: 'docker'
+            };
+          }
+        });
+
+        await withServer(app, async (baseUrl) => {
+          let response = await fetch(`${baseUrl}/api/linux-apps`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/gzip',
+              'x-aios-package-name': 'micro',
+              'x-aios-package-filename': 'micro.tar.gz'
+            },
+            body: fakeGzipArchive()
+          });
+          let payload = await response.json();
+          assert.equal(response.status, 201);
+          const packageId = payload.package.id;
+
+          response = await fetch(`${baseUrl}/api/linux-apps/${encodeURIComponent(packageId)}/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ args: ['--version'] })
+          });
+          payload = await response.json();
+          assert.equal(response.status, 202);
+          assert.equal(payload.ok, true);
+          assert.equal(payload.executablePath, 'micro');
+          assert.equal(payload.process.status, 'completed');
+          assert.equal(receivedPackage.id, packageId);
+          assert.match(receivedPackage.archivePath, /micro|tar\.gz|linux-packages/);
+        });
+      } finally {
+        if (originalDataDir === undefined) {
+          delete process.env.AIOS_DATA_DIR;
+        } else {
+          process.env.AIOS_DATA_DIR = originalDataDir;
+        }
+      }
+    });
