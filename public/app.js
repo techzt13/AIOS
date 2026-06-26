@@ -2687,3 +2687,71 @@ notesNewButton.addEventListener('click', createNote);
 notesDeleteButton.addEventListener('click', deleteActiveNote);
 
 selectNote(null);
+
+// === TERMINAL ===
+let term = null;
+let fitAddon = null;
+let terminalSocket = null;
+
+function initTerminal(options = {}) {
+  const container = document.getElementById('terminalContainer');
+  if (!container) return;
+
+  if (!term) {
+    term = new Terminal({
+      cursorBlink: true,
+      theme: { background: '#000000' }
+    });
+    fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(container);
+  }
+
+  term.clear();
+  term.write('\x1b[33mConnecting to AIOS runtime...\x1b[0m\r\n');
+
+  if (terminalSocket) {
+    terminalSocket.close();
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  terminalSocket = new WebSocket(`${protocol}//${window.location.host}`);
+
+  terminalSocket.onopen = () => {
+    fitAddon.fit();
+    terminalSocket.send(JSON.stringify({ 
+      type: 'init', 
+      cols: term.cols, 
+      rows: term.rows,
+      packageId: options.packageId || null
+    }));
+  };
+
+  terminalSocket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.type === 'data') {
+      term.write(msg.data);
+    } else if (msg.type === 'exit') {
+      term.write(`\r\n\x1b[31m[Process exited with code ${msg.code}]\x1b[0m\r\n`);
+    } else if (msg.type === 'error') {
+      term.write(`\r\n\x1b[31m[Error] ${msg.data}\x1b[0m\r\n`);
+    }
+  };
+
+  terminalSocket.onclose = () => {
+    term.write('\r\n\x1b[31m[Disconnected]\x1b[0m\r\n');
+  };
+
+  term.onData((data) => {
+    if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
+      terminalSocket.send(JSON.stringify({ type: 'data', data }));
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    if (fitAddon) fitAddon.fit();
+    if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
+      terminalSocket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    }
+  });
+}
