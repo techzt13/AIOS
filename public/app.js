@@ -48,6 +48,10 @@ const fileReadStatus = document.getElementById('fileReadStatus');
 const terminalCommandInput = document.getElementById('terminalCommandInput');
 const terminalRunButton = document.getElementById('terminalRunButton');
 const terminalOutput = document.getElementById('terminalOutput');
+const terminalTitle = document.getElementById('terminalTitle');
+const terminalAppGlyph = document.getElementById('terminalAppGlyph');
+const terminalStatusText = document.getElementById('terminalStatusText');
+const terminalRuntimeBadge = document.getElementById('terminalRuntimeBadge');
 
 const browserToolbar = document.getElementById('browserToolbar');
 const browserBackButton = document.getElementById('browserBackButton');
@@ -1866,7 +1870,7 @@ function renderLinuxPackages() {
     runButton.type = 'button';
     runButton.textContent = 'Run';
     runButton.addEventListener('click', () => {
-      runLinuxPackage(linuxPackage.id).catch((error) => setFeedback(linuxPackageStatus, error.message, 'error'));
+      runLinuxPackage(linuxPackage.id, { name: linuxPackage.name, glyph: 'LX' }).catch((error) => setFeedback(linuxPackageStatus, error.message, 'error'));
     });
 
     const removeButton = document.createElement('button');
@@ -1887,13 +1891,13 @@ function renderLinuxPackages() {
   });
 }
 
-async function runLinuxPackage(packageId) {
+async function runLinuxPackage(packageId, packageInfo = {}) {
   setFeedback(linuxPackageStatus, 'Starting Linux package...', 'info');
-  pendingTerminalLaunch = { packageId };
+  pendingTerminalLaunch = { packageId, name: packageInfo.name, glyph: packageInfo.glyph };
   openWindow('terminal');
   setFeedback(
     linuxPackageStatus,
-    'Linux package started in Terminal window.',
+    `${packageInfo.name || 'Linux app'} started in Terminal window.`,
     'success'
   );
   await loadProcesses();
@@ -2702,10 +2706,29 @@ function initTerminal(options = {}) {
   const container = document.getElementById('terminalContainer');
   if (!container) return;
 
+  const isLinuxApp = Boolean(options.packageId);
+  const appName = options.name || (isLinuxApp ? 'Linux App' : 'Terminal');
+  const appGlyph = options.glyph || (isLinuxApp ? 'LX' : '$');
+
+  if (terminalTitle) terminalTitle.textContent = appName;
+  if (terminalAppGlyph) terminalAppGlyph.textContent = appGlyph;
+  if (terminalStatusText) terminalStatusText.textContent = isLinuxApp ? `Running ${appName}` : 'Shell ready';
+  if (terminalRuntimeBadge) {
+    terminalRuntimeBadge.textContent = isLinuxApp ? 'Linux App' : 'AIOS Runtime';
+    terminalRuntimeBadge.classList.toggle('linux-app', isLinuxApp);
+  }
+
   if (!term) {
     term = new Terminal({
       cursorBlink: true,
-      theme: { background: '#000000' }
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      fontSize: 14,
+      theme: {
+        background: '#0a0e14',
+        foreground: '#cbe8ff',
+        cursor: '#0a84ff',
+        selectionBackground: 'rgba(10, 132, 255, 0.35)'
+      }
     });
     fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
@@ -2713,7 +2736,7 @@ function initTerminal(options = {}) {
   }
 
   term.clear();
-  term.write('\x1b[33mConnecting to AIOS runtime...\x1b[0m\r\n');
+  term.write(`\x1b[33mConnecting to AIOS runtime for ${appName}...\x1b[0m\r\n`);
 
   if (terminalSocket) {
     terminalSocket.close();
@@ -2738,13 +2761,16 @@ function initTerminal(options = {}) {
       term.write(msg.data);
     } else if (msg.type === 'exit') {
       term.write(`\r\n\x1b[31m[Process exited with code ${msg.code}]\x1b[0m\r\n`);
+      if (terminalStatusText) terminalStatusText.textContent = isLinuxApp ? `${appName} finished` : 'Disconnected';
     } else if (msg.type === 'error') {
       term.write(`\r\n\x1b[31m[Error] ${msg.data}\x1b[0m\r\n`);
+      if (terminalStatusText) terminalStatusText.textContent = `Error: ${msg.data}`;
     }
   };
 
   terminalSocket.onclose = () => {
     term.write('\r\n\x1b[31m[Disconnected]\x1b[0m\r\n');
+    if (terminalStatusText) terminalStatusText.textContent = isLinuxApp ? `${appName} disconnected` : 'Disconnected';
   };
 
   term.onData((data) => {

@@ -2170,3 +2170,70 @@ button:focus-visible {
   border-radius: 0 12px 12px 0 !important;
   transform: none !important;
 }
+
+
+/* === AIOS Terminal === */
+.terminal-window {
+  display: flex;
+  flex-direction: column;
+  background: #0a0e14;
+  padding: 0;
+  overflow: hidden;
+}
+
+.terminal-app-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+#terminalContainer {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px;
+  overflow: hidden;
+}
+
+#terminalContainer .xterm {
+  height: 100%;
+}
+
+#terminalContainer .xterm-screen {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.terminal-statusbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.45);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.72rem;
+  color: #8fa3bf;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+#terminalRuntimeBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(10, 132, 255, 0.16);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+#terminalRuntimeBadge.linux-app {
+  background: rgba(46, 204, 113, 0.16);
+  color: #2ecc71;
+}
