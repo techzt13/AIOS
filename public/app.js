@@ -178,6 +178,7 @@ let browserLoadTimer = null;
 let currentBrowserUrl = '';
 let browserHistory = [];
 let browserHistoryIndex = -1;
+let browserFrameEmbedFriendly = false;
 
 const IFRAME_BLOCKED_HOSTS = [
   'google.com',
@@ -420,6 +421,32 @@ function canUseBrowserWebview() {
   return window.aiosNative?.runtime === 'electron-desktop' && Boolean(browserWebview);
 }
 
+// Some sites block iframe embedding but publish an embed-friendly variant.
+// Rewriting keeps them inside the AIOS browser window.
+function embedFriendlyUrl(urlValue) {
+  try {
+    const parsed = new URL(urlValue);
+    const host = parsed.hostname.replace(/^(www|m)\./, '').toLowerCase();
+    if (host === 'youtu.be') {
+      const id = parsed.pathname.split('/').filter(Boolean)[0];
+      if (id) return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`;
+    }
+    if (host === 'youtube.com') {
+      const id = parsed.searchParams.get('v');
+      if (parsed.pathname === '/watch' && id) {
+        return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1`;
+      }
+      if (parsed.pathname.startsWith('/shorts/')) {
+        const shortId = parsed.pathname.split('/').filter(Boolean)[1];
+        if (shortId) return `https://www.youtube-nocookie.com/embed/${shortId}?autoplay=1`;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 function browserWebviewIsVisible() {
   return canUseBrowserWebview() && !browserWebview.classList.contains('hidden');
 }
@@ -481,8 +508,8 @@ function showBrowserBlockedNotice(url, mode = 'blocked') {
       detail.textContent = 'AIOS opened this page through the native runtime instead of the iframe sandbox.';
     } else {
       detail.textContent = hostLikelyBlocksEmbedding(url)
-        ? 'This site is known to block embedded browser frames. Use the native browser session, or try embedded mode anyway.'
-        : 'If the page stays blank, this site may block embedded browser frames. Open it through the native runtime.';
+        ? 'This site is known to block embedded frames. If it stays blank, open a native browser session as a fallback.'
+        : 'If the page stays blank, this site may block embedded frames. Open a native browser session as a fallback.';
     }
   }
 }
@@ -561,22 +588,21 @@ function openBrowserUrl(rawValue, options = {}) {
   hideBrowserBlockedNotice();
   browserUrlInput.value = url;
 
-  if (!options.forceEmbed && canUseBrowserWebview()) {
+  if (canUseBrowserWebview()) {
     loadBrowserWebview(url);
     openWindow('browser');
     return;
   }
 
-  if (!options.forceEmbed) {
-    browserFrame.src = 'about:blank';
-    openRealBrowserTab(url);
-    openWindow('browser');
-    return;
-  }
-
+  // Embedded iframe is the default; a native browser session only opens when
+  // the user explicitly asks for one.
+  const embedUrl = embedFriendlyUrl(url);
+  browserFrameEmbedFriendly = Boolean(embedUrl);
   showBrowserEmbeddedFrame();
-  browserFrame.src = url;
-  if (hostLikelyBlocksEmbedding(url)) {
+  browserFrame.src = embedUrl || url;
+  if (embedUrl) {
+    hideBrowserBlockedNotice();
+  } else if (hostLikelyBlocksEmbedding(url)) {
     showBrowserBlockedNotice(url);
   } else {
     browserLoadTimer = setTimeout(() => showBrowserBlockedNotice(url), 3500);
@@ -2449,6 +2475,13 @@ if (browserWebview) {
     }
   });
 }
+if (window.aiosNative?.onBrowserNavigate) {
+  // Popups and target=_blank links from the desktop runtime stay inside the
+  // AIOS browser window instead of spawning separate native windows.
+  window.aiosNative.onBrowserNavigate((url) => {
+    if (url) openBrowserUrl(url);
+  });
+}
 browserFrame.addEventListener('load', () => {
   if (browserLoadTimer) {
     clearTimeout(browserLoadTimer);
@@ -2457,7 +2490,7 @@ browserFrame.addEventListener('load', () => {
   if (!browserExternalPage.classList.contains('hidden')) {
     return;
   }
-  if (hostLikelyBlocksEmbedding(currentBrowserUrl)) {
+  if (!browserFrameEmbedFriendly && hostLikelyBlocksEmbedding(currentBrowserUrl)) {
     showBrowserBlockedNotice(currentBrowserUrl);
   }
 });

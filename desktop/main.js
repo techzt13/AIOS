@@ -39,7 +39,7 @@ function createMainWindow(baseUrl) {
 
   mainWindow.loadURL(baseUrl);
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    openBrowserOrExternal(url);
+    routeUrlIntoShellBrowser(url);
     return { action: 'deny' };
   });
   mainWindow.on('closed', () => {
@@ -108,6 +108,35 @@ function openBrowserOrExternal(url) {
   }
 }
 
+function routeUrlIntoShellBrowser(url) {
+  let protocol = '';
+  try {
+    protocol = new URL(url).protocol;
+  } catch {
+    console.error('Blocked malformed popup URL.');
+    return;
+  }
+
+  if (['mailto:', 'tel:'].includes(protocol)) {
+    shell.openExternal(url).catch((error) => {
+      console.error(`Failed to open external URL: ${error.message}`);
+    });
+    return;
+  }
+
+  if (!['http:', 'https:'].includes(protocol)) {
+    console.error(`Blocked unsupported popup protocol: ${protocol}`);
+    return;
+  }
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('aios:browser-navigate', url);
+    mainWindow.focus();
+  } else {
+    openBrowserOrExternal(url);
+  }
+}
+
 ipcMain.handle('aios:native-browser-open', async (_event, value) => createBrowserWindow(value));
 ipcMain.handle('aios:external-open', async (_event, value) => {
   const url = normalizeBrowserUrl(value);
@@ -118,6 +147,17 @@ ipcMain.handle('aios:external-open', async (_event, value) => {
 electronApp.whenReady().then(async () => {
   const baseUrl = await startAiosServer();
   createMainWindow(baseUrl);
+});
+
+// Keep popups from the in-shell <webview> browser inside the AIOS shell
+// instead of spawning separate Electron windows.
+electronApp.on('web-contents-created', (_event, contents) => {
+  if (contents.getType() === 'webview') {
+    contents.setWindowOpenHandler(({ url }) => {
+      routeUrlIntoShellBrowser(url);
+      return { action: 'deny' };
+    });
+  }
 });
 
 electronApp.on('activate', async () => {
