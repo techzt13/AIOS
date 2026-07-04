@@ -137,6 +137,7 @@ const WINDOW_IDS = {
   files: 'windowFiles',
   terminal: 'windowTerminal',
   settings: 'windowSettings',
+  calculator: 'windowCalculator',
   apps: 'windowApps'
 };
 
@@ -147,6 +148,7 @@ const WINDOW_LAYOUT = {
   files: { x: 0.16, y: 0.14 },
   terminal: { x: 0.24, y: 0.2 },
   settings: { x: 0.5, y: 0.08, centerX: true },
+  calculator: { x: 0.62, y: 0.18 },
   apps: { x: 0.5, y: 0.16, centerX: true }
 };
 const MAX_CHAT_HISTORY_MESSAGES = 80;
@@ -1735,6 +1737,7 @@ async function loadInstalledApps() {
 
   installedApps = payload.apps || [];
   renderInstalledApps();
+  renderAppStore();
 }
 
 async function installThirdPartyApp({ name, url, glyph }) {
@@ -1913,6 +1916,7 @@ async function loadLinuxPackages() {
 
   linuxPackages = payload.packages || [];
   renderLinuxPackages();
+  renderAppStore();
 }
 
 async function installSelectedLinuxPackage() {
@@ -1972,6 +1976,204 @@ async function removeLinuxPackage(packageId) {
 
   setFeedback(linuxPackageStatus, 'Linux package removed.', 'success');
   await loadLinuxPackages();
+}
+
+// === APP STORE ===
+const appStoreGrid = document.getElementById('appStoreGrid');
+const appStoreStatus = document.getElementById('appStoreStatus');
+
+const APP_STORE_CATALOG = [
+  {
+    id: 'store-youtube',
+    type: 'web',
+    name: 'YouTube',
+    glyph: 'YT',
+    description: 'Watch videos in the AIOS browser.',
+    url: 'https://www.youtube.com'
+  },
+  {
+    id: 'store-github',
+    type: 'web',
+    name: 'GitHub',
+    glyph: 'GH',
+    description: 'Browse repos, issues, and pull requests.',
+    url: 'https://github.com'
+  },
+  {
+    id: 'store-wikipedia',
+    type: 'web',
+    name: 'Wikipedia',
+    glyph: 'W',
+    description: 'The free encyclopedia.',
+    url: 'https://www.wikipedia.org'
+  },
+  {
+    id: 'store-maps',
+    type: 'web',
+    name: 'Google Maps',
+    glyph: 'GM',
+    description: 'Maps, directions, and places.',
+    url: 'https://maps.google.com'
+  },
+  {
+    id: 'store-spotify',
+    type: 'web',
+    name: 'Spotify',
+    glyph: 'SP',
+    description: 'Stream music from the web player.',
+    url: 'https://open.spotify.com'
+  },
+  {
+    id: 'store-excalidraw',
+    type: 'web',
+    name: 'Excalidraw',
+    glyph: 'EX',
+    description: 'Sketch diagrams on a virtual whiteboard.',
+    url: 'https://excalidraw.com'
+  },
+  {
+    id: 'store-lazygit',
+    type: 'linux',
+    name: 'lazygit',
+    glyph: 'LG',
+    description: 'Terminal UI for git — stage, commit, push.',
+    url: 'https://github.com/jesseduffield/lazygit/releases/download/v0.44.1/lazygit_0.44.1_Linux_x86_64.tar.gz'
+  },
+  {
+    id: 'store-bottom',
+    type: 'linux',
+    name: 'bottom',
+    glyph: 'BT',
+    description: 'Graphical system/process monitor (like htop).',
+    url: 'https://github.com/ClementTsang/bottom/releases/download/0.10.2/bottom_x86_64-unknown-linux-gnu.tar.gz'
+  },
+  {
+    id: 'store-glow',
+    type: 'linux',
+    name: 'glow',
+    glyph: 'GL',
+    description: 'Render markdown files beautifully in the terminal.',
+    url: 'https://github.com/charmbracelet/glow/releases/download/v2.0.0/glow_2.0.0_Linux_x86_64.tar.gz'
+  },
+  {
+    id: 'store-gdu',
+    type: 'linux',
+    name: 'gdu',
+    glyph: 'DU',
+    description: 'Fast disk usage analyzer with console UI.',
+    url: 'https://github.com/dundee/gdu/releases/latest/download/gdu_linux_amd64.tgz'
+  },
+  {
+    id: 'store-duf',
+    type: 'linux',
+    name: 'duf',
+    glyph: 'DF',
+    description: 'Pretty disk free/usage viewer.',
+    url: 'https://github.com/muesli/duf/releases/download/v0.8.1/duf_0.8.1_linux_x86_64.tar.gz'
+  },
+  {
+    id: 'store-lf',
+    type: 'linux',
+    name: 'lf',
+    glyph: 'LF',
+    description: 'Terminal file manager with vim-style keys.',
+    url: 'https://github.com/gokcehan/lf/releases/download/r32/lf-linux-amd64.tar.gz'
+  },
+  {
+    id: 'store-fzf',
+    type: 'linux',
+    name: 'fzf',
+    glyph: 'FZ',
+    description: 'Blazing fast fuzzy finder for the terminal.',
+    url: 'https://github.com/junegunn/fzf/releases/download/v0.55.0/fzf-0.55.0-linux_amd64.tar.gz'
+  }
+];
+
+function isStoreEntryInstalled(entry) {
+  if (entry.type === 'web') {
+    return installedApps.some((app) => (app.url || '').replace(/\/$/, '') === entry.url.replace(/\/$/, ''));
+  }
+  return linuxPackages.some((pkg) => pkg.name.toLowerCase() === entry.name.toLowerCase());
+}
+
+async function installStoreEntry(entry, button) {
+  button.disabled = true;
+  button.textContent = 'Installing...';
+  try {
+    if (entry.type === 'web') {
+      const response = await fetch('/api/apps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: entry.name, url: entry.url, glyph: entry.glyph, description: entry.description })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `Failed to install ${entry.name}.`);
+      }
+      await loadInstalledApps();
+    } else {
+      setFeedback(appStoreStatus, `Downloading ${entry.name}... this can take a moment.`, 'info');
+      const response = await fetch('/api/linux-apps/import-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: entry.url, name: entry.name })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `Failed to download ${entry.name}.`);
+      }
+      await loadLinuxPackages();
+    }
+    setFeedback(appStoreStatus, `${entry.name} installed.`, 'success');
+  } catch (error) {
+    setFeedback(appStoreStatus, error.message, 'error');
+  } finally {
+    renderAppStore();
+  }
+}
+
+function renderAppStore() {
+  if (!appStoreGrid) return;
+  appStoreGrid.innerHTML = '';
+
+  APP_STORE_CATALOG.forEach((entry) => {
+    const card = document.createElement('article');
+    card.className = 'app-launch-card third-party-app-card';
+
+    const glyph = document.createElement('span');
+    glyph.className = 'app-launch-icon';
+    glyph.textContent = entry.glyph;
+
+    const title = document.createElement('strong');
+    title.textContent = entry.name;
+
+    const badge = document.createElement('span');
+    badge.className = `app-store-badge ${entry.type === 'web' ? 'web' : 'linux'}`;
+    badge.textContent = entry.type === 'web' ? 'Web app' : 'Linux terminal';
+
+    const detail = document.createElement('small');
+    detail.textContent = entry.description;
+
+    const actions = document.createElement('div');
+    actions.className = 'third-party-app-actions';
+
+    const installed = isStoreEntryInstalled(entry);
+    const installButton = document.createElement('button');
+    installButton.type = 'button';
+    installButton.textContent = installed ? 'Installed' : 'Install';
+    installButton.disabled = installed;
+    if (!installed) {
+      installButton.addEventListener('click', () => installStoreEntry(entry, installButton));
+    }
+
+    actions.appendChild(installButton);
+    card.appendChild(glyph);
+    card.appendChild(title);
+    card.appendChild(badge);
+    card.appendChild(detail);
+    card.appendChild(actions);
+    appStoreGrid.appendChild(card);
+  });
 }
 
 async function listWorkspace(path = '.') {
@@ -2785,4 +2987,93 @@ function initTerminal(options = {}) {
       terminalSocket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
     }
   });
+}
+
+// === CALCULATOR ===
+const calcDisplay = document.getElementById('calcDisplay');
+const calcState = { current: '0', previous: null, operator: null, justEvaluated: false };
+
+function calcUpdateDisplay() {
+  if (!calcDisplay) return;
+  let text = calcState.current;
+  if (text.length > 12 && !text.includes('e')) {
+    const num = Number(text);
+    text = Math.abs(num) >= 1e12 || (Math.abs(num) < 1e-6 && num !== 0)
+      ? num.toExponential(6)
+      : String(Number(num.toPrecision(12)));
+  }
+  calcDisplay.textContent = text;
+}
+
+function calcApplyOperator(a, b, operator) {
+  switch (operator) {
+    case '+': return a + b;
+    case '-': return a - b;
+    case '*': return a * b;
+    case '/': return b === 0 ? NaN : a / b;
+    default: return b;
+  }
+}
+
+function calcInput(key) {
+  if (/^[0-9]$/.test(key)) {
+    if (calcState.justEvaluated) {
+      calcState.current = key;
+      calcState.justEvaluated = false;
+    } else {
+      calcState.current = calcState.current === '0' ? key : calcState.current + key;
+    }
+  } else if (key === '.') {
+    if (calcState.justEvaluated) {
+      calcState.current = '0.';
+      calcState.justEvaluated = false;
+    } else if (!calcState.current.includes('.')) {
+      calcState.current += '.';
+    }
+  } else if (key === 'clear') {
+    calcState.current = '0';
+    calcState.previous = null;
+    calcState.operator = null;
+    calcState.justEvaluated = false;
+  } else if (key === 'negate') {
+    calcState.current = calcState.current.startsWith('-')
+      ? calcState.current.slice(1)
+      : (calcState.current === '0' ? '0' : `-${calcState.current}`);
+  } else if (key === 'percent') {
+    calcState.current = String(Number(calcState.current) / 100);
+  } else if (['+', '-', '*', '/'].includes(key)) {
+    if (calcState.operator !== null && calcState.previous !== null && !calcState.justEvaluated) {
+      const result = calcApplyOperator(calcState.previous, Number(calcState.current), calcState.operator);
+      calcState.current = Number.isFinite(result) ? String(result) : 'Error';
+    }
+    calcState.previous = Number(calcState.current);
+    calcState.operator = key;
+    calcState.justEvaluated = true;
+  } else if (key === '=') {
+    if (calcState.operator !== null && calcState.previous !== null) {
+      const result = calcApplyOperator(calcState.previous, Number(calcState.current), calcState.operator);
+      calcState.current = Number.isFinite(result) ? String(result) : 'Error';
+      calcState.previous = null;
+      calcState.operator = null;
+      calcState.justEvaluated = true;
+    }
+  }
+  calcUpdateDisplay();
+}
+
+document.querySelectorAll('[data-calc]').forEach((button) => {
+  button.addEventListener('click', () => calcInput(button.dataset.calc));
+});
+
+const calculatorWindowEl = document.getElementById('windowCalculator');
+if (calculatorWindowEl) {
+  calculatorWindowEl.addEventListener('keydown', (event) => {
+    const keyMap = { Enter: '=', '=': '=', Escape: 'clear', Backspace: 'clear', '%': 'percent' };
+    const key = /^[0-9.+\-*/]$/.test(event.key) ? event.key : keyMap[event.key];
+    if (key) {
+      event.preventDefault();
+      calcInput(key);
+    }
+  });
+  calculatorWindowEl.tabIndex = -1;
 }

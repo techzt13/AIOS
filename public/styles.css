@@ -955,6 +955,96 @@ button.secondary {
   min-height: 190px;
 }
 
+.app-store-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-store-badge.web {
+  color: #0a5cc2;
+  background: rgba(10, 132, 255, 0.16);
+  border: 1px solid rgba(10, 132, 255, 0.28);
+}
+
+.app-store-badge.linux {
+  color: #7a4c00;
+  background: rgba(255, 170, 30, 0.2);
+  border: 1px solid rgba(255, 170, 30, 0.34);
+}
+
+.calculator-app {
+  width: 300px;
+  min-height: 0;
+}
+
+.calculator-window {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.calc-display {
+  display: block;
+  width: 100%;
+  min-height: 58px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(10, 14, 20, 0.86);
+  color: #eaf4ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 1.8rem;
+  text-align: right;
+  overflow: hidden;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.calc-key {
+  min-height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.72), rgba(226, 238, 255, 0.4));
+  color: #12203b;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.calc-key:hover {
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(226, 238, 255, 0.6));
+}
+
+.calc-key.op {
+  background: linear-gradient(150deg, rgba(10, 132, 255, 0.92), rgba(9, 96, 210, 0.92));
+  color: #ffffff;
+  border-color: rgba(10, 132, 255, 0.6);
+}
+
+.calc-key.op:hover {
+  background: linear-gradient(150deg, rgba(45, 152, 255, 0.95), rgba(20, 110, 224, 0.95));
+}
+
+.calc-key.fn {
+  background: linear-gradient(150deg, rgba(210, 222, 240, 0.85), rgba(188, 204, 228, 0.6));
+}
+
+.calc-key.wide {
+  grid-column: span 2;
+}
+
 .third-party-app-actions {
   display: flex;
   gap: 8px;
