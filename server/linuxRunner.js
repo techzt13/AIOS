@@ -143,10 +143,21 @@ async function assertSafeArchiveEntries(archivePath, deps = {}) {
   }
 }
 
+function defaultExtractRoot() {
+  // Colima/Lima only share certain host directories with the VM (e.g. /Users).
+  // /tmp on macOS is not shared, so Docker bind mounts from there appear empty.
+  // Extract into the project workspace instead, which is always visible.
+  const workspaceRoot = process.env.WORKSPACE_ROOT
+    || process.env.SANDBOX_DIR
+    || path.join(process.cwd(), 'workspace');
+  return path.join(workspaceRoot, '.aios-linux-runs');
+}
+
 async function extractArchive(archivePath, deps = {}) {
   const run = deps.runCommand || runCommand;
-  const tempRoot = deps.tempRoot || os.tmpdir();
-  const extractDir = await fs.mkdtemp(path.join(tempRoot, 'aios-linux-run-'));
+  const extractRoot = deps.extractRoot || defaultExtractRoot();
+  await fs.mkdir(extractRoot, { recursive: true });
+  const extractDir = await fs.mkdtemp(path.join(extractRoot, 'run-'));
 
   await assertSafeArchiveEntries(archivePath, deps);
   const result = await run({
