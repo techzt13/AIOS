@@ -153,6 +153,8 @@ electronApp.whenReady().then(async () => {
 // instead of spawning separate Electron windows.
 electronApp.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
+    // Present as plain Chrome so sites don't block the embedded browser.
+    contents.setUserAgent(contents.getUserAgent().replace(/\sElectron\/[\d.]+/i, '').replace(/\sAIOS\/[\d.]+/i, ''));
     contents.setWindowOpenHandler(({ url }) => {
       routeUrlIntoShellBrowser(url);
       return { action: 'deny' };

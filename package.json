@@ -4,8 +4,9 @@
   "description": "Zack and Richard have made an operating system called AI OS. Built for AI users and nerds.",
   "main": "server/index.js",
   "scripts": {
-    "start": "node server/index.js",
+    "start": "electron desktop/main.js",
     "desktop": "electron desktop/main.js",
+    "web": "node server/index.js",
     "build:site": "node scripts/build-site.js",
     "test": "node --test"
   },

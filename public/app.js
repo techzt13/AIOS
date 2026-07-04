@@ -532,7 +532,7 @@ async function launchNativeBrowserUrl(url) {
   try {
     payload = await response.json();
   } catch {
-    throw new Error('AIOS native browser API is unavailable. Restart npm start or run npm run desktop.');
+    throw new Error('AIOS native browser API is unavailable. Start AIOS with npm start (desktop mode).');
   }
   if (!response.ok || !payload.ok) {
     throw new Error(payload.error || 'Failed to open native browser session.');

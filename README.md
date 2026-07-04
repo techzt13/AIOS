@@ -5,26 +5,24 @@ AIOS runs as a local **AI-native OS runtime** with a macOS-inspired desktop. Use
 
 ## Quick start
 
-OS desktop mode:
-
 ```bash
 git clone https://github.com/techzt13/AIOS.git
 cd AIOS
 npm install
-npm run desktop
-```
-
-Localhost web-shell mode:
-
-```bash
 npm start
 ```
 
-Open: <http://localhost:8080>
+`npm start` launches the full AIOS desktop OS (Electron). AIOS starts its own local daemon and opens a native desktop shell. The AIOS Browser renders pages inside the Browser app using a real Chromium `<webview>` engine, so any site — YouTube, shops, logins — loads inside AIOS without being blocked.
 
-In desktop mode, AIOS starts its own local daemon and opens a native desktop shell. The AIOS Browser renders pages inside the Browser app using Electron `<webview>`, so sites like YouTube are not loaded through an iframe.
+Optional localhost web-shell mode (limited browser, runs in your existing browser tab):
 
-In web-shell mode, AIOS still runs on `localhost:8080`; the local daemon can launch your OS browser through `POST /api/browser/open`, but the page itself remains inside your existing browser.
+```bash
+npm run web
+```
+
+Then open: <http://localhost:8080>
+
+In web-shell mode the Browser app embeds sites in an iframe; sites that block embedding will show "refused to connect" and need the desktop mode above.
 
 By default AIOS binds to `127.0.0.1` so the OS runtime is local-only. Set `AIOS_HOST=0.0.0.0` only if you intentionally want to expose it on your network.
 
@@ -145,9 +143,9 @@ For now, AIOS does not run arbitrary downloaded code or native packages like `.d
 
 ## Browser behavior
 
-AIOS Browser is native-first because a webpage iframe is not a real browser. In `npm run desktop`, AIOS renders sites inside the Browser window using Electron `<webview>`, which gives AIOS a real Chromium browser surface instead of an iframe placeholder. YouTube and other protected sites load there as real browser pages inside AIOS.
+In desktop mode (`npm start`), AIOS renders sites inside the Browser window using a Chromium `<webview>` — a real browser engine, not an iframe. Sites cannot refuse to connect, and popups/new tabs are routed back into the AIOS Browser window instead of spawning separate native windows.
 
-When running only `npm start`, AIOS is still a localhost web shell, so it cannot embed a full browser engine inside the page. In that mode, the local daemon uses `POST /api/browser/open` to ask the host OS to open the URL in a native browser. The iframe path remains available only through **Try embedded anyway** for simple pages that allow embedding.
+In web-shell mode (`npm run web`), AIOS embeds sites in an iframe by default. Sites that block embedding (most shops, YouTube, social sites) will appear blank or say "refused to connect"; AIOS shows a notice with a native-browser fallback. YouTube video links are rewritten to the embeddable player so they still play inside the window.
 
 Example `manifest.webmanifest`:
 
