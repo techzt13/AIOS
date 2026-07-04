@@ -169,7 +169,7 @@ let copilotDeviceFlow = null;
 let copilotPollTimer = null;
 let currentWizardStep = 0;
 let wizardTestSucceeded = false;
-let shellState = { windows: {}, preferences: {} };
+let shellState = { windows: {}, preferences: {}, browserHistory: [] };
 let zCounter = 10;
 let installedApps = [];
 let linuxPackages = [];
@@ -480,6 +480,120 @@ function rememberBrowserHistory(url) {
   updateBrowserNavigationControls();
 }
 
+// === PERSISTENT BROWSER HISTORY ===
+const browserHistoryButton = document.getElementById('browserHistoryButton');
+const browserHistoryPanel = document.getElementById('browserHistoryPanel');
+const browserHistoryList = document.getElementById('browserHistoryList');
+const browserHistoryClearButton = document.getElementById('browserHistoryClearButton');
+const browserHistoryOptions = document.getElementById('browserHistoryOptions');
+const MAX_PERSISTED_HISTORY = 200;
+
+function recordBrowserVisit(url, title = '') {
+  if (!url || url === 'about:blank' || !/^https?:/i.test(url)) return;
+  const history = shellState.browserHistory || [];
+  const existing = history.find((entry) => entry.url === url);
+  const entry = {
+    url,
+    title: title || existing?.title || '',
+    visitedAt: Date.now()
+  };
+  shellState.browserHistory = [entry, ...history.filter((item) => item.url !== url)].slice(0, MAX_PERSISTED_HISTORY);
+  persistShellState();
+  renderBrowserHistoryUi();
+}
+
+function updateBrowserVisitTitle(url, title) {
+  if (!url || !title) return;
+  const entry = (shellState.browserHistory || []).find((item) => item.url === url);
+  if (entry && entry.title !== title) {
+    entry.title = title;
+    persistShellState();
+    renderBrowserHistoryUi();
+  }
+}
+
+function historyDisplayLabel(entry) {
+  if (entry.title) return entry.title;
+  try {
+    const parsed = new URL(entry.url);
+    return parsed.hostname.replace(/^www\./, '') + (parsed.pathname !== '/' ? parsed.pathname : '');
+  } catch {
+    return entry.url;
+  }
+}
+
+function renderBrowserHistoryUi() {
+  const history = shellState.browserHistory || [];
+
+  if (browserHistoryOptions) {
+    browserHistoryOptions.innerHTML = '';
+    history.slice(0, 30).forEach((entry) => {
+      const option = document.createElement('option');
+      option.value = entry.url;
+      option.label = entry.title || '';
+      browserHistoryOptions.appendChild(option);
+    });
+  }
+
+  if (!browserHistoryList) return;
+  browserHistoryList.innerHTML = '';
+
+  if (history.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'status-text';
+    empty.textContent = 'No browsing history yet.';
+    browserHistoryList.appendChild(empty);
+    return;
+  }
+
+  history.forEach((entry) => {
+    const row = document.createElement('div');
+    row.className = 'browser-history-item';
+
+    const openButton = document.createElement('button');
+    openButton.type = 'button';
+    openButton.className = 'browser-history-open';
+    const label = document.createElement('strong');
+    label.textContent = historyDisplayLabel(entry);
+    const urlText = document.createElement('small');
+    urlText.textContent = entry.url;
+    openButton.appendChild(label);
+    openButton.appendChild(urlText);
+    openButton.addEventListener('click', () => {
+      hideBrowserHistoryPanel();
+      openBrowserUrl(entry.url);
+    });
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'icon-button browser-history-delete';
+    deleteButton.title = 'Remove from history';
+    deleteButton.textContent = '✕';
+    deleteButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      shellState.browserHistory = (shellState.browserHistory || []).filter((item) => item.url !== entry.url);
+      persistShellState();
+      renderBrowserHistoryUi();
+    });
+
+    row.appendChild(openButton);
+    row.appendChild(deleteButton);
+    browserHistoryList.appendChild(row);
+  });
+}
+
+function hideBrowserHistoryPanel() {
+  if (browserHistoryPanel) browserHistoryPanel.classList.add('hidden');
+}
+
+function toggleBrowserHistoryPanel() {
+  if (!browserHistoryPanel) return;
+  browserHistoryPanel.classList.toggle('hidden');
+  if (!browserHistoryPanel.classList.contains('hidden')) {
+    renderBrowserHistoryUi();
+  }
+}
+
 function showBrowserEmbeddedFrame() {
   browserWebview.classList.add('hidden');
   browserExternalPage.classList.add('hidden');
@@ -586,7 +700,9 @@ function openBrowserUrl(rawValue, options = {}) {
   }
   currentBrowserUrl = url;
   hideBrowserBlockedNotice();
+  hideBrowserHistoryPanel();
   browserUrlInput.value = url;
+  recordBrowserVisit(url);
 
   if (canUseBrowserWebview()) {
     loadBrowserWebview(url);
@@ -914,20 +1030,24 @@ async function loadShellState() {
     if (response.ok && payload.ok) {
       shellState = {
         windows: payload.state.windows || {},
-        preferences: payload.state.preferences || {}
+        preferences: payload.state.preferences || {},
+        browserHistory: Array.isArray(payload.state.browserHistory) ? payload.state.browserHistory : []
       };
     }
   } catch {
-    shellState = { windows: {}, preferences: {} };
+    shellState = { windows: {}, preferences: {}, browserHistory: [] };
   }
 
   applyPreferences();
+  renderBrowserHistoryUi();
 
   Object.entries(WINDOW_IDS).forEach(([app, id]) => {
     const windowEl = document.getElementById(id);
     const state = shellState.windows?.[app] || {};
     if (typeof state.left === 'number') windowEl.style.left = `${state.left}px`;
     if (typeof state.top === 'number') windowEl.style.top = `${state.top}px`;
+    if (typeof state.width === 'number' && state.width >= 320) windowEl.style.width = `${state.width}px`;
+    if (typeof state.height === 'number' && state.height >= 200) windowEl.style.height = `${state.height}px`;
     if (state.open === false || state.minimized) {
       windowEl.classList.add('hidden');
     }
@@ -2448,6 +2568,25 @@ browserForwardButton.addEventListener('click', () => navigateBrowserHistory(1));
 browserRefreshButton.addEventListener('click', refreshBrowserUrl);
 browserOpenExternalButton.addEventListener('click', openCurrentBrowserUrlExternally);
 browserNoticeExternalButton.addEventListener('click', openCurrentBrowserUrlExternally);
+if (browserHistoryButton) {
+  browserHistoryButton.addEventListener('click', toggleBrowserHistoryPanel);
+}
+if (browserHistoryClearButton) {
+  browserHistoryClearButton.addEventListener('click', () => {
+    shellState.browserHistory = [];
+    persistShellState();
+    renderBrowserHistoryUi();
+  });
+}
+browserUrlInput.addEventListener('focus', () => browserUrlInput.select());
+document.addEventListener('keydown', (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'l') {
+    event.preventDefault();
+    openWindow('browser');
+    browserUrlInput.focus();
+    browserUrlInput.select();
+  }
+});
 browserTryEmbedButton.addEventListener('click', () => openBrowserUrl(currentBrowserUrl || browserUrlInput.value, {
   forceEmbed: true,
   recordHistory: false
@@ -2460,12 +2599,21 @@ if (browserWebview) {
   browserWebview.addEventListener('did-navigate', (event) => {
     currentBrowserUrl = event.url;
     browserUrlInput.value = event.url;
+    recordBrowserVisit(event.url);
     updateBrowserNavigationControls();
   });
   browserWebview.addEventListener('did-navigate-in-page', (event) => {
     currentBrowserUrl = event.url;
     browserUrlInput.value = event.url;
+    recordBrowserVisit(event.url);
     updateBrowserNavigationControls();
+  });
+  browserWebview.addEventListener('page-title-updated', (event) => {
+    const browserWindowTitle = document.querySelector('#windowBrowser .window-titlebar h2');
+    if (browserWindowTitle) {
+      browserWindowTitle.textContent = event.title ? event.title : 'Browser';
+    }
+    updateBrowserVisitTitle(currentBrowserUrl, event.title || '');
   });
   browserWebview.addEventListener('did-stop-loading', updateBrowserNavigationControls);
   browserWebview.addEventListener('new-window', (event) => {
@@ -2715,6 +2863,31 @@ document.querySelectorAll('.app-window').forEach((windowEl) => {
   initWindowDrag(windowEl);
   windowEl.addEventListener('mousedown', () => focusWindow(windowEl.dataset.app));
 });
+
+// Persist manual window resizing (CSS resize handle) per app.
+const windowResizeTimers = new Map();
+const windowResizeObserver = new ResizeObserver((entries) => {
+  entries.forEach((entry) => {
+    const windowEl = entry.target;
+    const app = windowEl.dataset.app;
+    if (!app) return;
+    if (windowEl.classList.contains('hidden')
+      || windowEl.classList.contains('maximized')
+      || windowEl.classList.contains('snapped-left')
+      || windowEl.classList.contains('snapped-right')
+      || windowEl.classList.contains('dragging')) {
+      return;
+    }
+    if (windowResizeTimers.has(app)) clearTimeout(windowResizeTimers.get(app));
+    windowResizeTimers.set(app, setTimeout(() => {
+      const rect = windowEl.getBoundingClientRect();
+      if (rect.width >= 320 && rect.height >= 200) {
+        recordWindowState(app, { width: Math.round(rect.width), height: Math.round(rect.height) });
+      }
+    }, 400));
+  });
+});
+document.querySelectorAll('.app-window').forEach((windowEl) => windowResizeObserver.observe(windowEl));
 
 renderMessage('system', 'Welcome to AIOS web shell. Use dock apps for chat, files, terminal, apps, and setup.');
 

@@ -138,10 +138,19 @@
               <button type="button" id="browserBackButton" class="icon-button" title="Back" aria-label="Back">◀</button>
               <button type="button" id="browserForwardButton" class="icon-button" title="Forward" aria-label="Forward">▶</button>
               <button type="button" id="browserRefreshButton" class="icon-button" title="Reload" aria-label="Reload">↻</button>
-              <input id="browserUrlInput" type="text" placeholder="Search the web or enter URL..." />
+              <input id="browserUrlInput" type="text" placeholder="Search the web or enter URL... (⌘L)" list="browserHistoryOptions" autocomplete="off" />
+              <datalist id="browserHistoryOptions"></datalist>
               <button type="submit" id="browserGoButton">Go</button>
+              <button type="button" id="browserHistoryButton" class="icon-button" title="History" aria-label="History">🕘</button>
               <button type="button" id="browserOpenExternalButton" class="secondary">Open native browser</button>
             </form>
+            <div id="browserHistoryPanel" class="browser-history-panel hidden">
+              <div class="browser-history-header">
+                <strong>History</strong>
+                <button type="button" id="browserHistoryClearButton" class="secondary">Clear history</button>
+              </div>
+              <div id="browserHistoryList" class="browser-history-list"></div>
+            </div>
             <div id="browserBlockedNotice" class="browser-notice hidden">
               <strong>This site limits embedded browsing.</strong>
               <span>AIOS keeps sites inside this window. If the page stays blank, the site blocks embedding — open a native browser session as a fallback.</span>
