@@ -2736,7 +2736,7 @@ function initTerminal(options = {}) {
   }
 
   term.clear();
-  term.write(`\x1b[33mConnecting to AIOS runtime for ${appName}...\x1b[0m\r\n`);
+  term.write(`\x1b[33mLaunching ${appName}...\x1b[0m\r\n`);
 
   if (terminalSocket) {
     terminalSocket.close();

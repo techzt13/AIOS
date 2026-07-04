@@ -64,6 +64,61 @@ async function commandExists(command, deps = {}) {
   return result.ok;
 }
 
+async function runtimeImageExists(dockerCommand, deps = {}) {
+  const run = deps.runCommand || runCommand;
+  const result = await run({
+    command: dockerCommand,
+    args: ['images', '--format', '{{.Repository}}:{{.Tag}}', LINUX_RUNTIME_IMAGE],
+    timeoutMs: 10000,
+    maxOutputBytes: 20000
+  });
+  return result.ok && result.stdout.trim().includes(LINUX_RUNTIME_IMAGE);
+}
+
+async function ensureLinuxRuntimeImage(deps = {}) {
+  const dockerCommand = resolveDockerCommand(deps);
+  if (!dockerCommand || !(await commandExists(dockerCommand, deps))) {
+    return { ok: false, pulled: false, error: 'Docker not available' };
+  }
+  if (await runtimeImageExists(dockerCommand, deps)) {
+    return { ok: true, pulled: false, image: LINUX_RUNTIME_IMAGE };
+  }
+
+  const run = deps.runCommand || runCommand;
+  const result = await run({
+    command: dockerCommand,
+    args: ['pull', LINUX_RUNTIME_IMAGE],
+    timeoutMs: 300000,
+    maxOutputBytes: 256000
+  });
+  return {
+    ok: result.ok,
+    pulled: result.ok,
+    image: LINUX_RUNTIME_IMAGE,
+    error: result.ok ? undefined : (result.stderr || 'docker pull failed')
+  };
+}
+
+function resolveDockerCommand(deps = {}) {
+  if (deps.dockerCommand) return deps.dockerCommand;
+  const candidates = [
+    process.env.AIOS_DOCKER_PATH,
+    '/usr/local/bin/docker',
+    '/opt/homebrew/bin/docker',
+    'docker'
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    if (candidate === 'docker') return candidate;
+    try {
+      require('fs').accessSync(candidate, require('fs').constants.X_OK);
+      return candidate;
+    } catch {
+      // try next
+    }
+  }
+  return 'docker';
+}
+
 async function assertSafeArchiveEntries(archivePath, deps = {}) {
   const run = deps.runCommand || runCommand;
   const result = await run({
@@ -261,8 +316,10 @@ async function startLinuxPackage({
 module.exports = {
   assertSafeArchiveEntries,
   commandExists,
+  ensureLinuxRuntimeImage,
   extractArchive,
   findExecutables,
+  resolveDockerCommand,
   runCommand,
   startLinuxPackage
 };

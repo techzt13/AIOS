@@ -54,7 +54,7 @@ const {
 const { resolveSandboxPath } = require('./sandbox');
 const { validateExecCommand, runExecCommand, startExecCommand } = require('./exec');
 const { openNativeBrowserUrl } = require('./browserLauncher');
-const { startLinuxPackage } = require('./linuxRunner');
+const { ensureLinuxRuntimeImage, startLinuxPackage } = require('./linuxRunner');
 const { ProcessRegistry } = require('./processRegistry');
 const { getRuntimeInfo } = require('./runtime');
 
@@ -895,6 +895,18 @@ if (require.main === module) {
     console.log(`AIOS running on http://${displayHost}:${PORT}`);
     console.log(`Runtime mode: local-daemon (${HOST === '127.0.0.1' || HOST === 'localhost' ? 'local-only' : `bound to ${HOST}`})`);
     console.log(`Workspace root: ${WORKSPACE_ROOT}`);
+
+    ensureLinuxRuntimeImage().then((result) => {
+      if (result.pulled) {
+        console.log(`Linux runtime image ready: ${result.image}`);
+      } else if (result.ok) {
+        console.log(`Linux runtime image already present: ${result.image}`);
+      } else {
+        console.log(`Linux runtime image not ready: ${result.error || 'unknown'}`);
+      }
+    }).catch((error) => {
+      console.log(`Linux runtime image warmup failed: ${error.message}`);
+    });
   });
   attachWebSockets(server);
 }
