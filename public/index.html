@@ -458,6 +458,11 @@
                 <strong>Text Editor</strong>
                 <small>Edit code and markdown with tabs.</small>
               </button>
+              <button type="button" class="app-launch-card" data-launch-app="instructions">
+                <span class="app-launch-icon">?</span>
+                <strong>Instructions</strong>
+                <small>Shortcuts, tips, and how to use AIOS.</small>
+              </button>
             </div>
             <section class="third-party-apps app-store-section">
               <div class="apps-section-header">
@@ -523,6 +528,62 @@
             </section>
           </div>
         </section>
+
+        <section id="windowInstructions" class="app-window hidden" data-app="instructions" data-title="Instructions">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="instructions" aria-label="Close Instructions"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="instructions" aria-label="Minimize Instructions"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="instructions" aria-label="Zoom Instructions"></button>
+            </div>
+            <h2>Instructions</h2>
+          </header>
+          <div class="window-body instructions-window">
+            <section class="instructions-hero">
+              <p class="wizard-kicker">Getting started</p>
+              <h3>How to use AIOS</h3>
+              <p class="status-text">Shortcuts, tips, and feature guides for the AIOS desktop.</p>
+            </section>
+            <div class="instructions-content">
+              <article class="instruction-card">
+                <h4>🖼 Screenshots</h4>
+                <p>Press <kbd>Shift</kbd> + <kbd>⌘</kbd> + <kbd>3</kbd> to capture the whole screen. Screenshots are saved to <code>workspace/Screenshots</code> and appear in the Downloads panel.</p>
+              </article>
+              <article class="instruction-card">
+                <h4>🔍 Spotlight Search</h4>
+                <p>Press <kbd>⌘</kbd> + <kbd>Space</kbd> to open Spotlight. Search apps, files, bookmarks, and browser history. Click any result to open it instantly.</p>
+              </article>
+              <article class="instruction-card">
+                <h4>🌐 Browser</h4>
+                <p>Type a URL or search term in the Browser address bar. Use tabs to keep multiple sites open. Bookmarks and history are saved across sessions. Sites that block embedding open in an Electron webview automatically.</p>
+              </article>
+              <article class="instruction-card">
+                <h4>🐧 Linux Apps</h4>
+                <p>Import .tar.gz Linux packages in the Apps window. AIOS stores them and can run them inside a Docker/Colima container. Make sure Colima is running if you are on macOS.</p>
+              </article>
+              <article class="instruction-card">
+                <h4>📝 Text Editor</h4>
+                <p>Open the Text Editor to write notes or code. Use tabs for multiple files. Press <kbd>⌘</kbd> + <kbd>S</kbd> to save, and <kbd>⌘</kbd> + <kbd>.</kbd> to toggle markdown preview.</p>
+              </article>
+              <article class="instruction-card">
+                <h4>🎨 Theme & Wallpaper</h4>
+                <p>Open Settings to switch between dark and light mode, change the accent color, or pick a wallpaper. You can also upload your own custom wallpaper.</p>
+              </article>
+              <article class="instruction-card">
+                <h4>⌨️ Window Shortcuts</h4>
+                <ul>
+                  <li><kbd>⌘</kbd> + <kbd>1</kbd>–<kbd>9</kbd> focus dock apps by position</li>
+                  <li>Drag a window titlebar to move it</li>
+                  <li>Click the red dot to close, yellow to minimize, green to zoom</li>
+                </ul>
+              </article>
+              <article class="instruction-card">
+                <h4>💾 Files & Downloads</h4>
+                <p>Use the Files app to browse your workspace. Downloads from the Browser are saved to <code>workspace/Downloads</code>. Open the Browser’s downloads panel to see recent files.</p>
+              </article>
+            </div>
+          </div>
+        </section>
       </main>
 
       <nav class="dock" aria-label="AIOS dock">
@@ -536,6 +597,7 @@
         <button type="button" class="dock-item" data-open-app="settings">Settings</button>
         <button type="button" class="dock-item" id="openSetupAssistant">Setup</button>
         <button type="button" class="dock-item" data-open-app="apps">Apps</button>
+        <button type="button" class="dock-item" data-open-app="instructions">Help</button>
       </nav>
     </div>
 

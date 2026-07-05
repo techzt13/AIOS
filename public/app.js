@@ -159,7 +159,8 @@ const WINDOW_IDS = {
   settings: 'windowSettings',
   calculator: 'windowCalculator',
   apps: 'windowApps',
-  editor: 'windowEditor'
+  editor: 'windowEditor',
+  instructions: 'windowInstructions'
 };
 
 const WINDOW_LAYOUT = {
@@ -1114,7 +1115,8 @@ function spotlightItems() {
     { id: 'app-calculator', type: 'app', name: 'Calculator', glyph: '=', action: () => openWindow('calculator') },
     { id: 'app-editor', type: 'app', name: 'Text Editor', glyph: 'TE', action: () => openWindow('editor') },
     { id: 'app-settings', type: 'app', name: 'Settings', glyph: 'ST', action: () => openWindow('settings') },
-    { id: 'app-apps', type: 'app', name: 'Apps', glyph: 'AP', action: () => openWindow('apps') }
+    { id: 'app-apps', type: 'app', name: 'Apps', glyph: 'AP', action: () => openWindow('apps') },
+    { id: 'app-instructions', type: 'app', name: 'Instructions', glyph: '?', action: () => openWindow('instructions') }
   ];
   const bookmarks = (shellState.bookmarks || []).map((bookmark) => ({
     id: `bookmark-${bookmark.id}`,
