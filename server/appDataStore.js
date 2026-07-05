@@ -123,7 +123,14 @@ function sanitizeShellState(value) {
   const state = value && typeof value === 'object' ? value : {};
   return {
     windows: state.windows && typeof state.windows === 'object' ? state.windows : {},
-    preferences: state.preferences && typeof state.preferences === 'object' ? state.preferences : {}
+    preferences: state.preferences && typeof state.preferences === 'object' ? state.preferences : {},
+    browserHistory: Array.isArray(state.browserHistory) ? state.browserHistory : [],
+    bookmarks: Array.isArray(state.bookmarks) ? state.bookmarks : [],
+    downloads: Array.isArray(state.downloads) ? state.downloads : [],
+    browserTabs: Array.isArray(state.browserTabs) ? state.browserTabs : [],
+    activeBrowserTab: typeof state.activeBrowserTab === 'string' ? state.activeBrowserTab : null,
+    editorTabs: Array.isArray(state.editorTabs) ? state.editorTabs : [],
+    activeEditorTab: typeof state.activeEditorTab === 'string' ? state.activeEditorTab : null
   };
 }
 
