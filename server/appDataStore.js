@@ -44,6 +44,37 @@ function getLinuxPackagesDir() {
   return path.join(getDataDir(), LINUX_PACKAGES_DIR);
 }
 
+const WALLPAPERS_DIR = 'wallpapers';
+
+function getWallpapersDir() {
+  return path.join(getDataDir(), WALLPAPERS_DIR);
+}
+
+async function ensureWallpapersDir() {
+  await ensureDataDir();
+  await fs.mkdir(getWallpapersDir(), { recursive: true, mode: 0o700 });
+}
+
+async function saveWallpaper(buffer, originalName) {
+  await ensureWallpapersDir();
+  const ext = path.extname(originalName || '').toLowerCase() || '.png';
+  const safeExt = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'].includes(ext) ? ext : '.png';
+  const storedFilename = `${crypto.randomUUID()}${safeExt}`;
+  const targetPath = path.join(getWallpapersDir(), storedFilename);
+  await fs.writeFile(targetPath, buffer, { mode: 0o600 });
+  return { storedFilename, targetPath };
+}
+
+async function listWallpapers() {
+  await ensureWallpapersDir();
+  try {
+    const files = await fs.readdir(getWallpapersDir());
+    return files.filter((f) => /\.(png|jpe?g|gif|webp|bmp)$/i.test(f));
+  } catch {
+    return [];
+  }
+}
+
 async function ensureDataDir() {
   const dataDir = getDataDir();
   await fs.mkdir(dataDir, { recursive: true, mode: 0o700 });
@@ -562,11 +593,13 @@ module.exports = {
   getLinuxPackagesDir,
   getNotesPath,
   getShellStatePath,
+  getWallpapersDir,
   installApp,
   installLinuxPackage,
   listImports,
   listInstalledApps,
   listLinuxPackages,
+  listWallpapers,
   loadApiKeyAuditEvents,
   loadNotes,
   loadShellState,
@@ -574,5 +607,6 @@ module.exports = {
   removeInstalledApp,
   removeLinuxPackage,
   saveNotes,
-  saveShellState
+  saveShellState,
+  saveWallpaper
 };

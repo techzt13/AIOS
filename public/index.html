@@ -20,6 +20,8 @@
         <div class="menu-right">
           <span id="providerStatusBadge">Provider: loading</span>
           <span id="runtimeBadge">Local runtime</span>
+          <button type="button" id="themeToggleButton" class="theme-toggle-button" title="Toggle theme" aria-label="Toggle theme">🌙</button>
+          <button type="button" id="spotlightButton" class="spotlight-button" title="Search (⌘Space)" aria-label="Search">🔍</button>
           <span id="clockLabel"></span>
         </div>
       </header>
@@ -134,6 +136,10 @@
             <h2>Browser</h2>
           </header>
           <div class="window-body browser-window">
+            <div id="browserTabBar" class="browser-tab-bar">
+              <div id="browserTabs" class="browser-tabs"></div>
+              <button type="button" id="browserNewTabButton" class="icon-button browser-new-tab" title="New tab" aria-label="New tab">+</button>
+            </div>
             <form id="browserToolbar" class="toolbar browser-toolbar">
               <button type="button" id="browserBackButton" class="icon-button" title="Back" aria-label="Back">◀</button>
               <button type="button" id="browserForwardButton" class="icon-button" title="Forward" aria-label="Forward">▶</button>
@@ -141,7 +147,9 @@
               <input id="browserUrlInput" type="text" placeholder="Search the web or enter URL... (⌘L)" list="browserHistoryOptions" autocomplete="off" />
               <datalist id="browserHistoryOptions"></datalist>
               <button type="submit" id="browserGoButton">Go</button>
+              <button type="button" id="browserBookmarkButton" class="icon-button" title="Bookmark" aria-label="Bookmark">☆</button>
               <button type="button" id="browserHistoryButton" class="icon-button" title="History" aria-label="History">🕘</button>
+              <button type="button" id="browserDownloadsButton" class="icon-button" title="Downloads" aria-label="Downloads">⬇</button>
               <button type="button" id="browserOpenExternalButton" class="secondary">Open native browser</button>
             </form>
             <div id="browserHistoryPanel" class="browser-history-panel hidden">
@@ -150,6 +158,20 @@
                 <button type="button" id="browserHistoryClearButton" class="secondary">Clear history</button>
               </div>
               <div id="browserHistoryList" class="browser-history-list"></div>
+            </div>
+            <div id="browserBookmarksPanel" class="browser-history-panel hidden">
+              <div class="browser-history-header">
+                <strong>Bookmarks</strong>
+                <button type="button" id="browserAddBookmarkButton" class="secondary">Bookmark current</button>
+              </div>
+              <div id="browserBookmarksList" class="browser-history-list"></div>
+            </div>
+            <div id="browserDownloadsPanel" class="browser-history-panel hidden">
+              <div class="browser-history-header">
+                <strong>Downloads</strong>
+                <button type="button" id="browserDownloadsClearButton" class="secondary">Clear</button>
+              </div>
+              <div id="browserDownloadsList" class="browser-history-list"></div>
             </div>
             <div id="browserBlockedNotice" class="browser-notice hidden">
               <strong>This site limits embedded browsing.</strong>
@@ -246,6 +268,12 @@
 
               <section class="control-group">
                 <p class="group-title">Desktop preferences</p>
+                <label for="themeSelect">Theme</label>
+                <select id="themeSelect">
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
+                  <option value="auto">Auto</option>
+                </select>
                 <label for="accentSelect">Accent</label>
                 <select id="accentSelect">
                   <option value="blue">Blue</option>
@@ -257,7 +285,11 @@
                   <option value="aurora">Aurora</option>
                   <option value="dusk">Dusk</option>
                   <option value="graphite">Graphite</option>
+                  <option value="custom">Custom</option>
                 </select>
+                <input id="wallpaperFileInput" type="file" accept="image/*" class="hidden" />
+                <button type="button" id="wallpaperUploadButton" class="secondary">Upload custom wallpaper</button>
+                <div id="wallpaperPreview" class="wallpaper-preview"></div>
                 <label class="checkbox-row" for="performanceModeToggle">
                   <input id="performanceModeToggle" type="checkbox" />
                   Reduce visual effects for performance
@@ -326,6 +358,36 @@
             </div>
           </div>
         </section>
+        <section id="windowEditor" class="app-window hidden" data-app="editor" data-title="Text Editor">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="editor" aria-label="Close Text Editor"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="editor" aria-label="Minimize Text Editor"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="editor" aria-label="Zoom Text Editor"></button>
+            </div>
+            <h2>Text Editor</h2>
+            <div class="titlebar-actions">
+              <button id="editorNewButton" type="button" class="titlebar-button">New</button>
+              <button id="editorOpenButton" type="button" class="titlebar-button">Open</button>
+              <button id="editorSaveButton" type="button" class="titlebar-button">Save</button>
+            </div>
+          </header>
+          <div class="window-body editor-window">
+            <div id="editorTabs" class="editor-tabs"></div>
+            <div class="editor-workspace">
+              <textarea id="editorTextarea" class="editor-textarea" placeholder="Start typing..."></textarea>
+              <pre id="editorPreview" class="editor-preview hidden" aria-hidden="true"><code id="editorCode"></code></pre>
+            </div>
+            <div class="editor-statusbar">
+              <span id="editorStatus">New file</span>
+              <label class="editor-preview-toggle">
+                <input id="editorPreviewToggle" type="checkbox" />
+                Preview markdown
+              </label>
+            </div>
+          </div>
+        </section>
+
         <section id="windowApps" class="app-window hidden" data-app="apps" data-title="Apps">
           <header class="window-titlebar">
             <div class="traffic-lights">
@@ -376,6 +438,11 @@
                 <span class="app-launch-icon">=</span>
                 <strong>Calculator</strong>
                 <small>Quick arithmetic without leaving the desktop.</small>
+              </button>
+              <button type="button" class="app-launch-card" data-launch-app="editor">
+                <span class="app-launch-icon">TE</span>
+                <strong>Text Editor</strong>
+                <small>Edit code and markdown with tabs.</small>
               </button>
             </div>
             <section class="third-party-apps app-store-section">
@@ -451,10 +518,22 @@
         <button type="button" class="dock-item" data-open-app="files">Files</button>
         <button type="button" class="dock-item" data-open-app="terminal">Terminal</button>
         <button type="button" class="dock-item" data-open-app="calculator">Calculator</button>
+        <button type="button" class="dock-item" data-open-app="editor">Editor</button>
         <button type="button" class="dock-item" data-open-app="settings">Settings</button>
         <button type="button" class="dock-item" id="openSetupAssistant">Setup</button>
         <button type="button" class="dock-item" data-open-app="apps">Apps</button>
       </nav>
+    </div>
+
+    <div id="spotlightOverlay" class="spotlight-overlay hidden" role="dialog" aria-modal="true" aria-label="Search AIOS">
+      <div class="spotlight-card">
+        <div class="spotlight-input-row">
+          <span class="spotlight-icon">🔍</span>
+          <input id="spotlightInput" type="text" placeholder="Search apps, files, history..." autocomplete="off" />
+          <kbd class="spotlight-hint">esc</kbd>
+        </div>
+        <div id="spotlightResults" class="spotlight-results"></div>
+      </div>
     </div>
 
     <div id="setupWizard" class="wizard-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">

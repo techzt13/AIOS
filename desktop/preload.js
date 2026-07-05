@@ -6,5 +6,9 @@ contextBridge.exposeInMainWorld('aiosNative', {
   openExternalUrl: (url) => ipcRenderer.invoke('aios:external-open', url),
   onBrowserNavigate: (callback) => {
     ipcRenderer.on('aios:browser-navigate', (_event, url) => callback(url));
-  }
+  },
+  onDownloadUpdate: (callback) => {
+    ipcRenderer.on('aios:download-update', (_event, payload) => callback(payload));
+  },
+  takeScreenshot: (options) => ipcRenderer.invoke('aios:screenshot', options || {})
 });

@@ -1,11 +1,27 @@
 const path = require('path');
-const { app: electronApp, BrowserWindow, ipcMain, shell } = require('electron');
+const fs = require('fs');
+const { app: electronApp, BrowserWindow, ipcMain, shell, desktopCapturer } = require('electron');
 const { createApp, attachWebSockets } = require('../server/index');
 const { normalizeBrowserUrl } = require('../server/browserLauncher');
 
 let server = null;
 let mainWindow = null;
 const browserWindows = new Set();
+let workspaceRoot = path.join(process.cwd(), 'workspace');
+
+async function fetchWorkspaceRoot() {
+  try {
+    const address = server?.address?.();
+    if (!address) return;
+    const res = await fetch(`http://127.0.0.1:${address.port}/api/runtime`);
+    const payload = await res.json();
+    if (payload.ok && payload.runtime?.workspaceRoot) {
+      workspaceRoot = payload.runtime.workspaceRoot;
+    }
+  } catch {
+    // Best effort.
+  }
+}
 
 function startAiosServer() {
   return new Promise((resolve, reject) => {
@@ -146,6 +162,7 @@ ipcMain.handle('aios:external-open', async (_event, value) => {
 
 electronApp.whenReady().then(async () => {
   const baseUrl = await startAiosServer();
+  await fetchWorkspaceRoot();
   createMainWindow(baseUrl);
 });
 
@@ -159,6 +176,80 @@ electronApp.on('web-contents-created', (_event, contents) => {
       routeUrlIntoShellBrowser(url);
       return { action: 'deny' };
     });
+
+    // Track downloads from the in-shell browser and save them to the workspace.
+    contents.session.on('will-download', (_event, item) => {
+      const downloadsDir = path.join(workspaceRoot, 'Downloads');
+      fs.mkdirSync(downloadsDir, { recursive: true });
+      const savePath = path.join(downloadsDir, item.getFilename());
+      item.setSavePath(savePath);
+
+      const downloadId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const send = (payload) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('aios:download-update', payload);
+        }
+      };
+
+      send({
+        id: downloadId,
+        filename: item.getFilename(),
+        url: item.getURL(),
+        state: 'progressing',
+        received: 0,
+        total: item.getTotalBytes(),
+        path: savePath
+      });
+
+      item.on('updated', (_evt, state) => {
+        send({
+          id: downloadId,
+          filename: item.getFilename(),
+          url: item.getURL(),
+          state,
+          received: item.getReceivedBytes(),
+          total: item.getTotalBytes(),
+          path: savePath
+        });
+      });
+
+      item.once('done', (_evt, state) => {
+        send({
+          id: downloadId,
+          filename: item.getFilename(),
+          url: item.getURL(),
+          state,
+          received: item.getReceivedBytes(),
+          total: item.getTotalBytes(),
+          path: savePath,
+          done: true
+        });
+      });
+    });
+  }
+});
+
+ipcMain.handle('aios:screenshot', async (_event, { sourceId } = {}) => {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: 1920, height: 1080 }
+    });
+    const source = sourceId
+      ? sources.find((s) => s.id === sourceId)
+      : sources[0];
+    if (!source) {
+      return { ok: false, error: 'No screen source available.' };
+    }
+    const screenshotsDir = path.join(workspaceRoot, 'Screenshots');
+    fs.mkdirSync(screenshotsDir, { recursive: true });
+    const filename = `Screenshot-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+    const savePath = path.join(screenshotsDir, filename);
+    fs.writeFileSync(savePath, source.thumbnail.toPNG());
+    const relativePath = path.relative(workspaceRoot, savePath);
+    return { ok: true, path: savePath, relativePath, filename };
+  } catch (error) {
+    return { ok: false, error: error.message };
   }
 });
 

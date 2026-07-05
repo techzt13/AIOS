@@ -37,11 +37,13 @@ const {
   ensureDataDir,
   getDataDir,
   getLinuxPackage,
+  getWallpapersDir,
   installApp,
   installLinuxPackage,
   listImports,
   listInstalledApps,
   listLinuxPackages,
+  listWallpapers,
   loadApiKeyAuditEvents,
   loadNotes,
   loadShellState,
@@ -49,7 +51,8 @@ const {
   removeInstalledApp,
   removeLinuxPackage,
   saveNotes,
-  saveShellState
+  saveShellState,
+  saveWallpaper
 } = require('./appDataStore');
 const { resolveSandboxPath } = require('./sandbox');
 const { validateExecCommand, runExecCommand, startExecCommand } = require('./exec');
@@ -363,6 +366,43 @@ function createApp(deps = {}) {
   app.post('/api/local-data/shell-state', async (req, res) => {
     const state = await saveShellState(req.body?.state || {});
     res.json({ ok: true, state });
+  });
+
+  app.post('/api/local-data/wallpaper', express.raw({ type: ['image/*', 'application/octet-stream'], limit: '8mb' }), async (req, res) => {
+    try {
+      const filename = String(req.get('x-aios-filename') || 'wallpaper.png').trim();
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return res.status(400).json({ ok: false, error: 'Image body is required.' });
+      }
+      const { storedFilename } = await saveWallpaper(req.body, filename);
+      return res.json({ ok: true, filename: storedFilename, url: `/api/local-data/wallpapers/${storedFilename}` });
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.get('/api/local-data/wallpapers/:filename', async (req, res) => {
+    try {
+      const targetPath = path.join(getWallpapersDir(), path.basename(req.params.filename));
+      const stat = await fs.stat(targetPath);
+      if (!stat.isFile()) {
+        return res.status(404).json({ ok: false, error: 'Wallpaper not found.' });
+      }
+      const ext = path.extname(targetPath).toLowerCase();
+      const contentType = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.bmp': 'image/bmp'
+      }[ext] || 'application/octet-stream';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(targetPath);
+    } catch (error) {
+      return res.status(404).json({ ok: false, error: 'Wallpaper not found.' });
+    }
   });
 
   app.get('/api/local-data/notes', async (_req, res) => {
@@ -874,6 +914,39 @@ function createApp(deps = {}) {
       });
     } catch (error) {
       return res.status(500).json({ ok: false, error: `Failed to list directory: ${error.message}` });
+    }
+  });
+
+  app.post('/api/fs/search', apiLimiter, async (req, res) => {
+    try {
+      const query = String(req.body?.query || '').trim().toLowerCase();
+      if (!query) {
+        return res.status(400).json({ ok: false, error: 'Search query is required.' });
+      }
+      const resolved = resolveSandboxPath(WORKSPACE_ROOT, '.', { allowRoot: true });
+      const results = [];
+      const maxResults = 50;
+
+      async function searchDir(dirPath, relPath) {
+        if (results.length >= maxResults) return;
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+          if (results.length >= maxResults) return;
+          if (entry.name.startsWith('.')) continue;
+          const entryRel = relPath ? `${relPath}/${entry.name}` : entry.name;
+          if (entry.name.toLowerCase().includes(query)) {
+            results.push({ path: entryRel, type: entry.isDirectory() ? 'directory' : 'file' });
+          }
+          if (entry.isDirectory()) {
+            await searchDir(path.join(dirPath, entry.name), entryRel);
+          }
+        }
+      }
+
+      await searchDir(resolved.targetPath, '');
+      return res.json({ ok: true, query, results });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: `Failed to search files: ${error.message}` });
     }
   });
 

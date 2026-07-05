@@ -85,7 +85,16 @@ const linuxPackagesGrid = document.getElementById('linuxPackagesGrid');
 
 const accentSelect = document.getElementById('accentSelect');
 const wallpaperSelect = document.getElementById('wallpaperSelect');
+const themeSelect = document.getElementById('themeSelect');
+const wallpaperFileInput = document.getElementById('wallpaperFileInput');
+const wallpaperUploadButton = document.getElementById('wallpaperUploadButton');
+const wallpaperPreview = document.getElementById('wallpaperPreview');
 const performanceModeToggle = document.getElementById('performanceModeToggle');
+const themeToggleButton = document.getElementById('themeToggleButton');
+const spotlightButton = document.getElementById('spotlightButton');
+const spotlightOverlay = document.getElementById('spotlightOverlay');
+const spotlightInput = document.getElementById('spotlightInput');
+const spotlightResults = document.getElementById('spotlightResults');
 const dataDirValue = document.getElementById('dataDirValue');
 const importTypeSelect = document.getElementById('importTypeSelect');
 const importFileInput = document.getElementById('importFileInput');
@@ -119,6 +128,15 @@ const wizardCopilotLink = document.getElementById('wizardCopilotLink');
 const wizardConnectStatus = document.getElementById('wizardConnectStatus');
 const wizardTestButton = document.getElementById('wizardTestButton');
 const wizardTestStatus = document.getElementById('wizardTestStatus');
+const editorTabs = document.getElementById('editorTabs');
+const editorTextarea = document.getElementById('editorTextarea');
+const editorPreview = document.getElementById('editorPreview');
+const editorCode = document.getElementById('editorCode');
+const editorStatus = document.getElementById('editorStatus');
+const editorNewButton = document.getElementById('editorNewButton');
+const editorOpenButton = document.getElementById('editorOpenButton');
+const editorSaveButton = document.getElementById('editorSaveButton');
+const editorPreviewToggle = document.getElementById('editorPreviewToggle');
 const wizardFinishStatus = document.getElementById('wizardFinishStatus');
 const openSetupAssistant = document.getElementById('openSetupAssistant');
 
@@ -138,7 +156,8 @@ const WINDOW_IDS = {
   terminal: 'windowTerminal',
   settings: 'windowSettings',
   calculator: 'windowCalculator',
-  apps: 'windowApps'
+  apps: 'windowApps',
+  editor: 'windowEditor'
 };
 
 const WINDOW_LAYOUT = {
@@ -149,7 +168,8 @@ const WINDOW_LAYOUT = {
   terminal: { x: 0.24, y: 0.2 },
   settings: { x: 0.5, y: 0.08, centerX: true },
   calculator: { x: 0.62, y: 0.18 },
-  apps: { x: 0.5, y: 0.16, centerX: true }
+  apps: { x: 0.5, y: 0.16, centerX: true },
+  editor: { x: 0.18, y: 0.12 }
 };
 const MAX_CHAT_HISTORY_MESSAGES = 80;
 const MAX_RENDERED_MESSAGES = 140;
@@ -169,7 +189,7 @@ let copilotDeviceFlow = null;
 let copilotPollTimer = null;
 let currentWizardStep = 0;
 let wizardTestSucceeded = false;
-let shellState = { windows: {}, preferences: {}, browserHistory: [] };
+let shellState = { windows: {}, preferences: {}, browserHistory: [], bookmarks: [], downloads: [], browserTabs: [], editorTabs: [] };
 let zCounter = 10;
 let installedApps = [];
 let linuxPackages = [];
@@ -179,6 +199,9 @@ let currentBrowserUrl = '';
 let browserHistory = [];
 let browserHistoryIndex = -1;
 let browserFrameEmbedFriendly = false;
+let browserTabState = { tabs: [], activeTabId: null };
+let editorTabState = { tabs: [], activeTabId: null };
+let customWallpaperUrl = null;
 
 const IFRAME_BLOCKED_HOSTS = [
   'google.com',
@@ -464,19 +487,35 @@ function updateBrowserNavigationControls() {
     }
   }
 
-  browserBackButton.disabled = browserHistoryIndex <= 0;
-  browserForwardButton.disabled = browserHistoryIndex < 0 || browserHistoryIndex >= browserHistory.length - 1;
+  const tab = getActiveBrowserTab();
+  if (tab) {
+    browserBackButton.disabled = tab.historyIndex <= 0;
+    browserForwardButton.disabled = tab.historyIndex < 0 || tab.historyIndex >= tab.history.length - 1;
+  } else {
+    browserBackButton.disabled = browserHistoryIndex <= 0;
+    browserForwardButton.disabled = browserHistoryIndex < 0 || browserHistoryIndex >= browserHistory.length - 1;
+  }
 }
 
 function rememberBrowserHistory(url) {
-  if (browserHistory[browserHistoryIndex] === url) {
-    updateBrowserNavigationControls();
-    return;
+  const tab = getActiveBrowserTab();
+  if (tab) {
+    if (tab.history[tab.historyIndex] === url) {
+      updateBrowserNavigationControls();
+      return;
+    }
+    tab.history = tab.history.slice(0, tab.historyIndex + 1);
+    tab.history.push(url);
+    tab.historyIndex = tab.history.length - 1;
+  } else {
+    if (browserHistory[browserHistoryIndex] === url) {
+      updateBrowserNavigationControls();
+      return;
+    }
+    browserHistory = browserHistory.slice(0, browserHistoryIndex + 1);
+    browserHistory.push(url);
+    browserHistoryIndex = browserHistory.length - 1;
   }
-
-  browserHistory = browserHistory.slice(0, browserHistoryIndex + 1);
-  browserHistory.push(url);
-  browserHistoryIndex = browserHistory.length - 1;
   updateBrowserNavigationControls();
 }
 
@@ -486,6 +525,17 @@ const browserHistoryPanel = document.getElementById('browserHistoryPanel');
 const browserHistoryList = document.getElementById('browserHistoryList');
 const browserHistoryClearButton = document.getElementById('browserHistoryClearButton');
 const browserHistoryOptions = document.getElementById('browserHistoryOptions');
+const browserTabBar = document.getElementById('browserTabBar');
+const browserTabs = document.getElementById('browserTabs');
+const browserNewTabButton = document.getElementById('browserNewTabButton');
+const browserBookmarkButton = document.getElementById('browserBookmarkButton');
+const browserBookmarksPanel = document.getElementById('browserBookmarksPanel');
+const browserBookmarksList = document.getElementById('browserBookmarksList');
+const browserAddBookmarkButton = document.getElementById('browserAddBookmarkButton');
+const browserDownloadsButton = document.getElementById('browserDownloadsButton');
+const browserDownloadsPanel = document.getElementById('browserDownloadsPanel');
+const browserDownloadsList = document.getElementById('browserDownloadsList');
+const browserDownloadsClearButton = document.getElementById('browserDownloadsClearButton');
 const MAX_PERSISTED_HISTORY = 200;
 
 function recordBrowserVisit(url, title = '') {
@@ -560,7 +610,7 @@ function renderBrowserHistoryUi() {
     openButton.appendChild(label);
     openButton.appendChild(urlText);
     openButton.addEventListener('click', () => {
-      hideBrowserHistoryPanel();
+      hideBrowserPanels();
       openBrowserUrl(entry.url);
     });
 
@@ -583,7 +633,7 @@ function renderBrowserHistoryUi() {
 }
 
 function hideBrowserHistoryPanel() {
-  if (browserHistoryPanel) browserHistoryPanel.classList.add('hidden');
+  hideBrowserPanels();
 }
 
 function toggleBrowserHistoryPanel() {
@@ -695,14 +745,24 @@ function openBrowserUrl(rawValue, options = {}) {
   const url = normalizeBrowserUrl(rawValue);
   if (!url) return;
   if (browserLoadTimer) clearTimeout(browserLoadTimer);
+
+  let tab = getActiveBrowserTab();
+  if (!tab || options.newTab) {
+    tab = createBrowserTab(url);
+  }
+  browserTabState.activeTabId = tab.id;
+
   if (options.recordHistory !== false) {
     rememberBrowserHistory(url);
   }
   currentBrowserUrl = url;
+  tab.url = url;
   hideBrowserBlockedNotice();
-  hideBrowserHistoryPanel();
+  hideBrowserPanels();
   browserUrlInput.value = url;
   recordBrowserVisit(url);
+  updateBookmarkButton();
+  renderBrowserTabs();
 
   if (canUseBrowserWebview()) {
     loadBrowserWebview(url);
@@ -712,11 +772,12 @@ function openBrowserUrl(rawValue, options = {}) {
 
   // Embedded iframe is the default; a native browser session only opens when
   // the user explicitly asks for one.
-  const embedUrl = embedFriendlyUrl(url);
-  browserFrameEmbedFriendly = Boolean(embedUrl);
+  const embedUrl = options.forceEmbed ? null : embedFriendlyUrl(url);
+  tab.embedFriendly = Boolean(embedUrl);
+  browserFrameEmbedFriendly = tab.embedFriendly;
   showBrowserEmbeddedFrame();
   browserFrame.src = embedUrl || url;
-  if (embedUrl) {
+  if (embedUrl || options.forceEmbed) {
     hideBrowserBlockedNotice();
   } else if (hostLikelyBlocksEmbedding(url)) {
     showBrowserBlockedNotice(url);
@@ -733,6 +794,7 @@ function openCurrentBrowserUrlExternally() {
 }
 
 function navigateBrowserHistory(delta) {
+  const tab = getActiveBrowserTab();
   if (browserWebviewIsVisible()) {
     try {
       if (delta < 0 && typeof browserWebview.goBack === 'function' && browserWebview.canGoBack()) {
@@ -746,11 +808,15 @@ function navigateBrowserHistory(delta) {
     return;
   }
 
-  const nextIndex = browserHistoryIndex + delta;
-  if (nextIndex < 0 || nextIndex >= browserHistory.length) return;
-  browserHistoryIndex = nextIndex;
+  const history = tab ? tab.history : browserHistory;
+  let index = tab ? tab.historyIndex : browserHistoryIndex;
+  const nextIndex = index + delta;
+  if (nextIndex < 0 || nextIndex >= history.length) return;
+  index = nextIndex;
+  if (tab) tab.historyIndex = index;
+  else browserHistoryIndex = index;
   updateBrowserNavigationControls();
-  openBrowserUrl(browserHistory[browserHistoryIndex], { recordHistory: false });
+  openBrowserUrl(history[index], { recordHistory: false });
 }
 
 function refreshBrowserUrl() {
@@ -762,6 +828,535 @@ function refreshBrowserUrl() {
   const url = normalizeBrowserUrl(currentBrowserUrl || browserUrlInput.value || browserFrame.src);
   if (!url || url === 'about:blank') return;
   openBrowserUrl(url, { recordHistory: false });
+}
+
+// === BROWSER TABS ===
+function getActiveBrowserTab() {
+  return browserTabState.tabs.find((tab) => tab.id === browserTabState.activeTabId) || null;
+}
+
+function createBrowserTab(url = 'about:blank', { activate = true } = {}) {
+  const tab = {
+    id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    url,
+    title: '',
+    history: url === 'about:blank' ? [] : [url],
+    historyIndex: url === 'about:blank' ? -1 : 0,
+    embedFriendly: false
+  };
+  browserTabState.tabs.push(tab);
+  if (activate) browserTabState.activeTabId = tab.id;
+  renderBrowserTabs();
+  return tab;
+}
+
+function closeBrowserTab(tabId) {
+  const index = browserTabState.tabs.findIndex((tab) => tab.id === tabId);
+  if (index < 0) return;
+  browserTabState.tabs.splice(index, 1);
+  if (browserTabState.activeTabId === tabId) {
+    const next = browserTabState.tabs[Math.max(0, index - 1)] || browserTabState.tabs[0];
+    browserTabState.activeTabId = next?.id || null;
+  }
+  if (browserTabState.tabs.length === 0) {
+    createBrowserTab('about:blank');
+  } else {
+    renderBrowserTabs();
+    activateBrowserTab(browserTabState.activeTabId);
+  }
+}
+
+function activateBrowserTab(tabId) {
+  const tab = browserTabState.tabs.find((t) => t.id === tabId);
+  if (!tab) return;
+  browserTabState.activeTabId = tab.id;
+  renderBrowserTabs();
+  currentBrowserUrl = tab.url;
+  browserUrlInput.value = tab.url === 'about:blank' ? '' : tab.url;
+  if (tab.url === 'about:blank') {
+    browserFrame.src = 'about:blank';
+    showBrowserEmbeddedFrame();
+    return;
+  }
+  if (canUseBrowserWebview()) {
+    loadBrowserWebview(tab.url);
+  } else {
+    const embedUrl = embedFriendlyUrl(tab.url);
+    tab.embedFriendly = Boolean(embedUrl);
+    browserFrameEmbedFriendly = tab.embedFriendly;
+    showBrowserEmbeddedFrame();
+    browserFrame.src = embedUrl || tab.url;
+  }
+  updateBrowserNavigationControls();
+}
+
+function renderBrowserTabs() {
+  if (!browserTabs) return;
+  browserTabs.innerHTML = '';
+  browserTabState.tabs.forEach((tab) => {
+    const el = document.createElement('div');
+    el.className = 'browser-tab' + (tab.id === browserTabState.activeTabId ? ' active' : '');
+    el.title = tab.title || tab.url;
+    el.addEventListener('click', () => activateBrowserTab(tab.id));
+
+    const title = document.createElement('span');
+    title.className = 'browser-tab-title';
+    title.textContent = tab.title || (tab.url === 'about:blank' ? 'New Tab' : tab.url);
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'browser-tab-close';
+    close.textContent = '✕';
+    close.title = 'Close tab';
+    close.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closeBrowserTab(tab.id);
+    });
+
+    el.appendChild(title);
+    el.appendChild(close);
+    browserTabs.appendChild(el);
+  });
+}
+
+function updateActiveTabFromNavigation(url, title = '') {
+  const tab = getActiveBrowserTab();
+  if (!tab) return;
+  tab.url = url;
+  if (title) tab.title = title;
+  if (tab.history[tab.historyIndex] === url) {
+    renderBrowserTabs();
+    return;
+  }
+  tab.history = tab.history.slice(0, tab.historyIndex + 1);
+  tab.history.push(url);
+  tab.historyIndex = tab.history.length - 1;
+  renderBrowserTabs();
+}
+
+// === BOOKMARKS ===
+function isCurrentUrlBookmarked() {
+  const url = currentBrowserUrl || browserUrlInput.value;
+  if (!url || url === 'about:blank') return false;
+  return (shellState.bookmarks || []).some((bookmark) => bookmark.url === url);
+}
+
+function addBookmark({ url, title = '' } = {}) {
+  const targetUrl = url || currentBrowserUrl || browserUrlInput.value;
+  if (!targetUrl || targetUrl === 'about:blank') return;
+  const historyEntry = (shellState.browserHistory || []).find((entry) => entry.url === targetUrl);
+  const bookmark = {
+    id: crypto.randomUUID ? crypto.randomUUID() : `bm-${Date.now()}`,
+    url: targetUrl,
+    title: title || historyEntry?.title || targetUrl,
+    createdAt: new Date().toISOString()
+  };
+  shellState.bookmarks = [bookmark, ...(shellState.bookmarks || []).filter((b) => b.url !== targetUrl)];
+  persistShellState();
+  renderBrowserBookmarksUi();
+  updateBookmarkButton();
+}
+
+function removeBookmark(id) {
+  shellState.bookmarks = (shellState.bookmarks || []).filter((b) => b.id !== id);
+  persistShellState();
+  renderBrowserBookmarksUi();
+  updateBookmarkButton();
+}
+
+function updateBookmarkButton() {
+  if (!browserBookmarkButton) return;
+  browserBookmarkButton.textContent = isCurrentUrlBookmarked() ? '★' : '☆';
+  browserBookmarkButton.title = isCurrentUrlBookmarked() ? 'Bookmarked' : 'Bookmark this page';
+}
+
+function renderBrowserBookmarksUi() {
+  if (!browserBookmarksList) return;
+  browserBookmarksList.innerHTML = '';
+  const bookmarks = shellState.bookmarks || [];
+  if (bookmarks.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'status-text';
+    empty.textContent = 'No bookmarks yet.';
+    browserBookmarksList.appendChild(empty);
+    return;
+  }
+  bookmarks.forEach((bookmark) => {
+    const row = document.createElement('div');
+    row.className = 'browser-history-item';
+    const openButton = document.createElement('button');
+    openButton.type = 'button';
+    openButton.className = 'browser-history-open';
+    const label = document.createElement('strong');
+    label.textContent = bookmark.title || bookmark.url;
+    const urlText = document.createElement('small');
+    urlText.textContent = bookmark.url;
+    openButton.appendChild(label);
+    openButton.appendChild(urlText);
+    openButton.addEventListener('click', () => {
+      hideBrowserPanels();
+      openBrowserUrl(bookmark.url);
+    });
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'icon-button browser-history-delete';
+    deleteButton.textContent = '✕';
+    deleteButton.title = 'Remove bookmark';
+    deleteButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      removeBookmark(bookmark.id);
+    });
+    row.appendChild(openButton);
+    row.appendChild(deleteButton);
+    browserBookmarksList.appendChild(row);
+  });
+}
+
+function toggleBrowserBookmarksPanel() {
+  if (!browserBookmarksPanel) return;
+  const wasHidden = browserBookmarksPanel.classList.contains('hidden');
+  hideBrowserPanels();
+  if (wasHidden) {
+    browserBookmarksPanel.classList.remove('hidden');
+    renderBrowserBookmarksUi();
+  }
+}
+
+// === DOWNLOADS ===
+function recordDownload(item) {
+  shellState.downloads = [item, ...(shellState.downloads || [])].slice(0, 100);
+  persistShellState();
+  renderBrowserDownloadsUi();
+}
+
+function renderBrowserDownloadsUi() {
+  if (!browserDownloadsList) return;
+  browserDownloadsList.innerHTML = '';
+  const downloads = shellState.downloads || [];
+  if (downloads.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'status-text';
+    empty.textContent = 'No downloads yet.';
+    browserDownloadsList.appendChild(empty);
+    return;
+  }
+  downloads.forEach((download) => {
+    const row = document.createElement('div');
+    row.className = 'browser-history-item';
+    const openButton = document.createElement('button');
+    openButton.type = 'button';
+    openButton.className = 'browser-history-open';
+    const label = document.createElement('strong');
+    label.textContent = download.filename || 'Download';
+    const urlText = document.createElement('small');
+    urlText.textContent = `${download.state || 'completed'} • ${download.url}`;
+    openButton.appendChild(label);
+    openButton.appendChild(urlText);
+    openButton.addEventListener('click', () => {
+      if (download.path) openFileInEditor(download.path);
+    });
+    row.appendChild(openButton);
+    browserDownloadsList.appendChild(row);
+  });
+}
+
+function toggleBrowserDownloadsPanel() {
+  if (!browserDownloadsPanel) return;
+  const wasHidden = browserDownloadsPanel.classList.contains('hidden');
+  hideBrowserPanels();
+  if (wasHidden) {
+    browserDownloadsPanel.classList.remove('hidden');
+    renderBrowserDownloadsUi();
+  }
+}
+
+function hideBrowserPanels() {
+  browserHistoryPanel?.classList.add('hidden');
+  browserBookmarksPanel?.classList.add('hidden');
+  browserDownloadsPanel?.classList.add('hidden');
+}
+
+// === SPOTLIGHT SEARCH ===
+async function openSpotlight() {
+  if (!spotlightOverlay) return;
+  spotlightOverlay.classList.remove('hidden');
+  spotlightInput.value = '';
+  spotlightInput.focus();
+  await renderSpotlightResults('');
+}
+
+function closeSpotlight() {
+  spotlightOverlay?.classList.add('hidden');
+}
+
+function spotlightItems() {
+  const apps = [
+    { id: 'app-chat', type: 'app', name: 'AI Chat', glyph: 'AI', action: () => openWindow('chat') },
+    { id: 'app-browser', type: 'app', name: 'Browser', glyph: 'BR', action: () => openWindow('browser') },
+    { id: 'app-notes', type: 'app', name: 'Notes', glyph: 'N', action: () => openWindow('notes') },
+    { id: 'app-files', type: 'app', name: 'Files', glyph: 'FS', action: () => { openWindow('files'); refreshFileList().catch(() => {}); } },
+    { id: 'app-terminal', type: 'app', name: 'Terminal', glyph: '$', action: () => openWindow('terminal') },
+    { id: 'app-calculator', type: 'app', name: 'Calculator', glyph: '=', action: () => openWindow('calculator') },
+    { id: 'app-editor', type: 'app', name: 'Text Editor', glyph: 'TE', action: () => openWindow('editor') },
+    { id: 'app-settings', type: 'app', name: 'Settings', glyph: 'ST', action: () => openWindow('settings') },
+    { id: 'app-apps', type: 'app', name: 'Apps', glyph: 'AP', action: () => openWindow('apps') }
+  ];
+  const bookmarks = (shellState.bookmarks || []).map((bookmark) => ({
+    id: `bookmark-${bookmark.id}`,
+    type: 'bookmark',
+    name: bookmark.title || bookmark.url,
+    detail: bookmark.url,
+    glyph: '★',
+    action: () => openBrowserUrl(bookmark.url)
+  }));
+  const history = (shellState.browserHistory || []).slice(0, 20).map((entry) => ({
+    id: `history-${entry.url}`,
+    type: 'history',
+    name: entry.title || entry.url,
+    detail: entry.url,
+    glyph: '🕘',
+    action: () => openBrowserUrl(entry.url)
+  }));
+  return [...apps, ...bookmarks, ...history];
+}
+
+async function searchWorkspaceFiles(query) {
+  try {
+    const response = await fetch('/api/fs/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    const payload = await response.json();
+    return payload.ok ? payload.results : [];
+  } catch {
+    return [];
+  }
+}
+
+async function renderSpotlightResults(query) {
+  if (!spotlightResults) return;
+  const q = String(query || '').trim().toLowerCase();
+  const items = spotlightItems().filter((item) => {
+    if (!q) return true;
+    return (item.name || '').toLowerCase().includes(q) || (item.detail || '').toLowerCase().includes(q);
+  });
+
+  if (q) {
+    const files = await searchWorkspaceFiles(q);
+    files.forEach((file) => {
+      items.push({
+        id: `file-${file.path}`,
+        type: 'file',
+        name: file.path.split('/').pop(),
+        detail: file.path,
+        glyph: file.type === 'directory' ? '📁' : '📄',
+        action: () => {
+          if (file.type === 'directory') {
+            openWindow('files');
+            refreshFileList(file.path).catch(() => {});
+          } else {
+            openFileInEditor(file.path);
+          }
+        }
+      });
+    });
+  }
+
+  spotlightResults.innerHTML = '';
+  if (items.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'spotlight-empty';
+    empty.textContent = 'No results.';
+    spotlightResults.appendChild(empty);
+    return;
+  }
+  items.slice(0, 12).forEach((item, index) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'spotlight-result' + (index === 0 ? ' active' : '');
+    row.innerHTML = `<span class="spotlight-result-glyph">${item.glyph}</span><span class="spotlight-result-info"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.detail || item.type)}</small></span>`;
+    row.addEventListener('click', () => {
+      closeSpotlight();
+      item.action();
+    });
+    spotlightResults.appendChild(row);
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function moveSpotlightSelection(delta) {
+  const rows = spotlightResults?.querySelectorAll('.spotlight-result');
+  if (!rows || rows.length === 0) return;
+  const activeIndex = Array.from(rows).findIndex((row) => row.classList.contains('active'));
+  rows.forEach((row) => row.classList.remove('active'));
+  const nextIndex = Math.max(0, Math.min(rows.length - 1, activeIndex + delta));
+  rows[nextIndex].classList.add('active');
+  rows[nextIndex].scrollIntoView({ block: 'nearest' });
+}
+
+function activateSpotlightSelection() {
+  const active = spotlightResults?.querySelector('.spotlight-result.active');
+  if (active) active.click();
+}
+
+// === TEXT EDITOR ===
+function getActiveEditorTab() {
+  return editorTabState.tabs.find((tab) => tab.id === editorTabState.activeTabId) || null;
+}
+
+function createEditorTab({ path = '', content = '', title = 'Untitled' } = {}) {
+  const tab = {
+    id: `ed-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    path,
+    title: path ? path.split('/').pop() : title,
+    content,
+    saved: !path || false,
+    scrollTop: 0
+  };
+  editorTabState.tabs.push(tab);
+  editorTabState.activeTabId = tab.id;
+  renderEditorTabs();
+  loadEditorTab(tab.id);
+  return tab;
+}
+
+function closeEditorTab(tabId) {
+  const index = editorTabState.tabs.findIndex((tab) => tab.id === tabId);
+  if (index < 0) return;
+  editorTabState.tabs.splice(index, 1);
+  if (editorTabState.activeTabId === tabId) {
+    const next = editorTabState.tabs[Math.max(0, index - 1)] || editorTabState.tabs[0];
+    editorTabState.activeTabId = next?.id || null;
+  }
+  if (editorTabState.tabs.length === 0) {
+    createEditorTab();
+  } else {
+    renderEditorTabs();
+    loadEditorTab(editorTabState.activeTabId);
+  }
+}
+
+function activateEditorTab(tabId) {
+  const current = getActiveEditorTab();
+  if (current) {
+    current.content = editorTextarea.value;
+    current.scrollTop = editorTextarea.scrollTop;
+  }
+  const tab = editorTabState.tabs.find((t) => t.id === tabId);
+  if (!tab) return;
+  editorTabState.activeTabId = tab.id;
+  renderEditorTabs();
+  loadEditorTab(tab.id);
+}
+
+function loadEditorTab(tabId) {
+  const tab = editorTabState.tabs.find((t) => t.id === tabId);
+  if (!tab) return;
+  editorTextarea.value = tab.content;
+  editorTextarea.scrollTop = tab.scrollTop || 0;
+  editorStatus.textContent = tab.path ? `${tab.path}${tab.saved ? '' : ' • unsaved'}` : 'New file';
+  updateEditorPreview();
+}
+
+function renderEditorTabs() {
+  if (!editorTabs) return;
+  editorTabs.innerHTML = '';
+  editorTabState.tabs.forEach((tab) => {
+    const el = document.createElement('div');
+    el.className = 'editor-tab' + (tab.id === editorTabState.activeTabId ? ' active' : '');
+    el.title = tab.path || tab.title;
+    el.addEventListener('click', () => activateEditorTab(tab.id));
+
+    const title = document.createElement('span');
+    title.className = 'editor-tab-title';
+    title.textContent = tab.title + (tab.saved ? '' : ' ●');
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'editor-tab-close';
+    close.textContent = '✕';
+    close.title = 'Close tab';
+    close.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closeEditorTab(tab.id);
+    });
+
+    el.appendChild(title);
+    el.appendChild(close);
+    editorTabs.appendChild(el);
+  });
+}
+
+function handleEditorInput() {
+  const tab = getActiveEditorTab();
+  if (!tab) return;
+  tab.content = editorTextarea.value;
+  tab.saved = false;
+  renderEditorTabs();
+  editorStatus.textContent = tab.path ? `${tab.path} • unsaved` : 'Unsaved';
+  updateEditorPreview();
+}
+
+async function saveActiveEditorTab() {
+  const tab = getActiveEditorTab();
+  if (!tab) return;
+  let targetPath = tab.path;
+  if (!targetPath) {
+    const suggested = tab.title === 'Untitled' ? 'untitled.txt' : tab.title;
+    targetPath = window.prompt('Save as path (relative to workspace):', suggested);
+    if (!targetPath) return;
+  }
+  try {
+    await writeWorkspaceFile(targetPath, editorTextarea.value);
+    tab.path = targetPath;
+    tab.title = targetPath.split('/').pop();
+    tab.saved = true;
+    tab.content = editorTextarea.value;
+    renderEditorTabs();
+    editorStatus.textContent = `Saved ${targetPath}`;
+  } catch (error) {
+    editorStatus.textContent = `Save failed: ${error.message}`;
+  }
+}
+
+async function openFileInEditor(pathValue) {
+  try {
+    const file = await readWorkspaceFile(pathValue);
+    createEditorTab({ path: file.path, content: file.content, title: file.path.split('/').pop() });
+    openWindow('editor');
+  } catch (error) {
+    if (editorStatus) editorStatus.textContent = `Open failed: ${error.message}`;
+  }
+}
+
+function updateEditorPreview() {
+  if (!editorPreview || !editorCode) return;
+  const tab = getActiveEditorTab();
+  const isMarkdown = tab?.path?.toLowerCase().endsWith('.md') || editorPreviewToggle?.checked;
+  if (isMarkdown && editorPreviewToggle?.checked) {
+    editorPreview.classList.remove('hidden');
+    editorCode.innerHTML = renderMarkdownPreview(editorTextarea.value);
+  } else {
+    editorPreview.classList.add('hidden');
+  }
+}
+
+function renderMarkdownPreview(text) {
+  const escaped = escapeHtml(text || '');
+  return escaped
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br>');
 }
 
 function formatPathUp(pathValue) {
@@ -867,6 +1462,22 @@ function persistShellState() {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(async () => {
     try {
+      shellState.browserTabs = browserTabState.tabs.map((tab) => ({
+        id: tab.id,
+        url: tab.url,
+        title: tab.title,
+        history: tab.history,
+        historyIndex: tab.historyIndex,
+        embedFriendly: tab.embedFriendly
+      }));
+      shellState.activeBrowserTab = browserTabState.activeTabId;
+      shellState.editorTabs = editorTabState.tabs.map((tab) => ({
+        id: tab.id,
+        path: tab.path,
+        title: tab.title,
+        content: tab.content
+      }));
+      shellState.activeEditorTab = editorTabState.activeTabId;
       await fetch('/api/local-data/shell-state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -918,16 +1529,89 @@ function closeWindow(app) {
   activeWindowTitle.textContent = 'Desktop';
 }
 
+function resolveEffectiveTheme() {
+  const theme = shellState.preferences.theme || 'dark';
+  if (theme === 'auto') {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return theme;
+}
+
 function applyPreferences() {
   const accent = shellState.preferences.accent || 'blue';
   const wallpaper = shellState.preferences.wallpaper || 'aurora';
   const performanceMode = shellState.preferences.performanceMode === true;
+  const theme = resolveEffectiveTheme();
   root.dataset.accent = accent;
-  root.dataset.wallpaper = wallpaper;
+  root.dataset.wallpaper = wallpaper === 'custom' && customWallpaperUrl ? 'custom' : wallpaper;
   root.dataset.performance = performanceMode ? 'fast' : 'visual';
+  root.dataset.theme = theme;
   accentSelect.value = accent;
   wallpaperSelect.value = wallpaper;
+  if (themeSelect) themeSelect.value = shellState.preferences.theme || 'dark';
   performanceModeToggle.checked = performanceMode;
+  if (themeToggleButton) themeToggleButton.textContent = theme === 'light' ? '☀️' : '🌙';
+  applyCustomWallpaper();
+}
+
+function applyCustomWallpaper() {
+  const filename = shellState.preferences.customWallpaper;
+  customWallpaperUrl = filename ? `/api/local-data/wallpapers/${filename}` : null;
+  if (wallpaperPreview) {
+    wallpaperPreview.innerHTML = '';
+    if (customWallpaperUrl) {
+      const img = document.createElement('img');
+      img.src = customWallpaperUrl;
+      img.alt = 'Custom wallpaper preview';
+      wallpaperPreview.appendChild(img);
+    }
+  }
+  const shell = document.querySelector('.desktop-shell');
+  if (!shell) return;
+  const existing = shell.querySelector('.custom-wallpaper-layer');
+  if (existing) existing.remove();
+  if (shellState.preferences.wallpaper === 'custom' && customWallpaperUrl) {
+    const layer = document.createElement('div');
+    layer.className = 'custom-wallpaper-layer';
+    layer.style.cssText = 'position:absolute;inset:0;z-index:-1;background-size:cover;background-position:center;background-image:url(' + CSS.escape(customWallpaperUrl) + ');';
+    shell.appendChild(layer);
+  }
+}
+
+function toggleTheme() {
+  const current = shellState.preferences.theme || 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  shellState.preferences.theme = next;
+  applyPreferences();
+  persistShellState();
+}
+
+async function uploadCustomWallpaper(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    setFeedback(fileReadStatus, 'Choose an image file.', 'error');
+    return;
+  }
+  try {
+    const buffer = await file.arrayBuffer();
+    const response = await fetch('/api/local-data/wallpaper', {
+      method: 'POST',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-aios-filename': file.name
+      },
+      body: buffer
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'Upload failed');
+    shellState.preferences.customWallpaper = payload.filename;
+    customWallpaperUrl = payload.url;
+    shellState.preferences.wallpaper = 'custom';
+    wallpaperSelect.value = 'custom';
+    applyPreferences();
+    persistShellState();
+  } catch (error) {
+    setFeedback(fileReadStatus, error.message, 'error');
+  }
 }
 
 function initWindowDrag(windowEl) {
@@ -1040,6 +1724,42 @@ async function loadShellState() {
 
   applyPreferences();
   renderBrowserHistoryUi();
+  renderBrowserBookmarksUi();
+  renderBrowserDownloadsUi();
+
+  // Restore or initialize browser tabs
+  const savedBrowserTabs = Array.isArray(shellState.browserTabs) ? shellState.browserTabs : [];
+  if (savedBrowserTabs.length > 0) {
+    browserTabState.tabs = savedBrowserTabs.map((tab) => ({
+      id: tab.id || `tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      url: tab.url || 'about:blank',
+      title: tab.title || '',
+      history: Array.isArray(tab.history) ? tab.history : (tab.url ? [tab.url] : []),
+      historyIndex: typeof tab.historyIndex === 'number' ? tab.historyIndex : (tab.url ? 0 : -1),
+      embedFriendly: Boolean(tab.embedFriendly)
+    }));
+    browserTabState.activeTabId = shellState.activeBrowserTab || browserTabState.tabs[0]?.id;
+  } else {
+    createBrowserTab('about:blank', { activate: true });
+  }
+  renderBrowserTabs();
+
+  // Restore or initialize editor tabs
+  const savedEditorTabs = Array.isArray(shellState.editorTabs) ? shellState.editorTabs : [];
+  if (savedEditorTabs.length > 0) {
+    editorTabState.tabs = savedEditorTabs.map((tab) => ({
+      id: tab.id || `ed-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      path: tab.path || '',
+      title: tab.title || 'Untitled',
+      content: tab.content || '',
+      saved: true,
+      scrollTop: 0
+    }));
+    editorTabState.activeTabId = shellState.activeEditorTab || editorTabState.tabs[0]?.id;
+  } else {
+    createEditorTab();
+  }
+  renderEditorTabs();
 
   Object.entries(WINDOW_IDS).forEach(([app, id]) => {
     const windowEl = document.getElementById(id);
@@ -2386,9 +3106,8 @@ async function refreshFileList(pathValue = filesPathInput.value || '.') {
 
         try {
           const file = await readWorkspaceFile(nextPath);
-          fileEditorPath.textContent = file.path;
-          fileEditorContent.value = file.content;
-          setFeedback(fileReadStatus, `Opened ${file.path}`);
+          openFileInEditor(file.path);
+          setFeedback(fileReadStatus, `Opened ${file.path} in Text Editor`);
         } catch (error) {
           setFeedback(fileReadStatus, error.message, 'error');
         }
@@ -2568,14 +3287,42 @@ browserForwardButton.addEventListener('click', () => navigateBrowserHistory(1));
 browserRefreshButton.addEventListener('click', refreshBrowserUrl);
 browserOpenExternalButton.addEventListener('click', openCurrentBrowserUrlExternally);
 browserNoticeExternalButton.addEventListener('click', openCurrentBrowserUrlExternally);
+if (browserNewTabButton) {
+  browserNewTabButton.addEventListener('click', () => createBrowserTab('about:blank', { activate: true }));
+}
+if (browserBookmarkButton) {
+  browserBookmarkButton.addEventListener('click', () => {
+    toggleBrowserBookmarksPanel();
+  });
+}
+if (browserAddBookmarkButton) {
+  browserAddBookmarkButton.addEventListener('click', () => addBookmark());
+}
 if (browserHistoryButton) {
-  browserHistoryButton.addEventListener('click', toggleBrowserHistoryPanel);
+  browserHistoryButton.addEventListener('click', () => {
+    const wasHidden = browserHistoryPanel.classList.contains('hidden');
+    hideBrowserPanels();
+    if (wasHidden) {
+      browserHistoryPanel.classList.remove('hidden');
+      renderBrowserHistoryUi();
+    }
+  });
 }
 if (browserHistoryClearButton) {
   browserHistoryClearButton.addEventListener('click', () => {
     shellState.browserHistory = [];
     persistShellState();
     renderBrowserHistoryUi();
+  });
+}
+if (browserDownloadsButton) {
+  browserDownloadsButton.addEventListener('click', toggleBrowserDownloadsPanel);
+}
+if (browserDownloadsClearButton) {
+  browserDownloadsClearButton.addEventListener('click', () => {
+    shellState.downloads = [];
+    persistShellState();
+    renderBrowserDownloadsUi();
   });
 }
 browserUrlInput.addEventListener('focus', () => browserUrlInput.select());
@@ -2585,6 +3332,21 @@ document.addEventListener('keydown', (event) => {
     openWindow('browser');
     browserUrlInput.focus();
     browserUrlInput.select();
+  }
+  if ((event.metaKey || event.ctrlKey) && event.code === 'Space' && !event.shiftKey) {
+    event.preventDefault();
+    if (spotlightOverlay?.classList.contains('hidden')) {
+      openSpotlight();
+    } else {
+      closeSpotlight();
+    }
+  }
+  if (event.key === 'Escape' && spotlightOverlay && !spotlightOverlay.classList.contains('hidden')) {
+    closeSpotlight();
+  }
+  if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === '3') {
+    event.preventDefault();
+    takeScreenshot();
   }
 });
 browserTryEmbedButton.addEventListener('click', () => openBrowserUrl(currentBrowserUrl || browserUrlInput.value, {
@@ -2599,19 +3361,24 @@ if (browserWebview) {
   browserWebview.addEventListener('did-navigate', (event) => {
     currentBrowserUrl = event.url;
     browserUrlInput.value = event.url;
+    updateActiveTabFromNavigation(event.url);
     recordBrowserVisit(event.url);
+    updateBookmarkButton();
     updateBrowserNavigationControls();
   });
   browserWebview.addEventListener('did-navigate-in-page', (event) => {
     currentBrowserUrl = event.url;
     browserUrlInput.value = event.url;
+    updateActiveTabFromNavigation(event.url);
     recordBrowserVisit(event.url);
+    updateBookmarkButton();
     updateBrowserNavigationControls();
   });
   browserWebview.addEventListener('page-title-updated', (event) => {
-    const browserWindowTitle = document.querySelector('#windowBrowser .window-titlebar h2');
-    if (browserWindowTitle) {
-      browserWindowTitle.textContent = event.title ? event.title : 'Browser';
+    const tab = getActiveBrowserTab();
+    if (tab) {
+      tab.title = event.title || tab.title;
+      renderBrowserTabs();
     }
     updateBrowserVisitTitle(currentBrowserUrl, event.title || '');
   });
@@ -2629,6 +3396,46 @@ if (window.aiosNative?.onBrowserNavigate) {
   window.aiosNative.onBrowserNavigate((url) => {
     if (url) openBrowserUrl(url);
   });
+}
+
+if (window.aiosNative?.onDownloadUpdate) {
+  window.aiosNative.onDownloadUpdate((payload) => {
+    recordDownload({
+      id: payload.id,
+      filename: payload.filename,
+      url: payload.url,
+      state: payload.state,
+      path: payload.path,
+      received: payload.received,
+      total: payload.total,
+      done: payload.done,
+      at: new Date().toISOString()
+    });
+  });
+}
+
+async function takeScreenshot() {
+  if (!window.aiosNative?.takeScreenshot) {
+    renderMessage('system', 'Screenshots require the AIOS desktop runtime. Start with npm start.');
+    return;
+  }
+  try {
+    const result = await window.aiosNative.takeScreenshot();
+    if (!result.ok) throw new Error(result.error);
+    recordDownload({
+      id: `screenshot-${Date.now()}`,
+      filename: result.filename,
+      url: 'aios://screenshot',
+      state: 'completed',
+      path: result.relativePath,
+      done: true,
+      at: new Date().toISOString()
+    });
+    openFileInEditor(result.relativePath);
+    renderMessage('system', `Screenshot saved to ${result.relativePath}`);
+  } catch (error) {
+    renderMessage('system', `Screenshot failed: ${error.message}`);
+  }
 }
 browserFrame.addEventListener('load', () => {
   if (browserLoadTimer) {
@@ -2780,6 +3587,79 @@ wallpaperSelect.addEventListener('change', () => {
   applyPreferences();
   persistShellState();
 });
+
+themeSelect.addEventListener('change', () => {
+  shellState.preferences.theme = themeSelect.value;
+  applyPreferences();
+  persistShellState();
+});
+
+if (wallpaperUploadButton) {
+  wallpaperUploadButton.addEventListener('click', () => wallpaperFileInput?.click());
+}
+if (wallpaperFileInput) {
+  wallpaperFileInput.addEventListener('change', () => {
+    const file = wallpaperFileInput.files?.[0];
+    if (file) uploadCustomWallpaper(file);
+  });
+}
+
+if (themeToggleButton) {
+  themeToggleButton.addEventListener('click', toggleTheme);
+}
+
+if (spotlightButton) {
+  spotlightButton.addEventListener('click', openSpotlight);
+}
+
+if (spotlightOverlay) {
+  spotlightOverlay.addEventListener('click', (event) => {
+    if (event.target === spotlightOverlay) closeSpotlight();
+  });
+}
+
+if (spotlightInput) {
+  spotlightInput.addEventListener('input', () => renderSpotlightResults(spotlightInput.value).catch(() => {}));
+  spotlightInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeSpotlight();
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveSpotlightSelection(1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveSpotlightSelection(-1);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      activateSpotlightSelection();
+    }
+  });
+}
+
+if (editorNewButton) {
+  editorNewButton.addEventListener('click', () => createEditorTab());
+}
+if (editorOpenButton) {
+  editorOpenButton.addEventListener('click', async () => {
+    const pathValue = window.prompt('Open file path (relative to workspace):');
+    if (pathValue) await openFileInEditor(pathValue);
+  });
+}
+if (editorSaveButton) {
+  editorSaveButton.addEventListener('click', saveActiveEditorTab);
+}
+if (editorTextarea) {
+  editorTextarea.addEventListener('input', handleEditorInput);
+  editorTextarea.addEventListener('keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      saveActiveEditorTab();
+    }
+  });
+}
+if (editorPreviewToggle) {
+  editorPreviewToggle.addEventListener('change', updateEditorPreview);
+}
 
 performanceModeToggle.addEventListener('change', () => {
   shellState.preferences.performanceMode = performanceModeToggle.checked;
