@@ -93,6 +93,12 @@ const wallpaperUploadButton = document.getElementById('wallpaperUploadButton');
 const wallpaperPreview = document.getElementById('wallpaperPreview');
 const performanceModeToggle = document.getElementById('performanceModeToggle');
 const themeToggleButton = document.getElementById('themeToggleButton');
+const tipsDetailOverlay = document.getElementById('tipsDetailOverlay');
+const tipsDetailClose = document.getElementById('tipsDetailClose');
+const tipsDetailGlyph = document.getElementById('tipsDetailGlyph');
+const tipsDetailCategory = document.getElementById('tipsDetailCategory');
+const tipsDetailTitle = document.getElementById('tipsDetailTitle');
+const tipsDetailBody = document.getElementById('tipsDetailBody');
 const spotlightButton = document.getElementById('spotlightButton');
 const spotlightOverlay = document.getElementById('spotlightOverlay');
 const spotlightInput = document.getElementById('spotlightInput');
@@ -1116,7 +1122,7 @@ function spotlightItems() {
     { id: 'app-editor', type: 'app', name: 'Text Editor', glyph: 'TE', action: () => openWindow('editor') },
     { id: 'app-settings', type: 'app', name: 'Settings', glyph: 'ST', action: () => openWindow('settings') },
     { id: 'app-apps', type: 'app', name: 'Apps', glyph: 'AP', action: () => openWindow('apps') },
-    { id: 'app-instructions', type: 'app', name: 'Instructions', glyph: '?', action: () => openWindow('instructions') }
+    { id: 'app-instructions', type: 'app', name: 'Tips', glyph: '💡', action: () => openWindow('instructions') }
   ];
   const bookmarks = (shellState.bookmarks || []).map((bookmark) => ({
     id: `bookmark-${bookmark.id}`,
@@ -3654,6 +3660,87 @@ if (wallpaperFileInput) {
 
 if (themeToggleButton) {
   themeToggleButton.addEventListener('click', toggleTheme);
+}
+
+const TIPS = {
+  screenshots: {
+    glyph: '📸',
+    category: 'Featured',
+    title: 'Take a screenshot',
+    body: '<p>Press <kbd>Shift</kbd> + <kbd>⌘</kbd> + <kbd>3</kbd> to capture the whole screen. Screenshots are saved to <code>workspace/Screenshots</code> and appear in the Browser’s Downloads panel.</p><p>This only works when AIOS is running in desktop mode (<code>npm start</code>), not in a regular browser tab.</p>'
+  },
+  spotlight: {
+    glyph: '🔍',
+    category: 'Search',
+    title: 'Find anything with Spotlight',
+    body: '<p>Press <kbd>⌘</kbd> + <kbd>Space</kbd> to open Spotlight. Type to search apps, files, bookmarks, and browser history. Click any result to open it instantly.</p><p>If <kbd>⌘</kbd> + <kbd>Space</kbd> opens macOS Spotlight instead, use the 🔍 button in the menu bar.</p>'
+  },
+  browser: {
+    glyph: '🌐',
+    category: 'Browse',
+    title: 'Surf with tabs & bookmarks',
+    body: '<p>Type a URL or search term in the Browser address bar. Use tabs to keep multiple sites open. Bookmarks and history are saved across sessions.</p><p>Sites that block embedding (like JD Sports) automatically open in an Electron webview when you run <code>npm start</code>.</p>'
+  },
+  linux: {
+    glyph: '🐧',
+    category: 'Power user',
+    title: 'Run Linux apps',
+    body: '<p>Import .tar.gz Linux packages in the Apps window. AIOS stores them and can run them inside a Docker/Colima container.</p><p>Make sure Colima is running on macOS. The first Linux app run may take a moment while AIOS pulls the Ubuntu image.</p>'
+  },
+  editor: {
+    glyph: '📝',
+    category: 'Create',
+    title: 'Edit with tabs',
+    body: '<p>Open the Text Editor to write notes or code. Use tabs for multiple files. Press <kbd>⌘</kbd> + <kbd>S</kbd> to save, and click the preview button to toggle markdown rendering.</p>'
+  },
+  theme: {
+    glyph: '🎨',
+    category: 'Personalize',
+    title: 'Make AIOS yours',
+    body: '<p>Open Settings to switch between dark and light mode, change the accent color, or pick a wallpaper. You can also upload your own custom wallpaper.</p>'
+  },
+  windows: {
+    glyph: '🪟',
+    category: 'Desktop',
+    title: 'Master window shortcuts',
+    body: '<ul><li><kbd>⌘</kbd> + <kbd>1</kbd>–<kbd>9</kbd> focus dock apps by position</li><li>Drag a window titlebar to move it</li><li>Click the red dot to close, yellow to minimize, green to zoom</li><li>Click a window to bring it to the front</li></ul>'
+  },
+  files: {
+    glyph: '📁',
+    category: 'Organize',
+    title: 'Manage files & downloads',
+    body: '<p>Use the Files app to browse your workspace. Downloads from the Browser are saved to <code>workspace/Downloads</code>. Open the Browser’s downloads panel to see recent files.</p>'
+  }
+};
+
+function openTip(id) {
+  const tip = TIPS[id];
+  if (!tip || !tipsDetailOverlay) return;
+  tipsDetailGlyph.textContent = tip.glyph;
+  tipsDetailCategory.textContent = tip.category;
+  tipsDetailTitle.textContent = tip.title;
+  tipsDetailBody.innerHTML = tip.body;
+  tipsDetailOverlay.classList.remove('hidden');
+}
+
+function closeTip() {
+  if (tipsDetailOverlay) tipsDetailOverlay.classList.add('hidden');
+}
+
+if (tipsDetailOverlay) {
+  document.querySelectorAll('.tips-hero, .tips-card').forEach((el) => {
+    el.addEventListener('click', () => openTip(el.dataset.tip));
+  });
+}
+
+if (tipsDetailClose) {
+  tipsDetailClose.addEventListener('click', closeTip);
+}
+
+if (tipsDetailOverlay) {
+  tipsDetailOverlay.addEventListener('click', (event) => {
+    if (event.target === tipsDetailOverlay) closeTip();
+  });
 }
 
 if (spotlightButton) {

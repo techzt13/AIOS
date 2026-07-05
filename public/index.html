@@ -459,9 +459,9 @@
                 <small>Edit code and markdown with tabs.</small>
               </button>
               <button type="button" class="app-launch-card" data-launch-app="instructions">
-                <span class="app-launch-icon">?</span>
-                <strong>Instructions</strong>
-                <small>Shortcuts, tips, and how to use AIOS.</small>
+                <span class="app-launch-icon">💡</span>
+                <strong>Tips</strong>
+                <small>Shortcuts, guides, and how to use AIOS.</small>
               </button>
             </div>
             <section class="third-party-apps app-store-section">
@@ -529,58 +529,88 @@
           </div>
         </section>
 
-        <section id="windowInstructions" class="app-window hidden" data-app="instructions" data-title="Instructions">
+        <section id="windowInstructions" class="app-window hidden" data-app="instructions" data-title="Tips">
           <header class="window-titlebar">
             <div class="traffic-lights">
-              <button class="light close" data-window-action="close" data-app="instructions" aria-label="Close Instructions"></button>
-              <button class="light minimize" data-window-action="minimize" data-app="instructions" aria-label="Minimize Instructions"></button>
-              <button class="light zoom" data-window-action="zoom" data-app="instructions" aria-label="Zoom Instructions"></button>
+              <button class="light close" data-window-action="close" data-app="instructions" aria-label="Close Tips"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="instructions" aria-label="Minimize Tips"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="instructions" aria-label="Zoom Tips"></button>
             </div>
-            <h2>Instructions</h2>
+            <h2>Tips</h2>
           </header>
-          <div class="window-body instructions-window">
-            <section class="instructions-hero">
-              <p class="wizard-kicker">Getting started</p>
-              <h3>How to use AIOS</h3>
-              <p class="status-text">Shortcuts, tips, and feature guides for the AIOS desktop.</p>
-            </section>
-            <div class="instructions-content">
-              <article class="instruction-card">
-                <h4>🖼 Screenshots</h4>
-                <p>Press <kbd>Shift</kbd> + <kbd>⌘</kbd> + <kbd>3</kbd> to capture the whole screen. Screenshots are saved to <code>workspace/Screenshots</code> and appear in the Downloads panel.</p>
-              </article>
-              <article class="instruction-card">
-                <h4>🔍 Spotlight Search</h4>
-                <p>Press <kbd>⌘</kbd> + <kbd>Space</kbd> to open Spotlight. Search apps, files, bookmarks, and browser history. Click any result to open it instantly.</p>
-              </article>
-              <article class="instruction-card">
-                <h4>🌐 Browser</h4>
-                <p>Type a URL or search term in the Browser address bar. Use tabs to keep multiple sites open. Bookmarks and history are saved across sessions. Sites that block embedding open in an Electron webview automatically.</p>
-              </article>
-              <article class="instruction-card">
-                <h4>🐧 Linux Apps</h4>
-                <p>Import .tar.gz Linux packages in the Apps window. AIOS stores them and can run them inside a Docker/Colima container. Make sure Colima is running if you are on macOS.</p>
-              </article>
-              <article class="instruction-card">
-                <h4>📝 Text Editor</h4>
-                <p>Open the Text Editor to write notes or code. Use tabs for multiple files. Press <kbd>⌘</kbd> + <kbd>S</kbd> to save, and <kbd>⌘</kbd> + <kbd>.</kbd> to toggle markdown preview.</p>
-              </article>
-              <article class="instruction-card">
-                <h4>🎨 Theme & Wallpaper</h4>
-                <p>Open Settings to switch between dark and light mode, change the accent color, or pick a wallpaper. You can also upload your own custom wallpaper.</p>
-              </article>
-              <article class="instruction-card">
-                <h4>⌨️ Window Shortcuts</h4>
-                <ul>
-                  <li><kbd>⌘</kbd> + <kbd>1</kbd>–<kbd>9</kbd> focus dock apps by position</li>
-                  <li>Drag a window titlebar to move it</li>
-                  <li>Click the red dot to close, yellow to minimize, green to zoom</li>
-                </ul>
-              </article>
-              <article class="instruction-card">
-                <h4>💾 Files & Downloads</h4>
-                <p>Use the Files app to browse your workspace. Downloads from the Browser are saved to <code>workspace/Downloads</code>. Open the Browser’s downloads panel to see recent files.</p>
-              </article>
+          <div class="window-body tips-window">
+            <div class="tips-scroll">
+              <section class="tips-header">
+                <h3>Tips</h3>
+                <p>Get the most out of AIOS.</p>
+              </section>
+
+              <button type="button" class="tips-hero" data-tip="screenshots">
+                <span class="tips-hero-glyph">📸</span>
+                <span class="tips-hero-label">Featured</span>
+                <span class="tips-hero-title">Take a screenshot</span>
+                <span class="tips-hero-subtitle">Capture your whole desktop with one keyboard shortcut.</span>
+              </button>
+
+              <section class="tips-section">
+                <h4>Tips for you</h4>
+                <div class="tips-grid">
+                  <button type="button" class="tips-card" data-tip="spotlight">
+                    <span class="tips-card-glyph">🔍</span>
+                    <span class="tips-card-category">Search</span>
+                    <span class="tips-card-title">Find anything with Spotlight</span>
+                    <span class="tips-card-subtitle">Apps, files, bookmarks, and history in one place.</span>
+                  </button>
+                  <button type="button" class="tips-card" data-tip="browser">
+                    <span class="tips-card-glyph">🌐</span>
+                    <span class="tips-card-category">Browse</span>
+                    <span class="tips-card-title">Surf with tabs & bookmarks</span>
+                    <span class="tips-card-subtitle">Keep multiple sites open and save your favorites.</span>
+                  </button>
+                  <button type="button" class="tips-card" data-tip="linux">
+                    <span class="tips-card-glyph">🐧</span>
+                    <span class="tips-card-category">Power user</span>
+                    <span class="tips-card-title">Run Linux apps</span>
+                    <span class="tips-card-subtitle">Import .tar.gz packages and run them in a container.</span>
+                  </button>
+                  <button type="button" class="tips-card" data-tip="editor">
+                    <span class="tips-card-glyph">📝</span>
+                    <span class="tips-card-category">Create</span>
+                    <span class="tips-card-title">Edit with tabs</span>
+                    <span class="tips-card-subtitle">Write notes or code, then save with ⌘S.</span>
+                  </button>
+                  <button type="button" class="tips-card" data-tip="theme">
+                    <span class="tips-card-glyph">🎨</span>
+                    <span class="tips-card-category">Personalize</span>
+                    <span class="tips-card-title">Make AIOS yours</span>
+                    <span class="tips-card-subtitle">Switch themes, accents, and wallpapers.</span>
+                  </button>
+                  <button type="button" class="tips-card" data-tip="windows">
+                    <span class="tips-card-glyph">🪟</span>
+                    <span class="tips-card-category">Desktop</span>
+                    <span class="tips-card-title">Master window shortcuts</span>
+                    <span class="tips-card-subtitle">Move, minimize, zoom, and focus with the keyboard.</span>
+                  </button>
+                  <button type="button" class="tips-card" data-tip="files">
+                    <span class="tips-card-glyph">📁</span>
+                    <span class="tips-card-category">Organize</span>
+                    <span class="tips-card-title">Manage files & downloads</span>
+                    <span class="tips-card-subtitle">Browse workspace files and find downloads fast.</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <div id="tipsDetailOverlay" class="tips-detail-overlay hidden">
+              <div class="tips-detail-sheet">
+                <button type="button" id="tipsDetailClose" class="tips-detail-close" aria-label="Close tip">✕</button>
+                <span id="tipsDetailGlyph" class="tips-detail-glyph">💡</span>
+                <span id="tipsDetailCategory" class="tips-detail-category">Category</span>
+                <h3 id="tipsDetailTitle">Tip title</h3>
+                <div id="tipsDetailBody" class="tips-detail-body">
+                  <p>Tip body goes here.</p>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -597,7 +627,7 @@
         <button type="button" class="dock-item" data-open-app="settings">Settings</button>
         <button type="button" class="dock-item" id="openSetupAssistant">Setup</button>
         <button type="button" class="dock-item" data-open-app="apps">Apps</button>
-        <button type="button" class="dock-item" data-open-app="instructions">Help</button>
+        <button type="button" class="dock-item" data-open-app="instructions">Tips</button>
       </nav>
     </div>
 
