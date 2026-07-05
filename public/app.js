@@ -1715,11 +1715,17 @@ async function loadShellState() {
       shellState = {
         windows: payload.state.windows || {},
         preferences: payload.state.preferences || {},
-        browserHistory: Array.isArray(payload.state.browserHistory) ? payload.state.browserHistory : []
+        browserHistory: Array.isArray(payload.state.browserHistory) ? payload.state.browserHistory : [],
+        bookmarks: Array.isArray(payload.state.bookmarks) ? payload.state.bookmarks : [],
+        downloads: Array.isArray(payload.state.downloads) ? payload.state.downloads : [],
+        browserTabs: Array.isArray(payload.state.browserTabs) ? payload.state.browserTabs : [],
+        activeBrowserTab: payload.state.activeBrowserTab || null,
+        editorTabs: Array.isArray(payload.state.editorTabs) ? payload.state.editorTabs : [],
+        activeEditorTab: payload.state.activeEditorTab || null
       };
     }
   } catch {
-    shellState = { windows: {}, preferences: {}, browserHistory: [] };
+    shellState = { windows: {}, preferences: {}, browserHistory: [], bookmarks: [], downloads: [], browserTabs: [], activeBrowserTab: null, editorTabs: [], activeEditorTab: null };
   }
 
   applyPreferences();
@@ -1743,6 +1749,9 @@ async function loadShellState() {
     createBrowserTab('about:blank', { activate: true });
   }
   renderBrowserTabs();
+  if (browserTabState.activeTabId) {
+    activateBrowserTab(browserTabState.activeTabId);
+  }
 
   // Restore or initialize editor tabs
   const savedEditorTabs = Array.isArray(shellState.editorTabs) ? shellState.editorTabs : [];
@@ -1760,6 +1769,9 @@ async function loadShellState() {
     createEditorTab();
   }
   renderEditorTabs();
+  if (editorTabState.activeTabId) {
+    loadEditorTab(editorTabState.activeTabId);
+  }
 
   Object.entries(WINDOW_IDS).forEach(([app, id]) => {
     const windowEl = document.getElementById(id);
