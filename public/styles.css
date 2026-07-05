@@ -2951,3 +2951,91 @@ button:focus-visible {
 :root[data-theme='light'] .spotlight-hint {
   background: rgba(18, 32, 59, 0.08);
 }
+
+:root[data-theme='light'] .dock-item {
+  color: var(--desktop-text);
+  background:
+    radial-gradient(circle at 24% 0%, rgba(255, 255, 255, 0.78), transparent 34%),
+    rgba(255, 255, 255, 0.62);
+  border-color: rgba(18, 32, 59, 0.12);
+  box-shadow:
+    0 10px 24px rgba(8, 16, 36, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+:root[data-theme='light'] .dock-item:hover {
+  background:
+    radial-gradient(circle at 24% 0%, rgba(255, 255, 255, 0.9), transparent 34%),
+    rgba(255, 255, 255, 0.78);
+}
+
+:root[data-theme='light'] .app-window {
+  background:
+    var(--liquid-glass-bg),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(242, 247, 255, 0.62)),
+    var(--window-bg);
+}
+
+:root[data-theme='light'] .window-titlebar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 255, 0.72)),
+    radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.9), transparent 44%);
+  border-bottom-color: rgba(18, 32, 59, 0.1);
+}
+
+:root[data-theme='light'] .composer,
+:root[data-theme='light'] .toolbar {
+  background:
+    var(--liquid-glass-bg),
+    rgba(255, 255, 255, 0.72);
+  border-color: rgba(18, 32, 59, 0.1);
+}
+
+:root[data-theme='light'] .chat-window .composer input {
+  background:
+    radial-gradient(circle at 16% 0%, rgba(255, 255, 255, 0.95), transparent 30%),
+    rgba(255, 255, 255, 0.9);
+  border-color: rgba(18, 32, 59, 0.12);
+}
+
+:root[data-theme='light'] .message.assistant {
+  background:
+    var(--liquid-glass-bg),
+    rgba(255, 255, 255, 0.78);
+  border-color: rgba(18, 32, 59, 0.1);
+}
+
+:root[data-theme='light'] .chat-model-select,
+:root[data-theme='light'] .titlebar-button {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.95), transparent 35%),
+    rgba(255, 255, 255, 0.72);
+  border-color: rgba(18, 32, 59, 0.12);
+}
+
+:root[data-theme='light'] .app-empty-state {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(18, 32, 59, 0.16);
+}
+
+:root[data-theme='light'] .wallpaper-thumb {
+  background: rgba(18, 32, 59, 0.06);
+  border-color: rgba(18, 32, 59, 0.1);
+}
+
+:root[data-theme='light'] .wallpaper-thumb:hover {
+  background: rgba(18, 32, 59, 0.1);
+}
+
+:root[data-theme='light'] .wallpaper-thumb.active {
+  background: rgba(18, 32, 59, 0.14);
+}
+
+:root[data-theme='light'] .wallpaper-thumb-label {
+  color: var(--desktop-text);
+}
+
+:root[data-theme='light'] .wallpaper-thumb-custom {
+  background: rgba(18, 32, 59, 0.08);
+  color: var(--desktop-text);
+}
