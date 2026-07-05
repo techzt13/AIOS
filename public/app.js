@@ -59,6 +59,8 @@ const browserForwardButton = document.getElementById('browserForwardButton');
 const browserRefreshButton = document.getElementById('browserRefreshButton');
 const browserUrlInput = document.getElementById('browserUrlInput');
 const browserWebview = document.getElementById('browserWebview');
+let browserWebviewReady = false;
+const browserWebviewReadyQueue = [];
 const browserFrame = document.getElementById('browserFrame');
 const browserOpenExternalButton = document.getElementById('browserOpenExternalButton');
 const browserBlockedNotice = document.getElementById('browserBlockedNotice');
@@ -471,20 +473,29 @@ function embedFriendlyUrl(urlValue) {
 }
 
 function browserWebviewIsVisible() {
-  return canUseBrowserWebview() && !browserWebview.classList.contains('hidden');
+  return canUseBrowserWebview() && browserWebviewReady && !browserWebview.classList.contains('hidden');
+}
+
+function whenBrowserWebviewReady(callback) {
+  if (browserWebviewReady) {
+    callback();
+  } else {
+    browserWebviewReadyQueue.push(callback);
+  }
 }
 
 function updateBrowserNavigationControls() {
   if (browserWebviewIsVisible() && typeof browserWebview.canGoBack === 'function') {
-    try {
-      browserBackButton.disabled = !browserWebview.canGoBack();
-      browserForwardButton.disabled = !browserWebview.canGoForward();
-      return;
-    } catch {
-      browserBackButton.disabled = true;
-      browserForwardButton.disabled = true;
-      return;
-    }
+    whenBrowserWebviewReady(() => {
+      try {
+        browserBackButton.disabled = !browserWebview.canGoBack();
+        browserForwardButton.disabled = !browserWebview.canGoForward();
+      } catch {
+        browserBackButton.disabled = true;
+        browserForwardButton.disabled = true;
+      }
+    });
+    return;
   }
 
   const tab = getActiveBrowserTab();
@@ -733,12 +744,14 @@ function loadBrowserWebview(url) {
   showBrowserWebview();
   hideBrowserBlockedNotice();
   browserExternalLink.href = url;
-  if (typeof browserWebview.loadURL === 'function') {
-    browserWebview.loadURL(url);
-  } else {
-    browserWebview.setAttribute('src', url);
-  }
-  updateBrowserNavigationControls();
+  whenBrowserWebviewReady(() => {
+    if (typeof browserWebview.loadURL === 'function') {
+      browserWebview.loadURL(url);
+    } else {
+      browserWebview.setAttribute('src', url);
+    }
+    updateBrowserNavigationControls();
+  });
 }
 
 function openBrowserUrl(rawValue, options = {}) {
@@ -796,15 +809,17 @@ function openCurrentBrowserUrlExternally() {
 function navigateBrowserHistory(delta) {
   const tab = getActiveBrowserTab();
   if (browserWebviewIsVisible()) {
-    try {
-      if (delta < 0 && typeof browserWebview.goBack === 'function' && browserWebview.canGoBack()) {
-        browserWebview.goBack();
-      } else if (delta > 0 && typeof browserWebview.goForward === 'function' && browserWebview.canGoForward()) {
-        browserWebview.goForward();
+    whenBrowserWebviewReady(() => {
+      try {
+        if (delta < 0 && typeof browserWebview.goBack === 'function' && browserWebview.canGoBack()) {
+          browserWebview.goBack();
+        } else if (delta > 0 && typeof browserWebview.goForward === 'function' && browserWebview.canGoForward()) {
+          browserWebview.goForward();
+        }
+      } catch {
+        updateBrowserNavigationControls();
       }
-    } catch {
-      updateBrowserNavigationControls();
-    }
+    });
     return;
   }
 
@@ -821,7 +836,7 @@ function navigateBrowserHistory(delta) {
 
 function refreshBrowserUrl() {
   if (browserWebviewIsVisible() && typeof browserWebview.reload === 'function') {
-    browserWebview.reload();
+    whenBrowserWebviewReady(() => browserWebview.reload());
     return;
   }
 
@@ -3366,6 +3381,17 @@ browserTryEmbedButton.addEventListener('click', () => openBrowserUrl(currentBrow
   recordHistory: false
 }));
 if (browserWebview) {
+  browserWebview.addEventListener('dom-ready', () => {
+    browserWebviewReady = true;
+    while (browserWebviewReadyQueue.length > 0) {
+      const cb = browserWebviewReadyQueue.shift();
+      try {
+        cb();
+      } catch (error) {
+        console.error('Error in webview ready callback:', error);
+      }
+    }
+  });
   browserWebview.addEventListener('did-start-loading', () => {
     hideBrowserBlockedNotice();
     updateBrowserNavigationControls();
