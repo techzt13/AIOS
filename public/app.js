@@ -86,7 +86,7 @@ const linuxPackageStatus = document.getElementById('linuxPackageStatus');
 const linuxPackagesGrid = document.getElementById('linuxPackagesGrid');
 
 const accentSelect = document.getElementById('accentSelect');
-const wallpaperSelect = document.getElementById('wallpaperSelect');
+const wallpaperGrid = document.getElementById('wallpaperGrid');
 const themeSelect = document.getElementById('themeSelect');
 const wallpaperFileInput = document.getElementById('wallpaperFileInput');
 const wallpaperUploadButton = document.getElementById('wallpaperUploadButton');
@@ -1562,7 +1562,11 @@ function applyPreferences() {
   root.dataset.performance = performanceMode ? 'fast' : 'visual';
   root.dataset.theme = theme;
   accentSelect.value = accent;
-  wallpaperSelect.value = wallpaper;
+  if (wallpaperGrid) {
+    wallpaperGrid.querySelectorAll('.wallpaper-thumb').forEach((thumb) => {
+      thumb.classList.toggle('active', thumb.dataset.wallpaper === root.dataset.wallpaper);
+    });
+  }
   if (themeSelect) themeSelect.value = shellState.preferences.theme || 'dark';
   performanceModeToggle.checked = performanceMode;
   if (themeToggleButton) themeToggleButton.textContent = theme === 'light' ? '☀️' : '🌙';
@@ -1583,13 +1587,10 @@ function applyCustomWallpaper() {
   }
   const shell = document.querySelector('.desktop-shell');
   if (!shell) return;
-  const existing = shell.querySelector('.custom-wallpaper-layer');
-  if (existing) existing.remove();
   if (shellState.preferences.wallpaper === 'custom' && customWallpaperUrl) {
-    const layer = document.createElement('div');
-    layer.className = 'custom-wallpaper-layer';
-    layer.style.cssText = 'position:absolute;inset:0;z-index:-1;background-size:cover;background-position:center;background-image:url(' + CSS.escape(customWallpaperUrl) + ');';
-    shell.appendChild(layer);
+    shell.style.background = 'url(' + CSS.escape(customWallpaperUrl) + ') center/cover no-repeat';
+  } else {
+    shell.style.background = '';
   }
 }
 
@@ -1621,7 +1622,6 @@ async function uploadCustomWallpaper(file) {
     shellState.preferences.customWallpaper = payload.filename;
     customWallpaperUrl = payload.url;
     shellState.preferences.wallpaper = 'custom';
-    wallpaperSelect.value = 'custom';
     applyPreferences();
     persistShellState();
   } catch (error) {
@@ -3620,11 +3620,19 @@ accentSelect.addEventListener('change', () => {
   persistShellState();
 });
 
-wallpaperSelect.addEventListener('change', () => {
-  shellState.preferences.wallpaper = wallpaperSelect.value;
-  applyPreferences();
-  persistShellState();
-});
+if (wallpaperGrid) {
+  wallpaperGrid.addEventListener('click', (event) => {
+    const thumb = event.target.closest('.wallpaper-thumb');
+    if (!thumb) return;
+    if (thumb.dataset.wallpaper === 'custom') {
+      wallpaperFileInput?.click();
+      return;
+    }
+    shellState.preferences.wallpaper = thumb.dataset.wallpaper;
+    applyPreferences();
+    persistShellState();
+  });
+}
 
 themeSelect.addEventListener('change', () => {
   shellState.preferences.theme = themeSelect.value;
