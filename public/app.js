@@ -166,7 +166,11 @@ const WINDOW_IDS = {
   calculator: 'windowCalculator',
   apps: 'windowApps',
   editor: 'windowEditor',
-  instructions: 'windowInstructions'
+  instructions: 'windowInstructions',
+  calendar: 'windowCalendar',
+  monitor: 'windowMonitor',
+  trash: 'windowTrash',
+  music: 'windowMusic'
 };
 
 const WINDOW_LAYOUT = {
@@ -178,7 +182,11 @@ const WINDOW_LAYOUT = {
   settings: { x: 0.5, y: 0.08, centerX: true },
   calculator: { x: 0.62, y: 0.18 },
   apps: { x: 0.5, y: 0.16, centerX: true },
-  editor: { x: 0.18, y: 0.12 }
+  editor: { x: 0.18, y: 0.12 },
+  calendar: { x: 0.2, y: 0.12 },
+  monitor: { x: 0.22, y: 0.14 },
+  trash: { x: 0.3, y: 0.18 },
+  music: { x: 0.34, y: 0.16 }
 };
 const MAX_CHAT_HISTORY_MESSAGES = 80;
 const MAX_RENDERED_MESSAGES = 140;
@@ -198,7 +206,7 @@ let copilotDeviceFlow = null;
 let copilotPollTimer = null;
 let currentWizardStep = 0;
 let wizardTestSucceeded = false;
-let shellState = { windows: {}, preferences: {}, browserHistory: [], bookmarks: [], downloads: [], browserTabs: [], editorTabs: [] };
+let shellState = { windows: {}, preferences: {}, browserHistory: [], bookmarks: [], downloads: [], browserTabs: [], editorTabs: [], notifications: [], alarms: [] };
 let zCounter = 10;
 let installedApps = [];
 let linuxPackages = [];
@@ -305,6 +313,7 @@ function trimChatHistory() {
 
 function startNewChat({ showWelcome = true } = {}) {
   chatHistory = [];
+  currentConversationId = null;
   messagesEl.innerHTML = '';
   if (showWelcome) {
     renderMessage('system', 'New chat started. Your provider login and saved API keys were not changed.');
@@ -1122,7 +1131,11 @@ function spotlightItems() {
     { id: 'app-editor', type: 'app', name: 'Text Editor', glyph: 'TE', action: () => openWindow('editor') },
     { id: 'app-settings', type: 'app', name: 'Settings', glyph: 'ST', action: () => openWindow('settings') },
     { id: 'app-apps', type: 'app', name: 'Apps', glyph: 'AP', action: () => openWindow('apps') },
-    { id: 'app-instructions', type: 'app', name: 'Tips', glyph: '💡', action: () => openWindow('instructions') }
+    { id: 'app-instructions', type: 'app', name: 'Tips', glyph: '💡', action: () => openWindow('instructions') },
+    { id: 'app-calendar', type: 'app', name: 'Calendar', glyph: '📅', action: () => openWindow('calendar') },
+    { id: 'app-monitor', type: 'app', name: 'Activity Monitor', glyph: '📊', action: () => openWindow('monitor') },
+    { id: 'app-music', type: 'app', name: 'Music', glyph: '🎵', action: () => openWindow('music') },
+    { id: 'app-trash', type: 'app', name: 'Trash', glyph: '🗑', action: () => openWindow('trash') }
   ];
   const bookmarks = (shellState.bookmarks || []).map((bookmark) => ({
     id: `bookmark-${bookmark.id}`,
@@ -1533,7 +1546,7 @@ function openWindow(app) {
     save: true
   });
   focusWindow(app);
-  recordWindowState(app, { open: true, minimized: false });
+  recordWindowState(app, { open: true, minimized: false, space: activeSpace });
   if (app === 'notes' && typeof loadNotesApp === 'function') {
     loadNotesApp();
   }
@@ -1541,6 +1554,16 @@ function openWindow(app) {
     const terminalLaunch = pendingTerminalLaunch || {};
     pendingTerminalLaunch = null;
     setTimeout(() => initTerminal(terminalLaunch), 100);
+  }
+  if (app === 'calendar') {
+    renderCalendarApp();
+    renderAlarmsList();
+  }
+  if (app === 'monitor') {
+    startActivityMonitor();
+  }
+  if (app === 'trash') {
+    refreshTrash().catch(() => {});
   }
 }
 
@@ -1550,6 +1573,9 @@ function closeWindow(app) {
   windowEl.classList.add('hidden');
   recordWindowState(app, { open: false, minimized: true });
   activeWindowTitle.textContent = 'Desktop';
+  if (app === 'monitor') {
+    stopActivityMonitor();
+  }
 }
 
 function resolveEffectiveTheme() {
@@ -1744,14 +1770,17 @@ async function loadShellState() {
         browserTabs: Array.isArray(payload.state.browserTabs) ? payload.state.browserTabs : [],
         activeBrowserTab: payload.state.activeBrowserTab || null,
         editorTabs: Array.isArray(payload.state.editorTabs) ? payload.state.editorTabs : [],
-        activeEditorTab: payload.state.activeEditorTab || null
+        activeEditorTab: payload.state.activeEditorTab || null,
+        notifications: Array.isArray(payload.state.notifications) ? payload.state.notifications : [],
+        alarms: Array.isArray(payload.state.alarms) ? payload.state.alarms : []
       };
     }
   } catch {
-    shellState = { windows: {}, preferences: {}, browserHistory: [], bookmarks: [], downloads: [], browserTabs: [], activeBrowserTab: null, editorTabs: [], activeEditorTab: null };
+    shellState = { windows: {}, preferences: {}, browserHistory: [], bookmarks: [], downloads: [], browserTabs: [], activeBrowserTab: null, editorTabs: [], activeEditorTab: null, notifications: [], alarms: [] };
   }
 
   applyPreferences();
+  activeSpace = Math.min(SPACE_COUNT, Math.max(1, Number(shellState.preferences.activeSpace) || 1));
   renderBrowserHistoryUi();
   renderBrowserBookmarksUi();
   renderBrowserDownloadsUi();
@@ -1818,6 +1847,7 @@ async function loadShellState() {
     });
     focusWindow('chat');
   }
+  refreshSpaceVisibility();
 }
 
 function renderProviderSetupList() {
@@ -3126,28 +3156,61 @@ async function refreshFileList(pathValue = filesPathInput.value || '.') {
     filesPathInput.value = result.path || '.';
     filesEntries.innerHTML = '';
     result.entries.forEach((entry) => {
+      const prefix = result.path === '.' ? '' : `${result.path}/`;
+      const entryPath = `${prefix}${entry.name}`;
       const item = document.createElement('li');
+      item.className = 'file-entry-row';
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'file-entry';
+      button.dataset.filePath = entry.type === 'file' ? entryPath : '';
       button.textContent = `${entry.type === 'directory' ? '📁' : '📄'} ${entry.name}`;
       button.addEventListener('click', async () => {
-        const prefix = result.path === '.' ? '' : `${result.path}/`;
-        const nextPath = `${prefix}${entry.name}`;
         if (entry.type === 'directory') {
-          await refreshFileList(nextPath);
+          await refreshFileList(entryPath);
           return;
         }
 
         try {
-          const file = await readWorkspaceFile(nextPath);
+          const file = await readWorkspaceFile(entryPath);
           openFileInEditor(file.path);
           setFeedback(fileReadStatus, `Opened ${file.path} in Text Editor`);
         } catch (error) {
           setFeedback(fileReadStatus, error.message, 'error');
         }
       });
+      button.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        showFileContextMenu(event, entry, entryPath);
+      });
       item.appendChild(button);
+
+      if (entry.type === 'file') {
+        const previewButton = document.createElement('button');
+        previewButton.type = 'button';
+        previewButton.className = 'file-entry-action';
+        previewButton.title = 'Quick Look (Space)';
+        previewButton.setAttribute('aria-label', `Quick Look ${entry.name}`);
+        previewButton.textContent = '👁';
+        previewButton.addEventListener('click', (event) => {
+          event.stopPropagation();
+          openQuickLook(entryPath);
+        });
+        item.appendChild(previewButton);
+      }
+
+      const trashButton = document.createElement('button');
+      trashButton.type = 'button';
+      trashButton.className = 'file-entry-action';
+      trashButton.title = 'Move to Trash';
+      trashButton.setAttribute('aria-label', `Move ${entry.name} to Trash`);
+      trashButton.textContent = '🗑';
+      trashButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        moveFileToTrash(entryPath).catch((error) => setFeedback(fileReadStatus, error.message, 'error'));
+      });
+      item.appendChild(trashButton);
       filesEntries.appendChild(item);
     });
     setFeedback(fileReadStatus, `Listed ${result.path}`);
@@ -3383,6 +3446,23 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     takeScreenshot();
   }
+  if (event.ctrlKey && event.key === 'ArrowUp' && !event.metaKey) {
+    event.preventDefault();
+    toggleMissionControl();
+  }
+  if (event.ctrlKey && event.metaKey && event.key.toLowerCase() === 'q') {
+    event.preventDefault();
+    lockScreenNow();
+  }
+  if (event.key === ' ' && document.activeElement?.classList?.contains('file-entry') && document.activeElement.dataset.filePath) {
+    event.preventDefault();
+    openQuickLook(document.activeElement.dataset.filePath);
+  }
+  if (event.key === 'Escape') {
+    if (!quickLookOverlay.classList.contains('hidden')) closeQuickLook();
+    if (!missionControlOverlay.classList.contains('hidden')) toggleMissionControl(false);
+    hideContextMenu();
+  }
 });
 browserTryEmbedButton.addEventListener('click', () => openBrowserUrl(currentBrowserUrl || browserUrlInput.value, {
   forceEmbed: true,
@@ -3544,6 +3624,7 @@ chatForm.addEventListener('submit', async (event) => {
     chatHistory.push({ role: 'assistant', content: assistantText });
     trimChatHistory();
     renderMessage('assistant', assistantText);
+    saveCurrentConversation({ provider: provider.id, model });
   } catch (error) {
     renderMessage('system', `System error: ${error.message}`);
   }
@@ -3921,6 +4002,7 @@ loadShellState()
     loadApiAudit()
   ]))
   .then(() => {
+    initShellExtras();
     checkFirstRun();
     refreshFileList().catch(() => {});
   })
@@ -4297,4 +4379,1237 @@ if (calculatorWindowEl) {
     }
   });
   calculatorWindowEl.tabIndex = -1;
+}
+
+// ===================== AIOS Shell Extras =====================
+// Menu bar extras, notifications, calendar/clock, activity monitor,
+// trash, quick look, spaces, lock screen, context menus, music,
+// and AI chat history.
+
+const spacesSwitcher = document.getElementById('spacesSwitcher');
+const missionControlButton = document.getElementById('missionControlButton');
+const missionControlOverlay = document.getElementById('missionControlOverlay');
+const missionControlSpaces = document.getElementById('missionControlSpaces');
+const wifiStatus = document.getElementById('wifiStatus');
+const batteryStatus = document.getElementById('batteryStatus');
+const volumeButton = document.getElementById('volumeButton');
+const volumePopover = document.getElementById('volumePopover');
+const volumeSlider = document.getElementById('volumeSlider');
+const volumeValue = document.getElementById('volumeValue');
+const notificationsButton = document.getElementById('notificationsButton');
+const notificationsBadge = document.getElementById('notificationsBadge');
+const notificationCenter = document.getElementById('notificationCenter');
+const notificationList = document.getElementById('notificationList');
+const notificationEmpty = document.getElementById('notificationEmpty');
+const notificationsClearButton = document.getElementById('notificationsClearButton');
+const toastContainer = document.getElementById('toastContainer');
+const lockButton = document.getElementById('lockButton');
+const lockScreen = document.getElementById('lockScreen');
+const lockClock = document.getElementById('lockClock');
+const lockDate = document.getElementById('lockDate');
+const lockMessage = document.getElementById('lockMessage');
+const lockForm = document.getElementById('lockForm');
+const lockPinInput = document.getElementById('lockPinInput');
+const lockFeedback = document.getElementById('lockFeedback');
+const contextMenu = document.getElementById('contextMenu');
+const calendarPopover = document.getElementById('calendarPopover');
+const miniCalPrev = document.getElementById('miniCalPrev');
+const miniCalNext = document.getElementById('miniCalNext');
+const miniCalTitle = document.getElementById('miniCalTitle');
+const miniCalGrid = document.getElementById('miniCalGrid');
+const miniCalOpenApp = document.getElementById('miniCalOpenApp');
+const calPrevButton = document.getElementById('calPrevButton');
+const calNextButton = document.getElementById('calNextButton');
+const calTodayButton = document.getElementById('calTodayButton');
+const calTitle = document.getElementById('calTitle');
+const calGrid = document.getElementById('calGrid');
+const bigClock = document.getElementById('bigClock');
+const bigClockDate = document.getElementById('bigClockDate');
+const timerMinutesInput = document.getElementById('timerMinutesInput');
+const timerStartButton = document.getElementById('timerStartButton');
+const timerStopButton = document.getElementById('timerStopButton');
+const timerDisplay = document.getElementById('timerDisplay');
+const alarmTimeInput = document.getElementById('alarmTimeInput');
+const alarmLabelInput = document.getElementById('alarmLabelInput');
+const alarmAddButton = document.getElementById('alarmAddButton');
+const alarmsList = document.getElementById('alarmsList');
+const monitorUpdatedLabel = document.getElementById('monitorUpdatedLabel');
+const monitorCpuBar = document.getElementById('monitorCpuBar');
+const monitorCpuText = document.getElementById('monitorCpuText');
+const monitorMemBar = document.getElementById('monitorMemBar');
+const monitorMemText = document.getElementById('monitorMemText');
+const monitorServerText = document.getElementById('monitorServerText');
+const monitorProcessList = document.getElementById('monitorProcessList');
+const monitorContainerList = document.getElementById('monitorContainerList');
+const trashList = document.getElementById('trashList');
+const trashStatus = document.getElementById('trashStatus');
+const trashEmptyButton = document.getElementById('trashEmptyButton');
+const quickLookOverlay = document.getElementById('quickLookOverlay');
+const quickLookTitle = document.getElementById('quickLookTitle');
+const quickLookBody = document.getElementById('quickLookBody');
+const quickLookClose = document.getElementById('quickLookClose');
+const musicAddButton = document.getElementById('musicAddButton');
+const musicFileInput = document.getElementById('musicFileInput');
+const musicArtwork = document.getElementById('musicArtwork');
+const musicTrackTitle = document.getElementById('musicTrackTitle');
+const musicTrackDetail = document.getElementById('musicTrackDetail');
+const musicPrevButton = document.getElementById('musicPrevButton');
+const musicPlayButton = document.getElementById('musicPlayButton');
+const musicNextButton = document.getElementById('musicNextButton');
+const musicSeekSlider = document.getElementById('musicSeekSlider');
+const musicTimeLabel = document.getElementById('musicTimeLabel');
+const musicPlaylist = document.getElementById('musicPlaylist');
+const musicAudio = document.getElementById('musicAudio');
+const chatHistoryButton = document.getElementById('chatHistoryButton');
+const chatHistoryPanel = document.getElementById('chatHistoryPanel');
+const chatHistoryList = document.getElementById('chatHistoryList');
+const chatHistoryClearButton = document.getElementById('chatHistoryClearButton');
+
+const SPACE_COUNT = 3;
+let activeSpace = 1;
+let currentConversationId = null;
+let chatConversations = [];
+let chatHistorySaveTimer = null;
+let monitorTimer = null;
+let timerInterval = null;
+let timerEndsAt = null;
+let alarmFiredKeys = new Set();
+let calViewYear = new Date().getFullYear();
+let calViewMonth = new Date().getMonth();
+let miniCalYear = new Date().getFullYear();
+let miniCalMonth = new Date().getMonth();
+let globalVolume = 0.8;
+let lockClockInterval = null;
+let musicState = { tracks: [], currentIndex: -1, playing: false };
+
+// ---------- Notifications ----------
+
+function updateNotificationsBadge() {
+  const unread = (shellState.notifications || []).filter((item) => !item.read).length;
+  notificationsBadge.textContent = String(unread);
+  notificationsBadge.classList.toggle('hidden', unread === 0);
+}
+
+function showToast(title, body) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  const heading = document.createElement('strong');
+  heading.textContent = title;
+  const detail = document.createElement('span');
+  detail.textContent = body || '';
+  toast.appendChild(heading);
+  if (body) toast.appendChild(detail);
+  toast.addEventListener('click', () => toast.remove());
+  toastContainer.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('visible'));
+  setTimeout(() => {
+    toast.classList.remove('visible');
+    setTimeout(() => toast.remove(), 350);
+  }, 5000);
+}
+
+function notify(title, body = '', { toast = true } = {}) {
+  if (!Array.isArray(shellState.notifications)) shellState.notifications = [];
+  shellState.notifications.unshift({
+    id: `ntf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title: String(title).slice(0, 200),
+    body: String(body).slice(0, 500),
+    at: new Date().toISOString(),
+    read: false
+  });
+  shellState.notifications = shellState.notifications.slice(0, 50);
+  persistShellState();
+  updateNotificationsBadge();
+  renderNotificationCenter();
+  if (toast) showToast(title, body);
+}
+
+function renderNotificationCenter() {
+  const items = shellState.notifications || [];
+  notificationList.innerHTML = '';
+  notificationEmpty.classList.toggle('hidden', items.length > 0);
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    li.className = `notification-item${item.read ? '' : ' unread'}`;
+    const title = document.createElement('strong');
+    title.textContent = item.title;
+    const body = document.createElement('span');
+    body.textContent = item.body || '';
+    const time = document.createElement('time');
+    time.textContent = new Date(item.at).toLocaleString(undefined, {
+      hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric'
+    });
+    li.appendChild(title);
+    if (item.body) li.appendChild(body);
+    li.appendChild(time);
+    notificationList.appendChild(li);
+  });
+}
+
+function toggleNotificationCenter(force) {
+  const show = typeof force === 'boolean' ? force : notificationCenter.classList.contains('hidden');
+  notificationCenter.classList.toggle('hidden', !show);
+  if (show) {
+    renderNotificationCenter();
+    let changed = false;
+    (shellState.notifications || []).forEach((item) => {
+      if (!item.read) {
+        item.read = true;
+        changed = true;
+      }
+    });
+    if (changed) persistShellState();
+    updateNotificationsBadge();
+  }
+}
+
+notificationsButton.addEventListener('click', () => {
+  hideMenuPopovers();
+  toggleNotificationCenter();
+});
+notificationsClearButton.addEventListener('click', () => {
+  shellState.notifications = [];
+  persistShellState();
+  renderNotificationCenter();
+  updateNotificationsBadge();
+});
+
+// ---------- Menu bar extras ----------
+
+function hideMenuPopovers() {
+  volumePopover.classList.add('hidden');
+  calendarPopover.classList.add('hidden');
+}
+
+function updateWifiStatus() {
+  const online = navigator.onLine !== false;
+  wifiStatus.textContent = online ? '📶' : '📵';
+  wifiStatus.title = online ? 'Network: online' : 'Network: offline';
+}
+
+window.addEventListener('online', () => {
+  updateWifiStatus();
+  notify('Network', 'Connection restored.');
+});
+window.addEventListener('offline', () => {
+  updateWifiStatus();
+  notify('Network', 'You are offline.');
+});
+
+function renderBatteryStatus(battery) {
+  const percent = Math.round(battery.level * 100);
+  const glyph = battery.charging ? '⚡️' : (percent <= 20 ? '🪫' : '🔋');
+  batteryStatus.textContent = `${glyph} ${percent}%`;
+  batteryStatus.title = battery.charging ? `Battery: ${percent}% (charging)` : `Battery: ${percent}%`;
+  batteryStatus.classList.remove('hidden');
+}
+
+function initBatteryStatus() {
+  if (!navigator.getBattery) return;
+  navigator.getBattery().then((battery) => {
+    renderBatteryStatus(battery);
+    ['levelchange', 'chargingchange'].forEach((eventName) => {
+      battery.addEventListener(eventName, () => renderBatteryStatus(battery));
+    });
+  }).catch(() => {});
+}
+
+function volumeGlyph() {
+  if (globalVolume === 0) return '🔇';
+  if (globalVolume < 0.5) return '🔈';
+  return '🔊';
+}
+
+function applyVolume() {
+  musicAudio.volume = globalVolume;
+  volumeButton.textContent = volumeGlyph();
+  volumeSlider.value = String(Math.round(globalVolume * 100));
+  volumeValue.textContent = `${Math.round(globalVolume * 100)}%`;
+}
+
+volumeButton.addEventListener('click', () => {
+  const wasHidden = volumePopover.classList.contains('hidden');
+  hideMenuPopovers();
+  notificationCenter.classList.add('hidden');
+  if (wasHidden) volumePopover.classList.remove('hidden');
+});
+
+volumeSlider.addEventListener('input', () => {
+  globalVolume = Number(volumeSlider.value) / 100;
+  shellState.preferences.volume = globalVolume;
+  applyVolume();
+  persistShellState();
+});
+
+// ---------- Mini calendar popover ----------
+
+function buildMonthGrid(container, year, month) {
+  container.innerHTML = '';
+  const today = new Date();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  for (let i = 0; i < firstDay; i += 1) {
+    container.appendChild(document.createElement('span'));
+  }
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const cell = document.createElement('span');
+    cell.className = 'cal-day';
+    cell.textContent = String(day);
+    if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+      cell.classList.add('today');
+    }
+    container.appendChild(cell);
+  }
+}
+
+function renderMiniCalendar() {
+  miniCalTitle.textContent = new Date(miniCalYear, miniCalMonth, 1).toLocaleString(undefined, {
+    month: 'long', year: 'numeric'
+  });
+  buildMonthGrid(miniCalGrid, miniCalYear, miniCalMonth);
+}
+
+clockLabel.addEventListener('click', () => {
+  const wasHidden = calendarPopover.classList.contains('hidden');
+  hideMenuPopovers();
+  notificationCenter.classList.add('hidden');
+  if (wasHidden) {
+    miniCalYear = new Date().getFullYear();
+    miniCalMonth = new Date().getMonth();
+    renderMiniCalendar();
+    calendarPopover.classList.remove('hidden');
+  }
+});
+miniCalPrev.addEventListener('click', () => {
+  miniCalMonth -= 1;
+  if (miniCalMonth < 0) { miniCalMonth = 11; miniCalYear -= 1; }
+  renderMiniCalendar();
+});
+miniCalNext.addEventListener('click', () => {
+  miniCalMonth += 1;
+  if (miniCalMonth > 11) { miniCalMonth = 0; miniCalYear += 1; }
+  renderMiniCalendar();
+});
+miniCalOpenApp.addEventListener('click', () => {
+  hideMenuPopovers();
+  openWindow('calendar');
+});
+
+// ---------- Calendar & Clock app ----------
+
+function renderCalendarApp() {
+  calTitle.textContent = new Date(calViewYear, calViewMonth, 1).toLocaleString(undefined, {
+    month: 'long', year: 'numeric'
+  });
+  buildMonthGrid(calGrid, calViewYear, calViewMonth);
+}
+
+calPrevButton.addEventListener('click', () => {
+  calViewMonth -= 1;
+  if (calViewMonth < 0) { calViewMonth = 11; calViewYear -= 1; }
+  renderCalendarApp();
+});
+calNextButton.addEventListener('click', () => {
+  calViewMonth += 1;
+  if (calViewMonth > 11) { calViewMonth = 0; calViewYear += 1; }
+  renderCalendarApp();
+});
+calTodayButton.addEventListener('click', () => {
+  calViewYear = new Date().getFullYear();
+  calViewMonth = new Date().getMonth();
+  renderCalendarApp();
+});
+
+function tickBigClock() {
+  const now = new Date();
+  bigClock.textContent = now.toLocaleTimeString(undefined, {
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+  bigClockDate.textContent = now.toLocaleDateString(undefined, {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+  });
+}
+
+// ---------- Timer ----------
+
+function stopTimer({ silent = false } = {}) {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = null;
+  timerEndsAt = null;
+  timerDisplay.classList.add('hidden');
+  timerStopButton.classList.add('hidden');
+  timerStartButton.classList.remove('hidden');
+  if (!silent) notify('Timer', 'Timer stopped.');
+}
+
+function tickTimer() {
+  const remaining = Math.max(0, Math.round((timerEndsAt - Date.now()) / 1000));
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+  timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  if (remaining <= 0) {
+    stopTimer({ silent: true });
+    notify('Timer finished', 'Your countdown timer is done.');
+  }
+}
+
+timerStartButton.addEventListener('click', () => {
+  const minutes = Math.max(0, Math.min(720, Number(timerMinutesInput.value) || 0));
+  if (!minutes) return;
+  timerEndsAt = Date.now() + minutes * 60 * 1000;
+  timerDisplay.classList.remove('hidden');
+  timerStartButton.classList.add('hidden');
+  timerStopButton.classList.remove('hidden');
+  tickTimer();
+  timerInterval = setInterval(tickTimer, 1000);
+});
+timerStopButton.addEventListener('click', () => stopTimer());
+
+// ---------- Alarms ----------
+
+function renderAlarmsList() {
+  const alarms = shellState.alarms || [];
+  alarmsList.innerHTML = '';
+  alarms.forEach((alarm) => {
+    const li = document.createElement('li');
+    li.className = 'alarm-item';
+    const toggle = document.createElement('input');
+    toggle.type = 'checkbox';
+    toggle.checked = alarm.enabled !== false;
+    toggle.setAttribute('aria-label', `Enable alarm ${alarm.time}`);
+    toggle.addEventListener('change', () => {
+      alarm.enabled = toggle.checked;
+      persistShellState();
+    });
+    const label = document.createElement('span');
+    label.textContent = `${alarm.time} ${alarm.label ? `• ${alarm.label}` : ''}`;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'file-entry-action';
+    remove.textContent = '✕';
+    remove.setAttribute('aria-label', `Delete alarm ${alarm.time}`);
+    remove.addEventListener('click', () => {
+      shellState.alarms = (shellState.alarms || []).filter((entry) => entry.id !== alarm.id);
+      persistShellState();
+      renderAlarmsList();
+    });
+    li.appendChild(toggle);
+    li.appendChild(label);
+    li.appendChild(remove);
+    alarmsList.appendChild(li);
+  });
+}
+
+alarmAddButton.addEventListener('click', () => {
+  const time = alarmTimeInput.value;
+  if (!time) return;
+  if (!Array.isArray(shellState.alarms)) shellState.alarms = [];
+  shellState.alarms.push({
+    id: `alarm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    time,
+    label: alarmLabelInput.value.trim().slice(0, 100),
+    enabled: true
+  });
+  alarmLabelInput.value = '';
+  persistShellState();
+  renderAlarmsList();
+  notify('Alarm set', `Alarm scheduled for ${time}.`);
+});
+
+function checkAlarms() {
+  const now = new Date();
+  const current = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const minuteKey = `${now.toDateString()}-${current}`;
+  (shellState.alarms || []).forEach((alarm) => {
+    if (alarm.enabled === false || alarm.time !== current) return;
+    const firedKey = `${alarm.id}-${minuteKey}`;
+    if (alarmFiredKeys.has(firedKey)) return;
+    alarmFiredKeys.add(firedKey);
+    notify('⏰ Alarm', alarm.label ? `${alarm.time} — ${alarm.label}` : `It is ${alarm.time}.`);
+  });
+  if (alarmFiredKeys.size > 200) alarmFiredKeys = new Set();
+}
+
+// ---------- Activity Monitor ----------
+
+function formatUptime(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
+async function refreshActivityMonitor() {
+  try {
+    const response = await fetch('/api/system/stats');
+    const payload = await response.json();
+    if (!payload.ok) throw new Error(payload.error || 'Stats unavailable');
+    const stats = payload.stats;
+
+    const cpuPercent = Math.min(100, Math.round((stats.loadAvg[0] / Math.max(1, stats.cpuCount)) * 100));
+    monitorCpuBar.style.width = `${cpuPercent}%`;
+    monitorCpuBar.classList.toggle('hot', cpuPercent > 80);
+    monitorCpuText.textContent = `${cpuPercent}% • load ${stats.loadAvg.join(' / ')} • ${stats.cpuCount} cores`;
+
+    const memPercent = Math.round((stats.usedMem / Math.max(1, stats.totalMem)) * 100);
+    monitorMemBar.style.width = `${memPercent}%`;
+    monitorMemBar.classList.toggle('hot', memPercent > 85);
+    monitorMemText.textContent = `${formatBytes(stats.usedMem)} of ${formatBytes(stats.totalMem)} (${memPercent}%)`;
+
+    monitorServerText.textContent = `PID ${stats.serverProcess.pid} • ${formatBytes(stats.serverProcess.rss)} RSS • up ${formatUptime(stats.serverProcess.uptime)}`;
+
+    monitorProcessList.innerHTML = '';
+    const processes = stats.processes || [];
+    if (processes.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'status-text';
+      li.textContent = 'No tracked AIOS processes.';
+      monitorProcessList.appendChild(li);
+    }
+    processes.slice(0, 20).forEach((proc) => {
+      const li = document.createElement('li');
+      li.className = 'monitor-row';
+      li.textContent = `${proc.status === 'running' ? '🟢' : '⚪️'} ${proc.title || proc.command || proc.id} • ${proc.status}${proc.pid ? ` • PID ${proc.pid}` : ''}`;
+      monitorProcessList.appendChild(li);
+    });
+
+    monitorContainerList.innerHTML = '';
+    const containers = stats.containers || [];
+    if (containers.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'status-text';
+      li.textContent = 'No running Linux containers.';
+      monitorContainerList.appendChild(li);
+    }
+    containers.forEach((container) => {
+      const li = document.createElement('li');
+      li.className = 'monitor-row';
+      li.textContent = `🐧 ${container.name} • CPU ${container.cpu} • Mem ${container.mem} • Net ${container.net}`;
+      monitorContainerList.appendChild(li);
+    });
+
+    monitorUpdatedLabel.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+  } catch (error) {
+    monitorUpdatedLabel.textContent = `Error: ${error.message}`;
+  }
+}
+
+function startActivityMonitor() {
+  stopActivityMonitor();
+  refreshActivityMonitor();
+  monitorTimer = setInterval(refreshActivityMonitor, 3000);
+}
+
+function stopActivityMonitor() {
+  if (monitorTimer) clearInterval(monitorTimer);
+  monitorTimer = null;
+}
+
+// ---------- Trash ----------
+
+async function moveFileToTrash(pathValue) {
+  const response = await fetch('/api/fs/trash', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: pathValue })
+  });
+  const payload = await response.json();
+  if (!payload.ok) throw new Error(payload.error || 'Failed to move to trash.');
+  notify('Moved to Trash', payload.item?.name || pathValue);
+  refreshFileList().catch(() => {});
+  if (!document.getElementById('windowTrash').classList.contains('hidden')) {
+    refreshTrash().catch(() => {});
+  }
+  return payload.item;
+}
+
+async function refreshTrash() {
+  const response = await fetch('/api/trash');
+  const payload = await response.json();
+  if (!payload.ok) {
+    setFeedback(trashStatus, payload.error || 'Failed to load trash.', 'error');
+    return;
+  }
+  trashList.innerHTML = '';
+  const items = payload.items || [];
+  setFeedback(trashStatus, items.length === 0 ? 'Trash is empty.' : `${items.length} item${items.length === 1 ? '' : 's'} in Trash`);
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    li.className = 'trash-item';
+    const info = document.createElement('div');
+    info.className = 'trash-item-info';
+    const name = document.createElement('strong');
+    name.textContent = `${item.type === 'directory' ? '📁' : '📄'} ${item.name}`;
+    const detail = document.createElement('span');
+    detail.className = 'status-text';
+    detail.textContent = `${item.originalPath} • deleted ${new Date(item.deletedAt).toLocaleString()}${item.size ? ` • ${formatBytes(item.size)}` : ''}`;
+    info.appendChild(name);
+    info.appendChild(detail);
+    const actions = document.createElement('div');
+    actions.className = 'trash-item-actions';
+    const restore = document.createElement('button');
+    restore.type = 'button';
+    restore.className = 'titlebar-button';
+    restore.textContent = 'Restore';
+    restore.addEventListener('click', async () => {
+      try {
+        const restoreResponse = await fetch('/api/trash/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id })
+        });
+        const restorePayload = await restoreResponse.json();
+        if (!restorePayload.ok) throw new Error(restorePayload.error);
+        notify('Restored from Trash', `${item.name} → ${restorePayload.restoredPath}`);
+        refreshTrash().catch(() => {});
+        refreshFileList().catch(() => {});
+      } catch (error) {
+        setFeedback(trashStatus, error.message, 'error');
+      }
+    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'titlebar-button';
+    remove.textContent = 'Delete';
+    remove.addEventListener('click', async () => {
+      try {
+        const deleteResponse = await fetch(`/api/trash/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+        const deletePayload = await deleteResponse.json();
+        if (!deletePayload.ok) throw new Error(deletePayload.error);
+        refreshTrash().catch(() => {});
+      } catch (error) {
+        setFeedback(trashStatus, error.message, 'error');
+      }
+    });
+    actions.appendChild(restore);
+    actions.appendChild(remove);
+    li.appendChild(info);
+    li.appendChild(actions);
+    trashList.appendChild(li);
+  });
+}
+
+trashEmptyButton.addEventListener('click', async () => {
+  try {
+    const response = await fetch('/api/trash/empty', { method: 'POST' });
+    const payload = await response.json();
+    if (!payload.ok) throw new Error(payload.error);
+    notify('Trash emptied', `${payload.removed} item${payload.removed === 1 ? '' : 's'} permanently deleted.`);
+    refreshTrash().catch(() => {});
+  } catch (error) {
+    setFeedback(trashStatus, error.message, 'error');
+  }
+});
+
+// ---------- Quick Look ----------
+
+const QUICKLOOK_IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'];
+const QUICKLOOK_AUDIO_EXTS = ['mp3', 'wav', 'ogg', 'm4a', 'flac'];
+const QUICKLOOK_VIDEO_EXTS = ['mp4', 'webm', 'mov'];
+
+function closeQuickLook() {
+  quickLookOverlay.classList.add('hidden');
+  quickLookBody.innerHTML = '';
+}
+
+async function openQuickLook(pathValue) {
+  const ext = (pathValue.split('.').pop() || '').toLowerCase();
+  const rawUrl = `/api/fs/raw?path=${encodeURIComponent(pathValue)}`;
+  quickLookTitle.textContent = pathValue.split('/').pop() || pathValue;
+  quickLookBody.innerHTML = '';
+  quickLookOverlay.classList.remove('hidden');
+
+  if (QUICKLOOK_IMAGE_EXTS.includes(ext)) {
+    const img = document.createElement('img');
+    img.src = rawUrl;
+    img.alt = pathValue;
+    quickLookBody.appendChild(img);
+    return;
+  }
+  if (QUICKLOOK_AUDIO_EXTS.includes(ext)) {
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = rawUrl;
+    quickLookBody.appendChild(audio);
+    return;
+  }
+  if (QUICKLOOK_VIDEO_EXTS.includes(ext)) {
+    const video = document.createElement('video');
+    video.controls = true;
+    video.src = rawUrl;
+    quickLookBody.appendChild(video);
+    return;
+  }
+  if (ext === 'pdf') {
+    const frame = document.createElement('iframe');
+    frame.src = rawUrl;
+    frame.title = pathValue;
+    quickLookBody.appendChild(frame);
+    return;
+  }
+
+  const pre = document.createElement('pre');
+  pre.textContent = 'Loading preview...';
+  quickLookBody.appendChild(pre);
+  try {
+    const file = await readWorkspaceFile(pathValue);
+    pre.textContent = file.content.slice(0, 100000) || '(empty file)';
+  } catch (error) {
+    pre.textContent = `Cannot preview this file: ${error.message}`;
+  }
+}
+
+quickLookClose.addEventListener('click', closeQuickLook);
+quickLookOverlay.addEventListener('click', (event) => {
+  if (event.target === quickLookOverlay) closeQuickLook();
+});
+
+// ---------- Spaces & Mission Control ----------
+
+function refreshSpaceVisibility() {
+  Object.entries(WINDOW_IDS).forEach(([app, id]) => {
+    const windowEl = document.getElementById(id);
+    if (!windowEl) return;
+    const state = shellState.windows?.[app] || {};
+    const space = Number(state.space) || 1;
+    const open = state.open !== false && !state.minimized;
+    windowEl.classList.toggle('hidden', !(open && space === activeSpace));
+  });
+}
+
+function renderSpacesSwitcher() {
+  spacesSwitcher.innerHTML = '';
+  for (let space = 1; space <= SPACE_COUNT; space += 1) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `space-dot${space === activeSpace ? ' active' : ''}`;
+    button.textContent = String(space);
+    button.title = `Switch to Space ${space}`;
+    button.setAttribute('aria-label', `Switch to Space ${space}`);
+    button.addEventListener('click', () => switchSpace(space));
+    spacesSwitcher.appendChild(button);
+  }
+}
+
+function switchSpace(space) {
+  if (space === activeSpace) return;
+  activeSpace = space;
+  shellState.preferences.activeSpace = space;
+  persistShellState();
+  renderSpacesSwitcher();
+  refreshSpaceVisibility();
+  activeWindowTitle.textContent = `Space ${space}`;
+  if (!missionControlOverlay.classList.contains('hidden')) renderMissionControl();
+}
+
+function renderMissionControl() {
+  missionControlSpaces.innerHTML = '';
+  for (let space = 1; space <= SPACE_COUNT; space += 1) {
+    const panel = document.createElement('div');
+    panel.className = `mission-space${space === activeSpace ? ' active' : ''}`;
+    const heading = document.createElement('strong');
+    heading.textContent = `Space ${space}`;
+    panel.appendChild(heading);
+    const chips = document.createElement('div');
+    chips.className = 'mission-space-windows';
+    Object.entries(WINDOW_IDS).forEach(([app, id]) => {
+      const state = shellState.windows?.[app] || {};
+      const windowSpace = Number(state.space) || 1;
+      if (windowSpace !== space || state.open === false || state.minimized) return;
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'mission-window-chip';
+      chip.textContent = document.getElementById(id)?.dataset.title || app;
+      chip.addEventListener('click', (event) => {
+        event.stopPropagation();
+        switchSpace(space);
+        toggleMissionControl(false);
+        focusWindow(app);
+      });
+      chips.appendChild(chip);
+    });
+    if (!chips.children.length) {
+      const empty = document.createElement('span');
+      empty.className = 'status-text';
+      empty.textContent = 'No windows';
+      chips.appendChild(empty);
+    }
+    panel.appendChild(chips);
+    panel.addEventListener('click', () => {
+      switchSpace(space);
+      toggleMissionControl(false);
+    });
+    missionControlSpaces.appendChild(panel);
+  }
+}
+
+function toggleMissionControl(force) {
+  const show = typeof force === 'boolean' ? force : missionControlOverlay.classList.contains('hidden');
+  missionControlOverlay.classList.toggle('hidden', !show);
+  if (show) renderMissionControl();
+}
+
+missionControlButton.addEventListener('click', () => toggleMissionControl());
+missionControlOverlay.addEventListener('click', (event) => {
+  if (event.target === missionControlOverlay) toggleMissionControl(false);
+});
+
+// ---------- Lock screen ----------
+
+async function hashPin(pin) {
+  if (window.crypto?.subtle) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`aios:${pin}`));
+    return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  let hash = 0;
+  const text = `aios:${pin}`;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  }
+  return `fallback-${hash}`;
+}
+
+function tickLockClock() {
+  const now = new Date();
+  lockClock.textContent = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  lockDate.textContent = now.toLocaleDateString(undefined, {
+    weekday: 'long', month: 'long', day: 'numeric'
+  });
+}
+
+function showLockScreen() {
+  lockScreen.classList.remove('hidden');
+  lockPinInput.value = '';
+  setFeedback(lockFeedback);
+  lockMessage.textContent = shellState.preferences.lockPinHash
+    ? 'Enter your PIN to unlock'
+    : 'Set a PIN (4+ digits) to protect this desktop';
+  tickLockClock();
+  if (lockClockInterval) clearInterval(lockClockInterval);
+  lockClockInterval = setInterval(tickLockClock, 1000);
+  setTimeout(() => lockPinInput.focus(), 50);
+}
+
+function hideLockScreen() {
+  lockScreen.classList.add('hidden');
+  if (lockClockInterval) clearInterval(lockClockInterval);
+  lockClockInterval = null;
+}
+
+function lockScreenNow() {
+  shellState.preferences.locked = true;
+  persistShellState();
+  hideMenuPopovers();
+  notificationCenter.classList.add('hidden');
+  toggleMissionControl(false);
+  showLockScreen();
+}
+
+lockButton.addEventListener('click', lockScreenNow);
+
+lockForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const pin = lockPinInput.value.trim();
+  if (pin.length < 4) {
+    setFeedback(lockFeedback, 'PIN must be at least 4 characters.', 'error');
+    return;
+  }
+  const hashed = await hashPin(pin);
+  if (!shellState.preferences.lockPinHash) {
+    shellState.preferences.lockPinHash = hashed;
+    shellState.preferences.locked = false;
+    persistShellState();
+    hideLockScreen();
+    notify('Lock screen', 'PIN set. Use the 🔒 menu button or Ctrl+⌘Q to lock.');
+    return;
+  }
+  if (hashed === shellState.preferences.lockPinHash) {
+    shellState.preferences.locked = false;
+    persistShellState();
+    hideLockScreen();
+  } else {
+    setFeedback(lockFeedback, 'Incorrect PIN. Try again.', 'error');
+    lockPinInput.value = '';
+  }
+});
+
+// ---------- Context menus ----------
+
+function hideContextMenu() {
+  contextMenu.classList.add('hidden');
+  contextMenu.innerHTML = '';
+}
+
+function showContextMenu(items, x, y) {
+  contextMenu.innerHTML = '';
+  items.forEach((item) => {
+    if (item === 'separator') {
+      const separator = document.createElement('li');
+      separator.className = 'context-menu-separator';
+      contextMenu.appendChild(separator);
+      return;
+    }
+    const li = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('role', 'menuitem');
+    button.textContent = item.label;
+    if (item.danger) button.classList.add('danger');
+    button.addEventListener('click', () => {
+      hideContextMenu();
+      item.action();
+    });
+    li.appendChild(button);
+    contextMenu.appendChild(li);
+  });
+  contextMenu.classList.remove('hidden');
+  const rect = contextMenu.getBoundingClientRect();
+  const left = Math.min(x, window.innerWidth - rect.width - 8);
+  const top = Math.min(y, window.innerHeight - rect.height - 8);
+  contextMenu.style.left = `${Math.max(4, left)}px`;
+  contextMenu.style.top = `${Math.max(4, top)}px`;
+}
+
+document.addEventListener('click', (event) => {
+  if (!contextMenu.contains(event.target)) hideContextMenu();
+  if (!volumePopover.contains(event.target) && event.target !== volumeButton) {
+    volumePopover.classList.add('hidden');
+  }
+  if (!calendarPopover.contains(event.target) && event.target !== clockLabel) {
+    calendarPopover.classList.add('hidden');
+  }
+  if (!notificationCenter.contains(event.target) && event.target !== notificationsButton && !notificationsButton.contains(event.target)) {
+    notificationCenter.classList.add('hidden');
+  }
+});
+
+desktopCanvas.addEventListener('contextmenu', (event) => {
+  if (event.target !== desktopCanvas) return;
+  event.preventDefault();
+  showContextMenu([
+    { label: 'New Note', action: () => openWindow('notes') },
+    { label: 'Open Terminal', action: () => openWindow('terminal') },
+    { label: 'Open Files', action: () => { openWindow('files'); refreshFileList().catch(() => {}); } },
+    'separator',
+    { label: 'Change Wallpaper…', action: () => openWindow('settings') },
+    { label: 'Mission Control', action: () => toggleMissionControl(true) },
+    'separator',
+    { label: 'Lock Screen', action: lockScreenNow }
+  ], event.clientX, event.clientY);
+});
+
+function showFileContextMenu(event, entry, entryPath) {
+  const items = [];
+  if (entry.type === 'directory') {
+    items.push({ label: 'Open Folder', action: () => refreshFileList(entryPath).catch(() => {}) });
+  } else {
+    items.push({ label: 'Open in Editor', action: async () => {
+      try {
+        const file = await readWorkspaceFile(entryPath);
+        openFileInEditor(file.path);
+      } catch (error) {
+        setFeedback(fileReadStatus, error.message, 'error');
+      }
+    } });
+    items.push({ label: 'Quick Look', action: () => openQuickLook(entryPath) });
+  }
+  items.push('separator');
+  items.push({
+    label: 'Move to Trash',
+    danger: true,
+    action: () => moveFileToTrash(entryPath).catch((error) => setFeedback(fileReadStatus, error.message, 'error'))
+  });
+  showContextMenu(items, event.clientX, event.clientY);
+}
+
+dockAppButtons.forEach((button) => {
+  button.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    const app = button.dataset.openApp;
+    const windowEl = document.getElementById(WINDOW_IDS[app]);
+    const isOpen = windowEl && !windowEl.classList.contains('hidden');
+    const items = [
+      { label: isOpen ? 'Focus Window' : 'Open', action: () => openWindow(app) }
+    ];
+    if (isOpen) {
+      items.push({ label: 'Close Window', action: () => closeWindow(app) });
+    }
+    items.push('separator');
+    for (let space = 1; space <= SPACE_COUNT; space += 1) {
+      items.push({
+        label: `Move to Space ${space}`,
+        action: () => {
+          recordWindowState(app, { space });
+          refreshSpaceVisibility();
+        }
+      });
+    }
+    showContextMenu(items, event.clientX, event.clientY);
+  });
+});
+
+// ---------- Music player ----------
+
+function formatTrackTime(totalSeconds) {
+  if (!Number.isFinite(totalSeconds)) return '0:00';
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function renderMusicPlaylist() {
+  musicPlaylist.innerHTML = '';
+  if (musicState.tracks.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'status-text';
+    li.textContent = 'Playlist is empty. Click "Add Songs" to load local audio files.';
+    musicPlaylist.appendChild(li);
+    return;
+  }
+  musicState.tracks.forEach((track, index) => {
+    const li = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `music-playlist-item${index === musicState.currentIndex ? ' active' : ''}`;
+    button.textContent = `${index === musicState.currentIndex && musicState.playing ? '▶︎ ' : ''}${track.name}`;
+    button.addEventListener('click', () => playTrack(index));
+    li.appendChild(button);
+    musicPlaylist.appendChild(li);
+  });
+}
+
+function updateMusicNowPlaying() {
+  const track = musicState.tracks[musicState.currentIndex];
+  musicTrackTitle.textContent = track ? track.name : 'Nothing playing';
+  musicTrackDetail.textContent = track
+    ? `Track ${musicState.currentIndex + 1} of ${musicState.tracks.length}`
+    : 'Add local audio files to get started';
+  musicPlayButton.textContent = musicState.playing ? '⏸' : '▶️';
+  musicArtwork.classList.toggle('spinning', musicState.playing);
+  renderMusicPlaylist();
+}
+
+function playTrack(index) {
+  const track = musicState.tracks[index];
+  if (!track) return;
+  musicState.currentIndex = index;
+  musicAudio.src = track.url;
+  musicAudio.volume = globalVolume;
+  musicAudio.play().then(() => {
+    musicState.playing = true;
+    updateMusicNowPlaying();
+  }).catch(() => {
+    musicState.playing = false;
+    updateMusicNowPlaying();
+  });
+}
+
+musicAddButton.addEventListener('click', () => musicFileInput.click());
+musicFileInput.addEventListener('change', () => {
+  const files = Array.from(musicFileInput.files || []);
+  files.forEach((file) => {
+    musicState.tracks.push({ name: file.name.replace(/\.[^.]+$/, ''), url: URL.createObjectURL(file) });
+  });
+  musicFileInput.value = '';
+  if (musicState.currentIndex === -1 && musicState.tracks.length > 0) {
+    playTrack(0);
+  } else {
+    renderMusicPlaylist();
+  }
+});
+
+musicPlayButton.addEventListener('click', () => {
+  if (musicState.currentIndex === -1) {
+    playTrack(0);
+    return;
+  }
+  if (musicState.playing) {
+    musicAudio.pause();
+    musicState.playing = false;
+  } else {
+    musicAudio.play().catch(() => {});
+    musicState.playing = true;
+  }
+  updateMusicNowPlaying();
+});
+musicPrevButton.addEventListener('click', () => {
+  if (musicState.tracks.length === 0) return;
+  playTrack((musicState.currentIndex - 1 + musicState.tracks.length) % musicState.tracks.length);
+});
+musicNextButton.addEventListener('click', () => {
+  if (musicState.tracks.length === 0) return;
+  playTrack((musicState.currentIndex + 1) % musicState.tracks.length);
+});
+musicAudio.addEventListener('ended', () => {
+  if (musicState.currentIndex < musicState.tracks.length - 1) {
+    playTrack(musicState.currentIndex + 1);
+  } else {
+    musicState.playing = false;
+    updateMusicNowPlaying();
+  }
+});
+musicAudio.addEventListener('timeupdate', () => {
+  if (Number.isFinite(musicAudio.duration) && musicAudio.duration > 0) {
+    musicSeekSlider.value = String(Math.round((musicAudio.currentTime / musicAudio.duration) * 100));
+  }
+  musicTimeLabel.textContent = `${formatTrackTime(musicAudio.currentTime)} / ${formatTrackTime(musicAudio.duration)}`;
+});
+musicSeekSlider.addEventListener('input', () => {
+  if (Number.isFinite(musicAudio.duration) && musicAudio.duration > 0) {
+    musicAudio.currentTime = (Number(musicSeekSlider.value) / 100) * musicAudio.duration;
+  }
+});
+
+// ---------- AI chat history ----------
+
+function persistChatConversations() {
+  if (chatHistorySaveTimer) clearTimeout(chatHistorySaveTimer);
+  chatHistorySaveTimer = setTimeout(async () => {
+    try {
+      await fetch('/api/local-data/chat-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversations: chatConversations })
+      });
+    } catch {
+      // Best effort local persistence.
+    }
+  }, 300);
+}
+
+function conversationTitleFromMessages(messages) {
+  const firstUser = messages.find((message) => message.role === 'user');
+  const text = (firstUser?.content || 'Conversation').trim().replace(/\s+/g, ' ');
+  return text.length > 60 ? `${text.slice(0, 57)}...` : text;
+}
+
+function saveCurrentConversation({ provider = '', model = '' } = {}) {
+  if (chatHistory.length === 0) return;
+  const now = new Date().toISOString();
+  if (!currentConversationId) {
+    currentConversationId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    chatConversations.unshift({
+      id: currentConversationId,
+      title: conversationTitleFromMessages(chatHistory),
+      createdAt: now,
+      updatedAt: now,
+      provider,
+      model,
+      messages: chatHistory.slice()
+    });
+  } else {
+    const conversation = chatConversations.find((entry) => entry.id === currentConversationId);
+    if (conversation) {
+      conversation.messages = chatHistory.slice();
+      conversation.updatedAt = now;
+      if (provider) conversation.provider = provider;
+      if (model) conversation.model = model;
+    }
+  }
+  chatConversations = chatConversations.slice(0, 100);
+  persistChatConversations();
+  renderChatHistoryList();
+}
+
+function loadConversation(conversationId) {
+  const conversation = chatConversations.find((entry) => entry.id === conversationId);
+  if (!conversation) return;
+  currentConversationId = conversation.id;
+  chatHistory = conversation.messages.slice();
+  messagesEl.innerHTML = '';
+  chatHistory.forEach((message) => renderMessage(message.role, message.content));
+  renderChatHistoryList();
+  chatHistoryPanel.classList.add('hidden');
+}
+
+function renderChatHistoryList() {
+  chatHistoryList.innerHTML = '';
+  if (chatConversations.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'status-text';
+    li.textContent = 'No saved conversations yet.';
+    chatHistoryList.appendChild(li);
+    return;
+  }
+  chatConversations.forEach((conversation) => {
+    const li = document.createElement('li');
+    li.className = `chat-history-item${conversation.id === currentConversationId ? ' active' : ''}`;
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'chat-history-open';
+    const title = document.createElement('strong');
+    title.textContent = conversation.title || 'Conversation';
+    const detail = document.createElement('span');
+    detail.className = 'status-text';
+    const count = conversation.messages.length;
+    detail.textContent = `${new Date(conversation.updatedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} • ${count} message${count === 1 ? '' : 's'}`;
+    open.appendChild(title);
+    open.appendChild(detail);
+    open.addEventListener('click', () => loadConversation(conversation.id));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'file-entry-action';
+    remove.textContent = '✕';
+    remove.setAttribute('aria-label', `Delete conversation ${conversation.title}`);
+    remove.addEventListener('click', (event) => {
+      event.stopPropagation();
+      chatConversations = chatConversations.filter((entry) => entry.id !== conversation.id);
+      if (currentConversationId === conversation.id) currentConversationId = null;
+      persistChatConversations();
+      renderChatHistoryList();
+    });
+    li.appendChild(open);
+    li.appendChild(remove);
+    chatHistoryList.appendChild(li);
+  });
+}
+
+async function loadChatConversationsFromServer() {
+  try {
+    const response = await fetch('/api/local-data/chat-history');
+    const payload = await response.json();
+    if (response.ok && payload.ok) {
+      chatConversations = Array.isArray(payload.conversations) ? payload.conversations : [];
+    }
+  } catch {
+    chatConversations = [];
+  }
+  renderChatHistoryList();
+}
+
+chatHistoryButton.addEventListener('click', () => {
+  const wasHidden = chatHistoryPanel.classList.contains('hidden');
+  chatHistoryPanel.classList.toggle('hidden', !wasHidden);
+  if (wasHidden) renderChatHistoryList();
+});
+chatHistoryClearButton.addEventListener('click', () => {
+  chatConversations = [];
+  currentConversationId = null;
+  persistChatConversations();
+  renderChatHistoryList();
+});
+
+// ---------- Init ----------
+
+function initShellExtras() {
+  activeSpace = Math.min(SPACE_COUNT, Math.max(1, Number(shellState.preferences.activeSpace) || 1));
+  renderSpacesSwitcher();
+  refreshSpaceVisibility();
+  updateNotificationsBadge();
+  renderNotificationCenter();
+  updateWifiStatus();
+  initBatteryStatus();
+  globalVolume = typeof shellState.preferences.volume === 'number'
+    ? Math.min(1, Math.max(0, shellState.preferences.volume))
+    : 0.8;
+  applyVolume();
+  renderAlarmsList();
+  if (shellState.preferences.locked) {
+    showLockScreen();
+  }
+  loadChatConversationsFromServer();
+  setInterval(checkAlarms, 15000);
+  setInterval(() => {
+    if (!document.getElementById('windowCalendar').classList.contains('hidden')) tickBigClock();
+  }, 1000);
+  tickBigClock();
 }

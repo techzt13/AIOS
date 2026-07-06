@@ -32,6 +32,17 @@ No Docker, XFCE desktop, VNC, or container runtime is part of the supported app 
 
 - Desktop wallpaper + top menu bar + dock
 - Windowed apps: **AI Chat**, **Browser**, **Files**, **Terminal**, **Settings**, **Setup Assistant**
+- Menu bar extras: live clock with mini calendar, battery, network, volume, notifications bell, Spaces switcher, and lock button
+- Notifications center with toast banners and a slide-out history panel
+- **Calendar & Clock** app with month view, live clock, countdown timer, and alarms
+- **Activity Monitor** showing CPU/memory load, AIOS server stats, tracked processes, and Linux container usage
+- **Trash** with soft-delete from Files, restore, and empty
+- Quick Look previews (Space key or 👁 button) for images, audio, video, PDF, and text
+- Mission Control with three virtual desktop Spaces (Ctrl+Up)
+- Lock screen with PIN protection (Ctrl+⌘Q or the 🔒 menu button)
+- Right-click context menus on the desktop, files, and dock items
+- **Music** player for local audio playback with a playlist
+- AI Chat history: past conversations persist locally and can be browsed and reloaded
 - Local AIOS runtime status, process history, and workspace identity
 - Third-party web app launchers stored locally and opened through the native AIOS Browser path
 - First-run setup flow (provider select/connect/test/finish)

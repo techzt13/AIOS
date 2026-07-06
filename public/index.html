@@ -20,9 +20,30 @@
         <div class="menu-right">
           <span id="providerStatusBadge">Provider: loading</span>
           <span id="runtimeBadge">Local runtime</span>
+          <div id="spacesSwitcher" class="spaces-switcher" role="group" aria-label="Spaces"></div>
+          <button type="button" id="missionControlButton" class="menu-extra-button" title="Mission Control (Ctrl+Up)" aria-label="Mission Control">▦</button>
+          <span id="wifiStatus" class="menu-extra" title="Network status">📶</span>
+          <span id="batteryStatus" class="menu-extra hidden" title="Battery"></span>
+          <button type="button" id="volumeButton" class="menu-extra-button" title="Volume" aria-label="Volume">🔊</button>
+          <button type="button" id="notificationsButton" class="menu-extra-button" title="Notifications" aria-label="Notifications">🔔<span id="notificationsBadge" class="notifications-badge hidden">0</span></button>
+          <button type="button" id="lockButton" class="menu-extra-button" title="Lock screen (Ctrl+⌘Q)" aria-label="Lock screen">🔒</button>
           <button type="button" id="themeToggleButton" class="theme-toggle-button" title="Toggle theme" aria-label="Toggle theme">🌙</button>
           <button type="button" id="spotlightButton" class="spotlight-button" title="Search (⌘Space)" aria-label="Search">🔍</button>
-          <span id="clockLabel"></span>
+          <button type="button" id="clockLabel" class="menu-clock" title="Open calendar" aria-label="Clock and calendar"></button>
+        </div>
+        <div id="volumePopover" class="menu-popover hidden" aria-label="Volume control">
+          <label for="volumeSlider">Volume</label>
+          <input id="volumeSlider" type="range" min="0" max="100" value="80" />
+          <span id="volumeValue">80%</span>
+        </div>
+        <div id="calendarPopover" class="menu-popover calendar-popover hidden" aria-label="Mini calendar">
+          <div class="mini-calendar-header">
+            <button type="button" id="miniCalPrev" aria-label="Previous month">‹</button>
+            <strong id="miniCalTitle"></strong>
+            <button type="button" id="miniCalNext" aria-label="Next month">›</button>
+          </div>
+          <div id="miniCalGrid" class="mini-calendar-grid"></div>
+          <button type="button" id="miniCalOpenApp" class="titlebar-button">Open Calendar App</button>
         </div>
       </header>
 
@@ -39,10 +60,18 @@
               <select id="chatModelSelect" class="chat-model-select">
                 <option value="">Loading models...</option>
               </select>
+              <button id="chatHistoryButton" type="button" class="titlebar-button">History</button>
               <button id="newChatButton" type="button" class="titlebar-button">New Chat</button>
             </div>
           </header>
           <div class="window-body chat-window">
+            <aside id="chatHistoryPanel" class="chat-history-panel hidden" aria-label="Chat history">
+              <div class="chat-history-header">
+                <strong>Chat History</strong>
+                <button id="chatHistoryClearButton" type="button" class="titlebar-button">Clear All</button>
+              </div>
+              <ul id="chatHistoryList" class="chat-history-list"></ul>
+            </aside>
             <div id="messages" class="messages" aria-live="polite"></div>
             <form id="chatForm" class="composer">
               <input id="messageInput" type="text" placeholder="Message AIOS..." required />
@@ -614,6 +643,142 @@
             </div>
           </div>
         </section>
+        <section id="windowCalendar" class="app-window hidden" data-app="calendar" data-title="Calendar">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="calendar" aria-label="Close Calendar"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="calendar" aria-label="Minimize Calendar"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="calendar" aria-label="Zoom Calendar"></button>
+            </div>
+            <h2>Calendar &amp; Clock</h2>
+          </header>
+          <div class="window-body calendar-window">
+            <div class="calendar-main">
+              <div class="calendar-header">
+                <button type="button" id="calPrevButton" aria-label="Previous month">‹</button>
+                <h3 id="calTitle"></h3>
+                <button type="button" id="calTodayButton" class="titlebar-button">Today</button>
+                <button type="button" id="calNextButton" aria-label="Next month">›</button>
+              </div>
+              <div class="calendar-weekdays">
+                <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+              </div>
+              <div id="calGrid" class="calendar-grid"></div>
+            </div>
+            <aside class="calendar-sidebar">
+              <div class="clock-panel">
+                <div id="bigClock" class="big-clock">--:--:--</div>
+                <div id="bigClockDate" class="big-clock-date"></div>
+              </div>
+              <div class="timer-panel">
+                <h4>Timer</h4>
+                <div class="timer-controls">
+                  <input id="timerMinutesInput" type="number" min="0" max="720" value="5" aria-label="Timer minutes" />
+                  <span>min</span>
+                  <button id="timerStartButton" type="button" class="titlebar-button">Start</button>
+                  <button id="timerStopButton" type="button" class="titlebar-button hidden">Stop</button>
+                </div>
+                <div id="timerDisplay" class="timer-display hidden">00:00</div>
+              </div>
+              <div class="alarms-panel">
+                <h4>Alarms</h4>
+                <div class="alarm-controls">
+                  <input id="alarmTimeInput" type="time" aria-label="Alarm time" />
+                  <input id="alarmLabelInput" type="text" placeholder="Label" aria-label="Alarm label" />
+                  <button id="alarmAddButton" type="button" class="titlebar-button">Add</button>
+                </div>
+                <ul id="alarmsList" class="alarms-list"></ul>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="windowMonitor" class="app-window hidden" data-app="monitor" data-title="Activity Monitor">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="monitor" aria-label="Close Activity Monitor"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="monitor" aria-label="Minimize Activity Monitor"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="monitor" aria-label="Zoom Activity Monitor"></button>
+            </div>
+            <h2>Activity Monitor</h2>
+            <div class="titlebar-actions">
+              <span id="monitorUpdatedLabel" class="status-text"></span>
+            </div>
+          </header>
+          <div class="window-body monitor-window">
+            <div class="monitor-summary">
+              <div class="monitor-card">
+                <h4>CPU Load</h4>
+                <div class="monitor-bar"><div id="monitorCpuBar" class="monitor-bar-fill"></div></div>
+                <p id="monitorCpuText" class="status-text">Loading...</p>
+              </div>
+              <div class="monitor-card">
+                <h4>Memory</h4>
+                <div class="monitor-bar"><div id="monitorMemBar" class="monitor-bar-fill"></div></div>
+                <p id="monitorMemText" class="status-text">Loading...</p>
+              </div>
+              <div class="monitor-card">
+                <h4>AIOS Server</h4>
+                <p id="monitorServerText" class="status-text">Loading...</p>
+              </div>
+            </div>
+            <h4>AIOS Processes</h4>
+            <ul id="monitorProcessList" class="monitor-list"></ul>
+            <h4>Linux Containers</h4>
+            <ul id="monitorContainerList" class="monitor-list"></ul>
+          </div>
+        </section>
+
+        <section id="windowTrash" class="app-window hidden" data-app="trash" data-title="Trash">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="trash" aria-label="Close Trash"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="trash" aria-label="Minimize Trash"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="trash" aria-label="Zoom Trash"></button>
+            </div>
+            <h2>Trash</h2>
+            <div class="titlebar-actions">
+              <button id="trashEmptyButton" type="button" class="titlebar-button">Empty Trash</button>
+            </div>
+          </header>
+          <div class="window-body trash-window">
+            <p id="trashStatus" class="status-text"></p>
+            <ul id="trashList" class="trash-list" aria-label="Trash items"></ul>
+          </div>
+        </section>
+
+        <section id="windowMusic" class="app-window hidden" data-app="music" data-title="Music">
+          <header class="window-titlebar">
+            <div class="traffic-lights">
+              <button class="light close" data-window-action="close" data-app="music" aria-label="Close Music"></button>
+              <button class="light minimize" data-window-action="minimize" data-app="music" aria-label="Minimize Music"></button>
+              <button class="light zoom" data-window-action="zoom" data-app="music" aria-label="Zoom Music"></button>
+            </div>
+            <h2>Music</h2>
+            <div class="titlebar-actions">
+              <button id="musicAddButton" type="button" class="titlebar-button">Add Songs</button>
+              <input id="musicFileInput" type="file" accept="audio/*" multiple class="hidden" />
+            </div>
+          </header>
+          <div class="window-body music-window">
+            <div class="music-now-playing">
+              <div class="music-artwork" id="musicArtwork">🎵</div>
+              <div class="music-track-info">
+                <strong id="musicTrackTitle">Nothing playing</strong>
+                <span id="musicTrackDetail" class="status-text">Add local audio files to get started</span>
+              </div>
+            </div>
+            <div class="music-transport">
+              <button id="musicPrevButton" type="button" aria-label="Previous track">⏮</button>
+              <button id="musicPlayButton" type="button" aria-label="Play or pause">▶️</button>
+              <button id="musicNextButton" type="button" aria-label="Next track">⏭</button>
+              <input id="musicSeekSlider" type="range" min="0" max="100" value="0" aria-label="Seek" />
+              <span id="musicTimeLabel" class="status-text">0:00 / 0:00</span>
+            </div>
+            <ul id="musicPlaylist" class="music-playlist" aria-label="Playlist"></ul>
+            <audio id="musicAudio" class="hidden"></audio>
+          </div>
+        </section>
       </main>
 
       <nav class="dock" aria-label="AIOS dock">
@@ -627,7 +792,11 @@
         <button type="button" class="dock-item" data-open-app="settings">Settings</button>
         <button type="button" class="dock-item" id="openSetupAssistant">Setup</button>
         <button type="button" class="dock-item" data-open-app="apps">Apps</button>
+        <button type="button" class="dock-item" data-open-app="calendar">Calendar</button>
+        <button type="button" class="dock-item" data-open-app="monitor">Monitor</button>
+        <button type="button" class="dock-item" data-open-app="music">Music</button>
         <button type="button" class="dock-item" data-open-app="instructions">Tips</button>
+        <button type="button" class="dock-item dock-trash" data-open-app="trash">Trash</button>
       </nav>
     </div>
 
@@ -744,6 +913,49 @@
         </footer>
       </div>
     </div>
+
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <aside id="notificationCenter" class="notification-center hidden" aria-label="Notification center">
+      <header class="notification-center-header">
+        <strong>Notifications</strong>
+        <button type="button" id="notificationsClearButton" class="titlebar-button">Clear All</button>
+      </header>
+      <ul id="notificationList" class="notification-list"></ul>
+      <p id="notificationEmpty" class="status-text">No notifications</p>
+    </aside>
+
+    <div id="quickLookOverlay" class="quicklook-overlay hidden" role="dialog" aria-modal="true" aria-label="Quick Look">
+      <div class="quicklook-card">
+        <header class="quicklook-header">
+          <strong id="quickLookTitle">Preview</strong>
+          <button type="button" id="quickLookClose" class="tips-detail-close" aria-label="Close preview">✕</button>
+        </header>
+        <div id="quickLookBody" class="quicklook-body"></div>
+      </div>
+    </div>
+
+    <div id="missionControlOverlay" class="mission-control-overlay hidden" role="dialog" aria-modal="true" aria-label="Mission Control">
+      <h3 class="mission-control-title">Mission Control</h3>
+      <div id="missionControlSpaces" class="mission-control-spaces"></div>
+      <p class="status-text">Click a space to switch. Drag ideas aside: click a window chip to bring it to the current space.</p>
+    </div>
+
+    <div id="lockScreen" class="lock-screen hidden" role="dialog" aria-modal="true" aria-label="Lock screen">
+      <div class="lock-clock" id="lockClock">--:--</div>
+      <div class="lock-date" id="lockDate"></div>
+      <div class="lock-card">
+        <div class="lock-avatar">👤</div>
+        <p id="lockMessage" class="lock-message">Enter your PIN to unlock</p>
+        <form id="lockForm" class="lock-form">
+          <input id="lockPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="PIN" maxlength="12" />
+          <button type="submit">Unlock</button>
+        </form>
+        <p id="lockFeedback" class="status-text"></p>
+      </div>
+    </div>
+
+    <ul id="contextMenu" class="context-menu hidden" role="menu"></ul>
 
     <script src="/app.js"></script>
   </body>

@@ -7,6 +7,9 @@ const SHELL_STATE_FILE = 'shell-state.json';
 const IMPORTS_FILE = 'imports.json';
 const API_KEY_AUDIT_FILE = 'api-key-audit.json';
 const NOTES_FILE = 'notes.json';
+const CHAT_HISTORY_FILE = 'chat-history.json';
+const TRASH_FILE = 'trash.json';
+const TRASH_DIR = 'trash';
 const INSTALLED_APPS_FILE = 'installed-apps.json';
 const LINUX_APPS_FILE = 'linux-apps.json';
 const LINUX_PACKAGES_DIR = 'linux-packages';
@@ -30,6 +33,18 @@ function getApiKeyAuditPath() {
 
 function getNotesPath() {
   return path.join(getDataDir(), NOTES_FILE);
+}
+
+function getChatHistoryPath() {
+  return path.join(getDataDir(), CHAT_HISTORY_FILE);
+}
+
+function getTrashIndexPath() {
+  return path.join(getDataDir(), TRASH_FILE);
+}
+
+function getTrashDir() {
+  return path.join(getDataDir(), TRASH_DIR);
 }
 
 function getInstalledAppsPath() {
@@ -130,7 +145,9 @@ function sanitizeShellState(value) {
     browserTabs: Array.isArray(state.browserTabs) ? state.browserTabs : [],
     activeBrowserTab: typeof state.activeBrowserTab === 'string' ? state.activeBrowserTab : null,
     editorTabs: Array.isArray(state.editorTabs) ? state.editorTabs : [],
-    activeEditorTab: typeof state.activeEditorTab === 'string' ? state.activeEditorTab : null
+    activeEditorTab: typeof state.activeEditorTab === 'string' ? state.activeEditorTab : null,
+    notifications: Array.isArray(state.notifications) ? state.notifications : [],
+    alarms: Array.isArray(state.alarms) ? state.alarms : []
   };
 }
 
@@ -274,6 +291,150 @@ async function saveNotes(nextNotes) {
   const notes = Array.isArray(nextNotes) ? nextNotes.map(normalizeNote).filter(Boolean) : [];
   await writeJson(getNotesPath(), { notes });
   return { notes };
+}
+
+const MAX_CONVERSATIONS = 100;
+const MAX_CONVERSATION_MESSAGES = 200;
+
+function normalizeConversation(conversation) {
+  if (!conversation || typeof conversation !== 'object') return null;
+  const id = typeof conversation.id === 'string' && conversation.id.trim()
+    ? conversation.id.trim().slice(0, 80)
+    : crypto.randomUUID();
+  const messages = Array.isArray(conversation.messages)
+    ? conversation.messages
+        .filter((message) => message && typeof message === 'object')
+        .map((message) => ({
+          role: ['user', 'assistant', 'system'].includes(message.role) ? message.role : 'user',
+          content: sanitizeNoteText(message.content, 40000)
+        }))
+        .slice(-MAX_CONVERSATION_MESSAGES)
+    : [];
+  return {
+    id,
+    title: sanitizeNoteText(conversation.title, 200),
+    createdAt: typeof conversation.createdAt === 'string' ? conversation.createdAt : new Date().toISOString(),
+    updatedAt: typeof conversation.updatedAt === 'string' ? conversation.updatedAt : new Date().toISOString(),
+    provider: sanitizeNoteText(conversation.provider, 100),
+    model: sanitizeNoteText(conversation.model, 100),
+    messages
+  };
+}
+
+async function loadChatConversations() {
+  const parsed = await readJson(getChatHistoryPath(), { conversations: [] });
+  const conversations = Array.isArray(parsed.conversations)
+    ? parsed.conversations.map(normalizeConversation).filter(Boolean)
+    : [];
+  return { conversations };
+}
+
+async function saveChatConversations(nextConversations) {
+  const conversations = (Array.isArray(nextConversations) ? nextConversations : [])
+    .map(normalizeConversation)
+    .filter(Boolean)
+    .slice(0, MAX_CONVERSATIONS);
+  await writeJson(getChatHistoryPath(), { conversations });
+  return { conversations };
+}
+
+async function ensureTrashDir() {
+  await ensureDataDir();
+  await fs.mkdir(getTrashDir(), { recursive: true, mode: 0o700 });
+}
+
+function normalizeTrashItem(item) {
+  if (!item || typeof item === 'string' || typeof item !== 'object') return null;
+  if (typeof item.id !== 'string' || typeof item.storedName !== 'string') return null;
+  return {
+    id: item.id,
+    storedName: item.storedName,
+    name: sanitizeNoteText(item.name, 300),
+    originalPath: sanitizeNoteText(item.originalPath, 1000),
+    type: item.type === 'directory' ? 'directory' : 'file',
+    size: Number.isFinite(item.size) ? item.size : 0,
+    deletedAt: typeof item.deletedAt === 'string' ? item.deletedAt : new Date().toISOString()
+  };
+}
+
+async function loadTrashIndex() {
+  const parsed = await readJson(getTrashIndexPath(), { items: [] });
+  return Array.isArray(parsed.items) ? parsed.items.map(normalizeTrashItem).filter(Boolean) : [];
+}
+
+async function saveTrashIndex(items) {
+  await writeJson(getTrashIndexPath(), { items });
+}
+
+async function listTrashItems() {
+  return loadTrashIndex();
+}
+
+async function moveToTrash({ absolutePath, relativePath }) {
+  await ensureTrashDir();
+  const stat = await fs.stat(absolutePath);
+  const id = crypto.randomUUID();
+  const storedName = `${id}${path.extname(absolutePath)}`;
+  await fs.rename(absolutePath, path.join(getTrashDir(), storedName));
+  const item = {
+    id,
+    storedName,
+    name: path.basename(absolutePath),
+    originalPath: relativePath,
+    type: stat.isDirectory() ? 'directory' : 'file',
+    size: stat.isDirectory() ? 0 : stat.size,
+    deletedAt: new Date().toISOString()
+  };
+  const items = await loadTrashIndex();
+  items.unshift(item);
+  await saveTrashIndex(items);
+  return item;
+}
+
+async function restoreFromTrash(id, resolveTarget) {
+  const items = await loadTrashIndex();
+  const item = items.find((entry) => entry.id === id);
+  if (!item) {
+    return { ok: false, error: 'Trash item not found.' };
+  }
+  const target = resolveTarget(item.originalPath || item.name);
+  if (!target.ok) {
+    return { ok: false, error: target.error };
+  }
+  const storedPath = path.join(getTrashDir(), item.storedName);
+  let destination = target.targetPath;
+  try {
+    await fs.access(destination);
+    const ext = path.extname(destination);
+    const base = destination.slice(0, destination.length - ext.length);
+    destination = `${base}-restored-${Date.now()}${ext}`;
+  } catch {
+    // Destination free; restore to the original path.
+  }
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await fs.rename(storedPath, destination);
+  await saveTrashIndex(items.filter((entry) => entry.id !== id));
+  return { ok: true, item, restoredPath: destination };
+}
+
+async function removeTrashItem(id) {
+  const items = await loadTrashIndex();
+  const item = items.find((entry) => entry.id === id);
+  if (!item) {
+    return { ok: false, error: 'Trash item not found.' };
+  }
+  await fs.rm(path.join(getTrashDir(), item.storedName), { recursive: true, force: true });
+  await saveTrashIndex(items.filter((entry) => entry.id !== id));
+  return { ok: true };
+}
+
+async function emptyTrash() {
+  const items = await loadTrashIndex();
+  for (const item of items) {
+    await fs.rm(path.join(getTrashDir(), item.storedName), { recursive: true, force: true });
+  }
+  await saveTrashIndex([]);
+  return { removed: items.length };
 }
 
 function sanitizeAppName(value) {
@@ -590,6 +751,7 @@ async function removeLinuxPackage(packageId) {
 module.exports = {
   appendApiKeyAuditEvent,
   appendImportRecord,
+  emptyTrash,
   ensureDataDir,
   getApiKeyAuditPath,
   getDataDir,
@@ -606,13 +768,19 @@ module.exports = {
   listImports,
   listInstalledApps,
   listLinuxPackages,
+  listTrashItems,
   listWallpapers,
   loadApiKeyAuditEvents,
+  loadChatConversations,
   loadNotes,
   loadShellState,
   maskSecret,
+  moveToTrash,
   removeInstalledApp,
   removeLinuxPackage,
+  removeTrashItem,
+  restoreFromTrash,
+  saveChatConversations,
   saveNotes,
   saveShellState,
   saveWallpaper

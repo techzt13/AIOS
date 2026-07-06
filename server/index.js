@@ -10,6 +10,7 @@ require('dotenv').config();
 
 const express = require('express');
 const fs = require('fs/promises');
+const os = require('os');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const { dispatchChat } = require('./adapters');
@@ -34,6 +35,7 @@ const {
 const {
   appendApiKeyAuditEvent,
   appendImportRecord,
+  emptyTrash,
   ensureDataDir,
   getDataDir,
   getLinuxPackage,
@@ -43,13 +45,19 @@ const {
   listImports,
   listInstalledApps,
   listLinuxPackages,
+  listTrashItems,
   listWallpapers,
   loadApiKeyAuditEvents,
+  loadChatConversations,
   loadNotes,
   loadShellState,
   maskSecret,
+  moveToTrash,
   removeInstalledApp,
   removeLinuxPackage,
+  removeTrashItem,
+  restoreFromTrash,
+  saveChatConversations,
   saveNotes,
   saveShellState,
   saveWallpaper
@@ -414,6 +422,186 @@ function createApp(deps = {}) {
     const incoming = Array.isArray(req.body?.notes) ? req.body.notes : [];
     const { notes } = await saveNotes(incoming);
     res.json({ ok: true, notes });
+  });
+
+  app.get('/api/local-data/chat-history', async (_req, res) => {
+    const { conversations } = await loadChatConversations();
+    res.json({ ok: true, conversations });
+  });
+
+  app.post('/api/local-data/chat-history', async (req, res) => {
+    const incoming = Array.isArray(req.body?.conversations) ? req.body.conversations : [];
+    const { conversations } = await saveChatConversations(incoming);
+    res.json({ ok: true, conversations });
+  });
+
+  app.post('/api/fs/trash', apiLimiter, async (req, res) => {
+    try {
+      const resolved = resolveSandboxPath(WORKSPACE_ROOT, req.body?.path);
+      if (!resolved.ok) {
+        return res.status(400).json({ ok: false, error: resolved.error });
+      }
+      const relativePath = path.relative(resolved.sandboxRoot, resolved.targetPath);
+      if (relativePath.startsWith('.aios-data')) {
+        return res.status(400).json({ ok: false, error: 'Cannot trash AIOS data files.' });
+      }
+      const item = await moveToTrash({ absolutePath: resolved.targetPath, relativePath });
+      return res.json({ ok: true, item });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: `Failed to move to trash: ${error.message}` });
+    }
+  });
+
+  app.get('/api/trash', async (_req, res) => {
+    try {
+      const items = await listTrashItems();
+      res.json({ ok: true, items });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: `Failed to list trash: ${error.message}` });
+    }
+  });
+
+  app.post('/api/trash/restore', async (req, res) => {
+    try {
+      const result = await restoreFromTrash(String(req.body?.id || ''), (originalPath) =>
+        resolveSandboxPath(WORKSPACE_ROOT, originalPath)
+      );
+      if (!result.ok) {
+        return res.status(400).json({ ok: false, error: result.error });
+      }
+      return res.json({
+        ok: true,
+        item: result.item,
+        restoredPath: path.relative(WORKSPACE_ROOT, result.restoredPath)
+      });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: `Failed to restore: ${error.message}` });
+    }
+  });
+
+  app.delete('/api/trash/:itemId', async (req, res) => {
+    try {
+      const result = await removeTrashItem(String(req.params.itemId || ''));
+      if (!result.ok) {
+        return res.status(404).json({ ok: false, error: result.error });
+      }
+      return res.json({ ok: true });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: `Failed to delete trash item: ${error.message}` });
+    }
+  });
+
+  app.post('/api/trash/empty', async (_req, res) => {
+    try {
+      const result = await emptyTrash();
+      res.json({ ok: true, removed: result.removed });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: `Failed to empty trash: ${error.message}` });
+    }
+  });
+
+  app.get('/api/system/stats', async (_req, res) => {
+    try {
+      const cpus = os.cpus() || [];
+      const loadAvg = os.loadavg();
+      const totalMem = os.totalmem();
+      const freeMem = os.freemem();
+      const memoryUsage = process.memoryUsage();
+      const processes = processRegistry.listProcesses();
+
+      let containers = [];
+      try {
+        const dockerResult = await runExecCommand({
+          command: "docker stats --no-stream --format '{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}'",
+          cwd: WORKSPACE_ROOT,
+          timeoutMs: 5000,
+          maxBuffer: 1024 * 1024
+        });
+        if (dockerResult.ok && dockerResult.stdout) {
+          containers = dockerResult.stdout
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => {
+              const [name, cpu, mem, net] = line.split('\t');
+              return { name, cpu, mem, net };
+            });
+        }
+      } catch {
+        // Docker unavailable; report AIOS stats only.
+      }
+
+      res.json({
+        ok: true,
+        stats: {
+          platform: `${os.platform()} ${os.release()}`,
+          cpuCount: cpus.length,
+          cpuModel: cpus[0]?.model || 'Unknown',
+          loadAvg: loadAvg.map((value) => Number(value.toFixed(2))),
+          totalMem,
+          freeMem,
+          usedMem: totalMem - freeMem,
+          uptime: os.uptime(),
+          serverProcess: {
+            pid: process.pid,
+            rss: memoryUsage.rss,
+            heapUsed: memoryUsage.heapUsed,
+            uptime: process.uptime()
+          },
+          processes,
+          containers
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ ok: false, error: `Failed to collect stats: ${error.message}` });
+    }
+  });
+
+  app.get('/api/fs/raw', apiLimiter, async (req, res) => {
+    try {
+      const resolved = resolveSandboxPath(WORKSPACE_ROOT, String(req.query.path || ''));
+      if (!resolved.ok) {
+        return res.status(400).json({ ok: false, error: resolved.error });
+      }
+      const stat = await fs.stat(resolved.targetPath);
+      if (!stat.isFile()) {
+        return res.status(400).json({ ok: false, error: 'Path is not a file.' });
+      }
+      if (stat.size > 32 * 1024 * 1024) {
+        return res.status(400).json({ ok: false, error: 'File too large to preview.' });
+      }
+      const mimeTypes = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+        '.bmp': 'image/bmp',
+        '.ico': 'image/x-icon',
+        '.mp3': 'audio/mpeg',
+        '.wav': 'audio/wav',
+        '.ogg': 'audio/ogg',
+        '.m4a': 'audio/mp4',
+        '.flac': 'audio/flac',
+        '.mp4': 'video/mp4',
+        '.webm': 'video/webm',
+        '.mov': 'video/quicktime',
+        '.pdf': 'application/pdf',
+        '.json': 'application/json',
+        '.html': 'text/html',
+        '.css': 'text/css',
+        '.js': 'text/javascript',
+        '.md': 'text/markdown',
+        '.txt': 'text/plain'
+      };
+      const ext = path.extname(resolved.targetPath).toLowerCase();
+      res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.sendFile(resolved.targetPath);
+    } catch (error) {
+      return res.status(404).json({ ok: false, error: 'File not found.' });
+    }
   });
 
   app.get('/api/apps', async (_req, res) => {
