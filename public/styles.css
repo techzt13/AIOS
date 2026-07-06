@@ -236,7 +236,7 @@ body {
 .menu-left,
 .menu-right {
   display: flex;
-  gap: 10px;
+  gap: 6px;
   align-items: center;
   font-size: 0.83rem;
 }
@@ -256,7 +256,8 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.44);
 }
 
-.menu-right span,
+.menu-right > #providerStatusBadge,
+.menu-right > #runtimeBadge,
 .menu-center {
   border-radius: 999px;
   padding: 5px 9px;
@@ -2498,33 +2499,31 @@ button:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.12);
+  height: 24px;
+  min-width: 26px;
+  padding: 0 4px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
   color: var(--desktop-text);
-  font-size: 0.9rem;
+  font-size: 13px;
   cursor: pointer;
-  transition: background 140ms ease, transform 120ms ease;
+  transition: background 140ms ease;
 }
 
 .theme-toggle-button:hover,
 .spotlight-button:hover {
-  background: rgba(255, 255, 255, 0.24);
-  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 :root[data-theme='light'] .theme-toggle-button,
 :root[data-theme='light'] .spotlight-button {
-  border-color: rgba(18, 32, 59, 0.14);
-  background: rgba(18, 32, 59, 0.08);
   color: var(--desktop-text);
 }
 
 :root[data-theme='light'] .theme-toggle-button:hover,
 :root[data-theme='light'] .spotlight-button:hover {
-  background: rgba(18, 32, 59, 0.14);
+  background: rgba(18, 32, 59, 0.1);
 }
 
 /* === SPOTLIGHT SEARCH === */
@@ -3360,27 +3359,80 @@ button:focus-visible {
 
 /* ===================== AIOS Shell Extras ===================== */
 
+/* Flat compact controls: neutralize the chunky global button styling */
+.menu-extra-button,
+.menu-clock,
+.theme-toggle-button,
+.spotlight-button,
+.space-dot,
+.mini-calendar-header button,
+.calendar-header button,
+.music-transport button,
+.file-entry-action,
+.context-menu li button,
+.chat-history-open,
+.mission-window-chip {
+  min-height: 0;
+  box-shadow: none;
+  font-weight: 500;
+}
+
+.menu-extra-button:hover,
+.menu-clock:hover,
+.theme-toggle-button:hover,
+.spotlight-button:hover,
+.space-dot:hover,
+.mini-calendar-header button:hover,
+.calendar-header button:hover,
+.music-transport button:hover,
+.file-entry-action:hover,
+.context-menu li button:hover,
+.chat-history-open:hover,
+.mission-window-chip:hover {
+  box-shadow: none;
+  border-color: transparent;
+}
+
 /* Menu bar extras */
 .menu-extra {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 4px;
   font-size: 12px;
   color: var(--desktop-text);
+  white-space: nowrap;
 }
 
 .menu-extra-button,
 .menu-clock {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  min-width: 26px;
   background: transparent;
   border: none;
   color: var(--desktop-text);
   font-size: 13px;
-  padding: 2px 6px;
+  padding: 0 4px;
   border-radius: 6px;
   cursor: pointer;
+  white-space: nowrap;
+  transition: background 140ms ease;
+}
+
+.menu-clock {
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  padding: 0 8px;
 }
 
 .menu-extra-button:hover,
 .menu-clock:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .notifications-badge {
@@ -3401,25 +3453,33 @@ button:focus-visible {
 
 .spaces-switcher {
   display: inline-flex;
-  gap: 4px;
-  margin-right: 4px;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 6px;
+  margin: 0 2px;
 }
 
 .space-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  border: 1px solid var(--liquid-glass-line);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--desktop-text);
-  font-size: 11px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.35);
+  color: transparent;
+  font-size: 0;
   cursor: pointer;
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.space-dot:hover {
+  background: rgba(255, 255, 255, 0.6);
+  transform: scale(1.2);
 }
 
 .space-dot.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: #fff;
 }
 
 .menu-popover {
@@ -3461,9 +3521,14 @@ button:focus-visible {
   background: transparent;
   border: none;
   color: var(--window-text);
-  font-size: 16px;
+  font-size: 15px;
   cursor: pointer;
   padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.mini-calendar-header button:hover {
+  background: var(--button-secondary-bg);
 }
 
 .mini-calendar-grid,
@@ -3615,6 +3680,20 @@ button:focus-visible {
 
 .calendar-header button {
   cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--window-text);
+  padding: 2px 10px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.calendar-header button:hover {
+  background: var(--button-secondary-bg);
+}
+
+.calendar-header .titlebar-button {
+  font-size: 12px;
 }
 
 .calendar-weekdays {
@@ -4287,15 +4366,17 @@ button:focus-visible {
 /* Dark theme text fixes for extras */
 :root[data-theme='light'] .menu-extra-button:hover,
 :root[data-theme='light'] .menu-clock:hover {
-  background: rgba(18, 32, 59, 0.08);
+  background: rgba(18, 32, 59, 0.1);
 }
 
 :root[data-theme='light'] .space-dot {
-  background: rgba(18, 32, 59, 0.06);
-  border-color: rgba(18, 32, 59, 0.16);
+  background: rgba(18, 32, 59, 0.3);
+}
+
+:root[data-theme='light'] .space-dot:hover {
+  background: rgba(18, 32, 59, 0.5);
 }
 
 :root[data-theme='light'] .space-dot.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--window-text);
 }
