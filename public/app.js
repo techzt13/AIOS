@@ -1843,6 +1843,11 @@ async function loadShellState() {
     Object.entries(WINDOW_IDS).forEach(([app, id]) => {
       if (!document.getElementById(id)?.classList.contains('hidden')) {
         normalizeWindowPosition(app, { save: true });
+        // Record windows visible by default so Spaces tracks them.
+        const state = shellState.windows?.[app] || {};
+        if (state.open === undefined) {
+          recordWindowState(app, { open: true, minimized: false, space: activeSpace });
+        }
       }
     });
     focusWindow('chat');
@@ -5071,8 +5076,17 @@ function refreshSpaceVisibility() {
     if (!windowEl) return;
     const state = shellState.windows?.[app] || {};
     const space = Number(state.space) || 1;
-    const open = state.open !== false && !state.minimized;
-    windowEl.classList.toggle('hidden', !(open && space === activeSpace));
+    if (space !== activeSpace) {
+      windowEl.classList.add('hidden');
+      return;
+    }
+    // Only explicitly opened windows are shown; windows with no saved
+    // state keep their default visibility from the HTML.
+    if (state.open === true && !state.minimized) {
+      windowEl.classList.remove('hidden');
+    } else if (state.open === false || state.minimized) {
+      windowEl.classList.add('hidden');
+    }
   });
 }
 
@@ -5114,7 +5128,11 @@ function renderMissionControl() {
     Object.entries(WINDOW_IDS).forEach(([app, id]) => {
       const state = shellState.windows?.[app] || {};
       const windowSpace = Number(state.space) || 1;
-      if (windowSpace !== space || state.open === false || state.minimized) return;
+      const windowEl = document.getElementById(id);
+      const isOpen = state.minimized
+        ? false
+        : (state.open === true || (state.open === undefined && windowEl && !windowEl.classList.contains('hidden')));
+      if (windowSpace !== space || !isOpen) return;
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'mission-window-chip';
