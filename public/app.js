@@ -3796,6 +3796,54 @@ const TIPS = {
     category: 'Organize',
     title: 'Manage files & downloads',
     body: '<p>Use the Files app to browse your workspace. Downloads from the Browser are saved to <code>workspace/Downloads</code>. Open the Browser’s downloads panel to see recent files.</p>'
+  },
+  menubar: {
+    glyph: '🎚️',
+    category: 'Menu bar',
+    title: 'Control your Mac from the menu bar',
+    body: '<p>The right side of the menu bar shows live status: network, battery, volume, and notifications.</p><ul><li>Click 🔊 to open the volume slider — it reads and sets your <strong>Mac’s system volume</strong> when AIOS runs locally</li><li>Click 🔔 to open the notification center; toasts appear under the menu bar</li><li>Click the clock for a mini calendar</li></ul>'
+  },
+  spaces: {
+    glyph: '🖥️',
+    category: 'Desktop',
+    title: 'Work across Spaces',
+    body: '<p>AIOS has three virtual desktops. The dots in the menu bar show which Space you are on — click one to switch.</p><ul><li>Press <kbd>Ctrl</kbd> + <kbd>↑</kbd> or click the grid icon for Mission Control</li><li>Right-click a dock app to move its window to another Space</li><li>New windows open on the current Space</li></ul>'
+  },
+  lock: {
+    glyph: '🔒',
+    category: 'Privacy',
+    title: 'Lock your desktop',
+    body: '<p>Click the 🔒 button in the menu bar or press <kbd>Ctrl</kbd> + <kbd>⌘</kbd> + <kbd>Q</kbd> to lock AIOS. The first time, you will be asked to set a PIN (4+ characters).</p><p>The lock survives reloads — AIOS stays locked until the correct PIN is entered.</p>'
+  },
+  trash: {
+    glyph: '🗑️',
+    category: 'Organize',
+    title: 'Trash & Quick Look',
+    body: '<p>In the Files app, click 🗑 next to any file to move it to the Trash — nothing is deleted permanently until you empty it. Open Trash from the dock to restore or delete items.</p><p>Click 👁 (or select a file and press <kbd>Space</kbd>) for a Quick Look preview of images, audio, video, PDF, and text without opening an app.</p>'
+  },
+  chathistory: {
+    glyph: '💬',
+    category: 'AI',
+    title: 'Browse your chat history',
+    body: '<p>Every AI Chat conversation is saved automatically. Click <strong>History</strong> in the chat titlebar to browse past conversations, reload one to continue where you left off, or delete the ones you no longer need.</p>'
+  },
+  calendar: {
+    glyph: '📅',
+    category: 'Productivity',
+    title: 'Calendar, timer & alarms',
+    body: '<p>Open Calendar from the dock for a month view, a live clock, a countdown timer, and alarms. Alarms fire a notification at the time you set — even while you work in other apps.</p><p>Need a quick date check? Click the clock in the menu bar for a mini calendar.</p>'
+  },
+  monitor: {
+    glyph: '📊',
+    category: 'Power user',
+    title: 'Watch system activity',
+    body: '<p>Activity Monitor shows live CPU load, memory pressure, the AIOS server process, tracked exec processes, and running Linux containers — refreshed every few seconds while the window is open.</p>'
+  },
+  music: {
+    glyph: '🎵',
+    category: 'Media',
+    title: 'Play your music',
+    body: '<p>Open Music from the dock and click <strong>Add Songs</strong> to load local audio files. Use the transport controls to play, seek, and skip. The menu bar volume slider controls playback — and your Mac’s system volume too.</p>'
   }
 };
 
@@ -4632,17 +4680,50 @@ function applyVolume() {
   volumeValue.textContent = `${Math.round(globalVolume * 100)}%`;
 }
 
+let systemVolumeSupported = false;
+let systemVolumeSetTimer = null;
+
+async function syncSystemVolume() {
+  try {
+    const response = await fetch('/api/system/volume');
+    const payload = await response.json();
+    if (payload.ok && payload.supported) {
+      systemVolumeSupported = true;
+      globalVolume = Math.min(1, Math.max(0, (payload.muted ? 0 : payload.volume) / 100));
+      applyVolume();
+    }
+  } catch {
+    // System volume unavailable; the slider controls app audio only.
+  }
+}
+
+function pushSystemVolume(volume) {
+  if (!systemVolumeSupported) return;
+  if (systemVolumeSetTimer) clearTimeout(systemVolumeSetTimer);
+  systemVolumeSetTimer = setTimeout(() => {
+    fetch('/api/system/volume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ volume: Math.round(volume * 100) })
+    }).catch(() => {});
+  }, 150);
+}
+
 volumeButton.addEventListener('click', () => {
   const wasHidden = volumePopover.classList.contains('hidden');
   hideMenuPopovers();
   notificationCenter.classList.add('hidden');
-  if (wasHidden) volumePopover.classList.remove('hidden');
+  if (wasHidden) {
+    syncSystemVolume();
+    volumePopover.classList.remove('hidden');
+  }
 });
 
 volumeSlider.addEventListener('input', () => {
   globalVolume = Number(volumeSlider.value) / 100;
   shellState.preferences.volume = globalVolume;
   applyVolume();
+  pushSystemVolume(globalVolume);
   persistShellState();
 });
 
@@ -5620,6 +5701,7 @@ function initShellExtras() {
     ? Math.min(1, Math.max(0, shellState.preferences.volume))
     : 0.8;
   applyVolume();
+  syncSystemVolume();
   renderAlarmsList();
   if (shellState.preferences.locked) {
     showLockScreen();

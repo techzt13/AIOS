@@ -8,6 +8,7 @@ function attachWebSockets(server) {
 
 require('dotenv').config();
 
+const { execFile } = require('child_process');
 const express = require('express');
 const fs = require('fs/promises');
 const os = require('os');
@@ -555,6 +556,41 @@ function createApp(deps = {}) {
     } catch (error) {
       res.status(500).json({ ok: false, error: `Failed to collect stats: ${error.message}` });
     }
+  });
+
+  app.get('/api/system/volume', async (_req, res) => {
+    if (process.platform !== 'darwin') {
+      return res.json({ ok: true, supported: false });
+    }
+    execFile('osascript', ['-e', 'get volume settings'], { timeout: 3000 }, (error, stdout) => {
+      if (error) {
+        return res.json({ ok: true, supported: false });
+      }
+      const volumeMatch = /output volume:(\d+)/.exec(stdout);
+      const mutedMatch = /output muted:(true|false)/.exec(stdout);
+      return res.json({
+        ok: true,
+        supported: true,
+        volume: volumeMatch ? Number(volumeMatch[1]) : 50,
+        muted: mutedMatch ? mutedMatch[1] === 'true' : false
+      });
+    });
+  });
+
+  app.post('/api/system/volume', async (req, res) => {
+    if (process.platform !== 'darwin') {
+      return res.json({ ok: true, supported: false });
+    }
+    const volume = Math.max(0, Math.min(100, Math.round(Number(req.body?.volume))));
+    if (!Number.isFinite(volume)) {
+      return res.status(400).json({ ok: false, error: 'A volume between 0 and 100 is required.' });
+    }
+    execFile('osascript', ['-e', `set volume output volume ${volume}`], { timeout: 3000 }, (error) => {
+      if (error) {
+        return res.json({ ok: true, supported: false });
+      }
+      return res.json({ ok: true, supported: true, volume });
+    });
   });
 
   app.get('/api/fs/raw', apiLimiter, async (req, res) => {
