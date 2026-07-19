@@ -843,6 +843,46 @@ button.secondary {
     rgba(255, 255, 255, 0.52);
 }
 
+.files-breadcrumbs,
+.files-tools {
+  margin: 8px 0;
+}
+
+.files-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: #566681;
+  font-size: 0.82rem;
+}
+
+.files-breadcrumbs button,
+.file-entry-action {
+  min-height: 0;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  box-shadow: none;
+}
+
+.files-tools input {
+  flex: 1;
+}
+
+.file-entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+  gap: 6px;
+  align-items: center;
+}
+
+.file-list.drag-over {
+  outline: 2px dashed color-mix(in srgb, var(--accent) 70%, white);
+  outline-offset: -6px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
 .editor-panel {
   display: flex;
   flex-direction: column;
@@ -1203,6 +1243,10 @@ button.secondary {
 
 .settings-window .control-group {
   overflow: visible;
+}
+
+#settingsStartupApps {
+  min-height: 150px;
 }
 
 .control-group::-webkit-scrollbar,

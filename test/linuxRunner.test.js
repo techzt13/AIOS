@@ -65,6 +65,10 @@ test('linux runner executes package via docker and tracks process lifecycle', as
   };
 
   let receivedCommand = null;
+  let resolveSpawned;
+  const spawned = new Promise((resolve) => {
+    resolveSpawned = resolve;
+  });
   const child = new EventEmitter();
   child.pid = 9999;
   child.kill = () => true;
@@ -86,6 +90,7 @@ test('linux runner executes package via docker and tracks process lifecycle', as
     },
     spawn: (command, args, options) => {
       receivedCommand = { command, args, options };
+      resolveSpawned();
       return child;
     },
     tempRoot: os.tmpdir()
@@ -98,7 +103,10 @@ test('linux runner executes package via docker and tracks process lifecycle', as
     deps
   });
 
-  await new Promise(resolve => setTimeout(resolve, 50));
+  await Promise.race([
+    spawned,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out waiting for docker spawn')), 2000))
+  ]);
 
   assert.equal(receivedCommand.command, 'docker');
   assert.equal(receivedCommand.args[0], 'run');

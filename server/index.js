@@ -1084,6 +1084,54 @@ function createApp(deps = {}) {
     }
   });
 
+  app.post('/api/fs/mkdir', apiLimiter, async (req, res) => {
+    try {
+      const { path: requestedPath } = req.body || {};
+      const resolved = resolveSandboxPath(WORKSPACE_ROOT, requestedPath);
+
+      if (!resolved.ok) {
+        return res.status(400).json({ ok: false, error: resolved.error });
+      }
+
+      await fs.mkdir(resolved.targetPath, { recursive: true });
+      return res.status(201).json({
+        ok: true,
+        path: path.relative(resolved.sandboxRoot, resolved.targetPath) || '.'
+      });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: `Failed to create folder: ${error.message}` });
+    }
+  });
+
+  app.post(
+    '/api/fs/upload',
+    apiLimiter,
+    express.raw({ type: ['*/*'], limit: FS_READ_MAX_BYTES }),
+    async (req, res) => {
+      try {
+        const filename = String(req.get('x-aios-filename') || '').trim();
+        if (!filename || filename.includes('/') || filename.includes('\\')) {
+          return res.status(400).json({ ok: false, error: 'A safe filename is required.' });
+        }
+        const directory = typeof req.query.path === 'string' && req.query.path.trim() ? req.query.path : '.';
+        const resolved = resolveSandboxPath(WORKSPACE_ROOT, path.posix.join(directory, filename));
+
+        if (!resolved.ok) {
+          return res.status(400).json({ ok: false, error: resolved.error });
+        }
+
+        await fs.mkdir(path.dirname(resolved.targetPath), { recursive: true });
+        await fs.writeFile(resolved.targetPath, req.body);
+        return res.status(201).json({
+          ok: true,
+          path: path.relative(resolved.sandboxRoot, resolved.targetPath)
+        });
+      } catch (error) {
+        return res.status(500).json({ ok: false, error: `Failed to upload file: ${error.message}` });
+      }
+    }
+  );
+
   app.post('/api/fs/read', apiLimiter, async (req, res) => {
     try {
       const { path: requestedPath } = req.body || {};
@@ -1106,6 +1154,114 @@ function createApp(deps = {}) {
       return res.json({ ok: true, path: path.relative(resolved.sandboxRoot, resolved.targetPath), content });
     } catch (error) {
       return res.status(500).json({ ok: false, error: `Failed to read file: ${error.message}` });
+    }
+  });
+
+  app.post('/api/fs/rename', apiLimiter, async (req, res) => {
+    try {
+      const { path: requestedPath, name } = req.body || {};
+      const safeName = String(name || '').trim();
+      if (!safeName || safeName.includes('/') || safeName.includes('\\')) {
+        return res.status(400).json({ ok: false, error: 'A safe new name is required.' });
+      }
+      const resolved = resolveSandboxPath(WORKSPACE_ROOT, requestedPath);
+
+      if (!resolved.ok) {
+        return res.status(400).json({ ok: false, error: resolved.error });
+      }
+
+      const targetPath = path.join(path.dirname(resolved.targetPath), safeName);
+      const targetResolved = resolveSandboxPath(resolved.sandboxRoot, path.relative(resolved.sandboxRoot, targetPath));
+      if (!targetResolved.ok) {
+        return res.status(400).json({ ok: false, error: targetResolved.error });
+      }
+
+      try {
+        await fs.access(targetResolved.targetPath);
+        return res.status(409).json({ ok: false, error: 'A file or folder with that name already exists.' });
+      } catch {
+        // Destination is available.
+      }
+
+      await fs.rename(resolved.targetPath, targetResolved.targetPath);
+      return res.json({
+        ok: true,
+        path: path.relative(resolved.sandboxRoot, targetResolved.targetPath)
+      });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: `Failed to rename item: ${error.message}` });
+    }
+  });
+
+  app.post('/api/fs/copy', apiLimiter, async (req, res) => {
+    try {
+      const { path: requestedPath, target } = req.body || {};
+      const sourceResolved = resolveSandboxPath(WORKSPACE_ROOT, requestedPath);
+      const targetResolved = resolveSandboxPath(WORKSPACE_ROOT, target || '.', { allowRoot: true });
+
+      if (!sourceResolved.ok) {
+        return res.status(400).json({ ok: false, error: sourceResolved.error });
+      }
+      if (!targetResolved.ok) {
+        return res.status(400).json({ ok: false, error: targetResolved.error });
+      }
+
+      const targetStat = await fs.stat(targetResolved.targetPath);
+      if (!targetStat.isDirectory()) {
+        return res.status(400).json({ ok: false, error: 'Copy target must be a folder.' });
+      }
+
+      const destinationPath = path.join(targetResolved.targetPath, path.basename(sourceResolved.targetPath));
+      try {
+        await fs.access(destinationPath);
+        return res.status(409).json({ ok: false, error: 'An item with that name already exists in the target folder.' });
+      } catch {
+        // Destination is available.
+      }
+
+      await fs.cp(sourceResolved.targetPath, destinationPath, { recursive: true, errorOnExist: true, force: false });
+      return res.json({
+        ok: true,
+        path: path.relative(sourceResolved.sandboxRoot, destinationPath)
+      });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: `Failed to copy item: ${error.message}` });
+    }
+  });
+
+  app.post('/api/fs/move', apiLimiter, async (req, res) => {
+    try {
+      const { path: requestedPath, target } = req.body || {};
+      const sourceResolved = resolveSandboxPath(WORKSPACE_ROOT, requestedPath);
+      const targetResolved = resolveSandboxPath(WORKSPACE_ROOT, target || '.', { allowRoot: true });
+
+      if (!sourceResolved.ok) {
+        return res.status(400).json({ ok: false, error: sourceResolved.error });
+      }
+      if (!targetResolved.ok) {
+        return res.status(400).json({ ok: false, error: targetResolved.error });
+      }
+
+      const targetStat = await fs.stat(targetResolved.targetPath);
+      if (!targetStat.isDirectory()) {
+        return res.status(400).json({ ok: false, error: 'Move target must be a folder.' });
+      }
+
+      const destinationPath = path.join(targetResolved.targetPath, path.basename(sourceResolved.targetPath));
+      try {
+        await fs.access(destinationPath);
+        return res.status(409).json({ ok: false, error: 'An item with that name already exists in the target folder.' });
+      } catch {
+        // Destination is available.
+      }
+
+      await fs.rename(sourceResolved.targetPath, destinationPath);
+      return res.json({
+        ok: true,
+        path: path.relative(sourceResolved.sandboxRoot, destinationPath)
+      });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: `Failed to move item: ${error.message}` });
     }
   });
 

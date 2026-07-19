@@ -39,6 +39,12 @@ const chatModelSelect = document.getElementById('chatModelSelect');
 const filesPathInput = document.getElementById('filesPathInput');
 const filesUpButton = document.getElementById('filesUpButton');
 const filesRefreshButton = document.getElementById('filesRefreshButton');
+const filesNewFolderButton = document.getElementById('filesNewFolderButton');
+const filesUploadButton = document.getElementById('filesUploadButton');
+const filesUploadInput = document.getElementById('filesUploadInput');
+const filesBreadcrumbs = document.getElementById('filesBreadcrumbs');
+const filesSearchInput = document.getElementById('filesSearchInput');
+const filesSortSelect = document.getElementById('filesSortSelect');
 const filesEntries = document.getElementById('filesEntries');
 const fileEditorPath = document.getElementById('fileEditorPath');
 const fileEditorContent = document.getElementById('fileEditorContent');
@@ -92,6 +98,15 @@ const wallpaperFileInput = document.getElementById('wallpaperFileInput');
 const wallpaperUploadButton = document.getElementById('wallpaperUploadButton');
 const wallpaperPreview = document.getElementById('wallpaperPreview');
 const performanceModeToggle = document.getElementById('performanceModeToggle');
+const settingsSystemVolumeToggle = document.getElementById('settingsSystemVolumeToggle');
+const settingsNotificationsToggle = document.getElementById('settingsNotificationsToggle');
+const settingsDefaultSpaceSelect = document.getElementById('settingsDefaultSpaceSelect');
+const settingsStartupApps = document.getElementById('settingsStartupApps');
+const settingsSaveStartupButton = document.getElementById('settingsSaveStartupButton');
+const settingsOpenMissionControlButton = document.getElementById('settingsOpenMissionControlButton');
+const settingsResetLockButton = document.getElementById('settingsResetLockButton');
+const settingsSnapToggle = document.getElementById('settingsSnapToggle');
+const settingsStatus = document.getElementById('settingsStatus');
 const themeToggleButton = document.getElementById('themeToggleButton');
 const tipsDetailOverlay = document.getElementById('tipsDetailOverlay');
 const tipsDetailClose = document.getElementById('tipsDetailClose');
@@ -208,6 +223,7 @@ let currentWizardStep = 0;
 let wizardTestSucceeded = false;
 let shellState = { windows: {}, preferences: {}, browserHistory: [], bookmarks: [], downloads: [], browserTabs: [], editorTabs: [], notifications: [], alarms: [] };
 let zCounter = 10;
+let focusedApp = null;
 let installedApps = [];
 let linuxPackages = [];
 let pendingTerminalLaunch = null;
@@ -1528,6 +1544,7 @@ function persistShellState() {
 function focusWindow(app) {
   const windowEl = document.getElementById(WINDOW_IDS[app]);
   if (!windowEl) return;
+  focusedApp = app;
   zCounter += 1;
   windowEl.style.zIndex = String(zCounter);
   document.querySelectorAll('.app-window').forEach((node) => node.classList.remove('focused'));
@@ -1540,6 +1557,12 @@ function openWindow(app) {
   const windowEl = document.getElementById(WINDOW_IDS[app]);
   if (!windowEl) return;
   const state = shellState.windows?.[app] || {};
+  const defaultSpace = shellState.preferences.defaultSpace;
+  if (defaultSpace && defaultSpace !== 'current' && !state.open) {
+    activeSpace = Math.min(SPACE_COUNT, Math.max(1, Number(defaultSpace) || activeSpace));
+    shellState.preferences.activeSpace = activeSpace;
+    renderSpacesSwitcher?.();
+  }
   windowEl.classList.remove('hidden');
   normalizeWindowPosition(app, {
     useDefault: typeof state.left !== 'number' || typeof state.top !== 'number',
@@ -1603,6 +1626,16 @@ function applyPreferences() {
   }
   if (themeSelect) themeSelect.value = shellState.preferences.theme || 'dark';
   performanceModeToggle.checked = performanceMode;
+  if (settingsSystemVolumeToggle) settingsSystemVolumeToggle.checked = shellState.preferences.systemVolumeSync !== false;
+  if (settingsNotificationsToggle) settingsNotificationsToggle.checked = shellState.preferences.notificationToasts !== false;
+  if (settingsDefaultSpaceSelect) settingsDefaultSpaceSelect.value = shellState.preferences.defaultSpace || 'current';
+  if (settingsSnapToggle) settingsSnapToggle.checked = shellState.preferences.edgeSnapping !== false;
+  if (settingsStartupApps) {
+    const startupApps = Array.isArray(shellState.preferences.startupApps) ? shellState.preferences.startupApps : [];
+    Array.from(settingsStartupApps.options).forEach((option) => {
+      option.selected = startupApps.includes(option.value);
+    });
+  }
   if (themeToggleButton) themeToggleButton.textContent = theme === 'light' ? '☀️' : '🌙';
   applyCustomWallpaper();
 }
@@ -1742,18 +1775,43 @@ function initWindowDrag(windowEl) {
       windowEl.style.top = `${lastY}px`;
       windowEl.classList.remove('dragging');
       
-      // Window Snapping logic
-      windowEl.classList.remove('snapped-left', 'snapped-right', 'maximized');
-      if (event.clientX < 20) {
-        windowEl.classList.add('snapped-left');
-      } else if (event.clientX > window.innerWidth - 20) {
-        windowEl.classList.add('snapped-right');
+      if (shellState.preferences.edgeSnapping !== false) {
+        windowEl.classList.remove('snapped-left', 'snapped-right', 'maximized');
+        if (event.clientX < 20) {
+          windowEl.classList.add('snapped-left');
+        } else if (event.clientX > window.innerWidth - 20) {
+          windowEl.classList.add('snapped-right');
+        }
       }
       
       recordWindowState(windowEl.dataset.app, { left: lastX, top: lastY });
     }
     dragging = false;
   });
+}
+
+function setWindowMode(app, mode) {
+  const windowEl = document.getElementById(WINDOW_IDS[app]);
+  if (!windowEl) return;
+  windowEl.classList.remove('snapped-left', 'snapped-right', 'maximized');
+  if (mode === 'left') windowEl.classList.add('snapped-left');
+  if (mode === 'right') windowEl.classList.add('snapped-right');
+  if (mode === 'full') windowEl.classList.add('maximized');
+  focusWindow(app);
+  recordWindowState(app, { open: true, minimized: false });
+}
+
+function toggleWindowFullscreen(app) {
+  const windowEl = document.getElementById(WINDOW_IDS[app]);
+  if (!windowEl) return;
+  const isFullscreen = windowEl.classList.contains('maximized');
+  setWindowMode(app, isFullscreen ? 'normal' : 'full');
+}
+
+function activeWindowApp() {
+  if (focusedApp && WINDOW_IDS[focusedApp]) return focusedApp;
+  const focused = document.querySelector('.app-window.focused:not(.hidden)');
+  return focused?.dataset.app || null;
 }
 
 async function loadShellState() {
@@ -3155,12 +3213,125 @@ async function writeWorkspaceFile(pathValue, content) {
   return payload;
 }
 
+async function createWorkspaceFolder(pathValue) {
+  const response = await fetch('/api/fs/mkdir', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: pathValue })
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Create folder failed (HTTP ${response.status}).`);
+  }
+  return payload;
+}
+
+async function renameWorkspaceItem(pathValue, name) {
+  const response = await fetch('/api/fs/rename', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: pathValue, name })
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Rename failed (HTTP ${response.status}).`);
+  }
+  return payload;
+}
+
+async function copyWorkspaceItem(pathValue, target) {
+  const response = await fetch('/api/fs/copy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: pathValue, target })
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Copy failed (HTTP ${response.status}).`);
+  }
+  return payload;
+}
+
+async function moveWorkspaceItem(pathValue, target) {
+  const response = await fetch('/api/fs/move', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: pathValue, target })
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error || `Move failed (HTTP ${response.status}).`);
+  }
+  return payload;
+}
+
+async function uploadWorkspaceFiles(files, directory = filesPathInput.value || '.') {
+  const uploads = Array.from(files || []);
+  if (!uploads.length) return [];
+  const results = [];
+  for (const file of uploads) {
+    const response = await fetch(`/api/fs/upload?path=${encodeURIComponent(directory || '.')}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-aios-filename': file.name
+      },
+      body: file
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || `Upload failed (HTTP ${response.status}).`);
+    }
+    results.push(payload);
+  }
+  return results;
+}
+
+function joinWorkspacePath(basePath, name) {
+  const base = !basePath || basePath === '.' ? '' : basePath.replace(/\/+$/, '');
+  return base ? `${base}/${name}` : name;
+}
+
+function renderFilesBreadcrumbs(pathValue) {
+  if (!filesBreadcrumbs) return;
+  filesBreadcrumbs.innerHTML = '';
+  const current = pathValue && pathValue !== '.' ? pathValue : '.';
+  const rootButton = document.createElement('button');
+  rootButton.type = 'button';
+  rootButton.textContent = 'Workspace';
+  rootButton.addEventListener('click', () => refreshFileList('.'));
+  filesBreadcrumbs.appendChild(rootButton);
+  if (current === '.') return;
+  let acc = '';
+  current.split('/').filter(Boolean).forEach((part) => {
+    const separator = document.createElement('span');
+    separator.textContent = '/';
+    filesBreadcrumbs.appendChild(separator);
+    acc = acc ? `${acc}/${part}` : part;
+    const targetPath = acc;
+    const crumb = document.createElement('button');
+    crumb.type = 'button';
+    crumb.textContent = part;
+    crumb.addEventListener('click', () => refreshFileList(targetPath));
+    filesBreadcrumbs.appendChild(crumb);
+  });
+}
+
 async function refreshFileList(pathValue = filesPathInput.value || '.') {
   try {
     const result = await listWorkspace(pathValue);
     filesPathInput.value = result.path || '.';
+    renderFilesBreadcrumbs(result.path || '.');
     filesEntries.innerHTML = '';
-    result.entries.forEach((entry) => {
+    const query = (filesSearchInput?.value || '').trim().toLowerCase();
+    const sortMode = filesSortSelect?.value || 'name';
+    const entries = [...result.entries]
+      .filter((entry) => !query || entry.name.toLowerCase().includes(query))
+      .sort((a, b) => {
+        if (sortMode === 'type' && a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+    entries.forEach((entry) => {
       const prefix = result.path === '.' ? '' : `${result.path}/`;
       const entryPath = `${prefix}${entry.name}`;
       const item = document.createElement('li');
@@ -3191,6 +3362,26 @@ async function refreshFileList(pathValue = filesPathInput.value || '.') {
       });
       item.appendChild(button);
 
+      const renameButton = document.createElement('button');
+      renameButton.type = 'button';
+      renameButton.className = 'file-entry-action';
+      renameButton.title = 'Rename';
+      renameButton.setAttribute('aria-label', `Rename ${entry.name}`);
+      renameButton.textContent = '✎';
+      renameButton.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        const name = window.prompt('Rename to:', entry.name);
+        if (!name || name === entry.name) return;
+        try {
+          await renameWorkspaceItem(entryPath, name);
+          await refreshFileList(result.path);
+          setFeedback(fileReadStatus, `Renamed ${entry.name} to ${name}`);
+        } catch (error) {
+          setFeedback(fileReadStatus, error.message, 'error');
+        }
+      });
+      item.appendChild(renameButton);
+
       if (entry.type === 'file') {
         const previewButton = document.createElement('button');
         previewButton.type = 'button';
@@ -3218,7 +3409,7 @@ async function refreshFileList(pathValue = filesPathInput.value || '.') {
       item.appendChild(trashButton);
       filesEntries.appendChild(item);
     });
-    setFeedback(fileReadStatus, `Listed ${result.path}`);
+    setFeedback(fileReadStatus, `Listed ${result.path} (${entries.length} shown)`);
   } catch (error) {
     setFeedback(fileReadStatus, error.message, 'error');
   }
@@ -3459,6 +3650,27 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     lockScreenNow();
   }
+  if (event.ctrlKey && event.metaKey && event.key === 'ArrowLeft') {
+    const app = activeWindowApp();
+    if (app) {
+      event.preventDefault();
+      setWindowMode(app, 'left');
+    }
+  }
+  if (event.ctrlKey && event.metaKey && event.key === 'ArrowRight') {
+    const app = activeWindowApp();
+    if (app) {
+      event.preventDefault();
+      setWindowMode(app, 'right');
+    }
+  }
+  if (event.ctrlKey && event.metaKey && event.key.toLowerCase() === 'f') {
+    const app = activeWindowApp();
+    if (app) {
+      event.preventDefault();
+      toggleWindowFullscreen(app);
+    }
+  }
   if (event.key === ' ' && document.activeElement?.classList?.contains('file-entry') && document.activeElement.dataset.filePath) {
     event.preventDefault();
     openQuickLook(document.activeElement.dataset.filePath);
@@ -3687,6 +3899,63 @@ if (terminalCommandInput && terminalRunButton && terminalOutput) {
 
 filesRefreshButton.addEventListener('click', () => refreshFileList(filesPathInput.value || '.'));
 filesUpButton.addEventListener('click', () => refreshFileList(formatPathUp(filesPathInput.value)));
+filesPathInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') refreshFileList(filesPathInput.value || '.');
+});
+if (filesSearchInput) {
+  filesSearchInput.addEventListener('input', () => refreshFileList(filesPathInput.value || '.'));
+}
+if (filesSortSelect) {
+  filesSortSelect.addEventListener('change', () => refreshFileList(filesPathInput.value || '.'));
+}
+if (filesNewFolderButton) {
+  filesNewFolderButton.addEventListener('click', async () => {
+    const name = window.prompt('New folder name:');
+    if (!name) return;
+    try {
+      const target = joinWorkspacePath(filesPathInput.value || '.', name);
+      await createWorkspaceFolder(target);
+      await refreshFileList(filesPathInput.value || '.');
+      setFeedback(fileReadStatus, `Created folder ${name}`, 'success');
+    } catch (error) {
+      setFeedback(fileReadStatus, error.message, 'error');
+    }
+  });
+}
+if (filesUploadButton && filesUploadInput) {
+  filesUploadButton.addEventListener('click', () => filesUploadInput.click());
+  filesUploadInput.addEventListener('change', async () => {
+    try {
+      const uploaded = await uploadWorkspaceFiles(filesUploadInput.files, filesPathInput.value || '.');
+      filesUploadInput.value = '';
+      await refreshFileList(filesPathInput.value || '.');
+      setFeedback(fileReadStatus, `Uploaded ${uploaded.length} file${uploaded.length === 1 ? '' : 's'}`, 'success');
+    } catch (error) {
+      setFeedback(fileReadStatus, error.message, 'error');
+    }
+  });
+}
+if (filesEntries) {
+  filesEntries.addEventListener('dragover', (event) => {
+    if (event.dataTransfer?.types?.includes('Files')) {
+      event.preventDefault();
+      filesEntries.classList.add('drag-over');
+    }
+  });
+  filesEntries.addEventListener('dragleave', () => filesEntries.classList.remove('drag-over'));
+  filesEntries.addEventListener('drop', async (event) => {
+    if (!event.dataTransfer?.files?.length) return;
+    event.preventDefault();
+    filesEntries.classList.remove('drag-over');
+    try {
+      const uploaded = await uploadWorkspaceFiles(event.dataTransfer.files, filesPathInput.value || '.');
+      await refreshFileList(filesPathInput.value || '.');
+      setFeedback(fileReadStatus, `Uploaded ${uploaded.length} dropped file${uploaded.length === 1 ? '' : 's'}`, 'success');
+    } catch (error) {
+      setFeedback(fileReadStatus, error.message, 'error');
+    }
+  });
+}
 fileSaveButton.addEventListener('click', async () => {
   const targetPath = fileEditorPath.textContent;
   if (!targetPath || targetPath === 'No file selected') {
@@ -3785,17 +4054,23 @@ const TIPS = {
     title: 'Make AIOS yours',
     body: '<p>Open Settings to switch between dark and light mode, change the accent color, or pick a wallpaper. You can also upload your own custom wallpaper.</p>'
   },
+  settingscenter: {
+    glyph: '⚙️',
+    category: 'Settings',
+    title: 'Tune AIOS from one place',
+    body: '<p>Settings is now the AIOS control center. Use it for provider/model setup, runtime details, theme, wallpaper, notification toasts, system-volume sync, startup apps, default Spaces, window snapping, Mission Control, and resetting your lock PIN.</p>'
+  },
   windows: {
     glyph: '🪟',
     category: 'Desktop',
     title: 'Master window shortcuts',
-    body: '<ul><li><kbd>⌘</kbd> + <kbd>1</kbd>–<kbd>9</kbd> focus dock apps by position</li><li>Drag a window titlebar to move it</li><li>Click the red dot to close, yellow to minimize, green to zoom</li><li>Click a window to bring it to the front</li></ul>'
+    body: '<ul><li><kbd>⌘</kbd> + <kbd>1</kbd>–<kbd>9</kbd> focus dock apps by position</li><li>Drag a window titlebar to move it, or drag to screen edges to snap</li><li><kbd>Ctrl</kbd> + <kbd>⌘</kbd> + <kbd>←</kbd>/<kbd>→</kbd> snaps the focused window</li><li><kbd>Ctrl</kbd> + <kbd>⌘</kbd> + <kbd>F</kbd> toggles fullscreen</li><li>Right-click dock apps for Snap Left, Snap Right, Fullscreen, Close, and Move to Space</li></ul>'
   },
   files: {
     glyph: '📁',
     category: 'Organize',
     title: 'Manage files & downloads',
-    body: '<p>Use the Files app to browse your workspace. Downloads from the Browser are saved to <code>workspace/Downloads</code>. Open the Browser’s downloads panel to see recent files.</p>'
+    body: '<p>Use the Files app to browse your workspace. Downloads from the Browser are saved to <code>workspace/Downloads</code>.</p><ul><li>Use breadcrumbs to jump between folders</li><li>Create folders, upload files, or drag files onto the list</li><li>Search/sort the current folder</li><li>Right-click items to rename, copy, move, Quick Look, or move to Trash</li></ul>'
   },
   menubar: {
     glyph: '🎚️',
@@ -3936,6 +4211,60 @@ performanceModeToggle.addEventListener('change', () => {
   persistShellState();
 });
 
+if (settingsSystemVolumeToggle) {
+  settingsSystemVolumeToggle.addEventListener('change', () => {
+    shellState.preferences.systemVolumeSync = settingsSystemVolumeToggle.checked;
+    persistShellState();
+    if (settingsSystemVolumeToggle.checked) syncSystemVolume();
+    if (settingsStatus) setFeedback(settingsStatus, 'Volume preference saved.', 'success');
+  });
+}
+
+if (settingsNotificationsToggle) {
+  settingsNotificationsToggle.addEventListener('change', () => {
+    shellState.preferences.notificationToasts = settingsNotificationsToggle.checked;
+    persistShellState();
+    if (settingsStatus) setFeedback(settingsStatus, 'Notification preference saved.', 'success');
+  });
+}
+
+if (settingsDefaultSpaceSelect) {
+  settingsDefaultSpaceSelect.addEventListener('change', () => {
+    shellState.preferences.defaultSpace = settingsDefaultSpaceSelect.value;
+    persistShellState();
+    if (settingsStatus) setFeedback(settingsStatus, 'Default Space saved.', 'success');
+  });
+}
+
+if (settingsSnapToggle) {
+  settingsSnapToggle.addEventListener('change', () => {
+    shellState.preferences.edgeSnapping = settingsSnapToggle.checked;
+    persistShellState();
+    if (settingsStatus) setFeedback(settingsStatus, 'Window snapping preference saved.', 'success');
+  });
+}
+
+if (settingsSaveStartupButton && settingsStartupApps) {
+  settingsSaveStartupButton.addEventListener('click', () => {
+    shellState.preferences.startupApps = Array.from(settingsStartupApps.selectedOptions).map((option) => option.value);
+    persistShellState();
+    if (settingsStatus) setFeedback(settingsStatus, 'Startup apps saved.', 'success');
+  });
+}
+
+if (settingsOpenMissionControlButton) {
+  settingsOpenMissionControlButton.addEventListener('click', () => toggleMissionControl(true));
+}
+
+if (settingsResetLockButton) {
+  settingsResetLockButton.addEventListener('click', () => {
+    shellState.preferences.lockPinHash = '';
+    shellState.preferences.locked = false;
+    persistShellState();
+    if (settingsStatus) setFeedback(settingsStatus, 'Lock PIN reset. Lock again to set a new PIN.', 'success');
+  });
+}
+
 dockAppButtons.forEach((button) => {
   button.addEventListener('click', () => {
     openWindow(button.dataset.openApp);
@@ -3993,11 +4322,7 @@ document.querySelectorAll('[data-window-action]').forEach((button) => {
     const app = button.dataset.app;
     const action = button.dataset.windowAction;
     if (action === 'zoom') {
-      const windowEl = document.getElementById(WINDOW_IDS[app]);
-      if (windowEl) {
-        windowEl.classList.toggle('maximized');
-      }
-      focusWindow(app);
+      toggleWindowFullscreen(app);
       return;
     }
     if (action === 'minimize') {
@@ -4038,6 +4363,16 @@ const windowResizeObserver = new ResizeObserver((entries) => {
 });
 document.querySelectorAll('.app-window').forEach((windowEl) => windowResizeObserver.observe(windowEl));
 
+function openStartupApps() {
+  const startupApps = Array.isArray(shellState.preferences.startupApps) ? shellState.preferences.startupApps : [];
+  startupApps
+    .filter((app) => WINDOW_IDS[app])
+    .forEach((app) => {
+      openWindow(app);
+      if (app === 'files') refreshFileList().catch(() => {});
+    });
+}
+
 renderMessage('system', 'Welcome to AIOS web shell. Use dock apps for chat, files, terminal, apps, and setup.');
 
 tickClock();
@@ -4056,6 +4391,7 @@ loadShellState()
   ]))
   .then(() => {
     initShellExtras();
+    openStartupApps();
     checkFirstRun();
     refreshFileList().catch(() => {});
   })
@@ -4574,7 +4910,7 @@ function notify(title, body = '', { toast = true } = {}) {
   persistShellState();
   updateNotificationsBadge();
   renderNotificationCenter();
-  if (toast) showToast(title, body);
+  if (toast && shellState.preferences.notificationToasts !== false) showToast(title, body);
 }
 
 function renderNotificationCenter() {
@@ -4684,6 +5020,7 @@ let systemVolumeSupported = false;
 let systemVolumeSetTimer = null;
 
 async function syncSystemVolume() {
+  if (shellState.preferences.systemVolumeSync === false) return;
   try {
     const response = await fetch('/api/system/volume');
     const payload = await response.json();
@@ -4698,6 +5035,7 @@ async function syncSystemVolume() {
 }
 
 function pushSystemVolume(volume) {
+  if (shellState.preferences.systemVolumeSync === false) return;
   if (!systemVolumeSupported) return;
   if (systemVolumeSetTimer) clearTimeout(systemVolumeSetTimer);
   systemVolumeSetTimer = setTimeout(() => {
@@ -5412,6 +5750,40 @@ function showFileContextMenu(event, entry, entryPath) {
     items.push({ label: 'Quick Look', action: () => openQuickLook(entryPath) });
   }
   items.push('separator');
+  items.push({ label: 'Rename…', action: async () => {
+    const name = window.prompt('Rename to:', entry.name);
+    if (!name || name === entry.name) return;
+    try {
+      await renameWorkspaceItem(entryPath, name);
+      await refreshFileList(filesPathInput.value || '.');
+      setFeedback(fileReadStatus, `Renamed ${entry.name} to ${name}`);
+    } catch (error) {
+      setFeedback(fileReadStatus, error.message, 'error');
+    }
+  } });
+  items.push({ label: 'Copy to Folder…', action: async () => {
+    const target = window.prompt('Copy to folder:', filesPathInput.value || '.');
+    if (!target) return;
+    try {
+      const result = await copyWorkspaceItem(entryPath, target);
+      await refreshFileList(filesPathInput.value || '.');
+      setFeedback(fileReadStatus, `Copied to ${result.path}`, 'success');
+    } catch (error) {
+      setFeedback(fileReadStatus, error.message, 'error');
+    }
+  } });
+  items.push({ label: 'Move to Folder…', action: async () => {
+    const target = window.prompt('Move to folder:', filesPathInput.value || '.');
+    if (!target) return;
+    try {
+      const result = await moveWorkspaceItem(entryPath, target);
+      await refreshFileList(filesPathInput.value || '.');
+      setFeedback(fileReadStatus, `Moved to ${result.path}`, 'success');
+    } catch (error) {
+      setFeedback(fileReadStatus, error.message, 'error');
+    }
+  } });
+  items.push('separator');
   items.push({
     label: 'Move to Trash',
     danger: true,
@@ -5430,6 +5802,9 @@ dockAppButtons.forEach((button) => {
       { label: isOpen ? 'Focus Window' : 'Open', action: () => openWindow(app) }
     ];
     if (isOpen) {
+      items.push({ label: 'Snap Left', action: () => setWindowMode(app, 'left') });
+      items.push({ label: 'Snap Right', action: () => setWindowMode(app, 'right') });
+      items.push({ label: 'Fullscreen', action: () => setWindowMode(app, 'full') });
       items.push({ label: 'Close Window', action: () => closeWindow(app) });
     }
     items.push('separator');

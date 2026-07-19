@@ -94,6 +94,17 @@
               <input id="filesPathInput" type="text" value="." aria-label="Current directory" />
               <button id="filesUpButton" type="button">Up</button>
               <button id="filesRefreshButton" type="button">Refresh</button>
+              <button id="filesNewFolderButton" type="button">New Folder</button>
+              <button id="filesUploadButton" type="button" class="secondary">Upload</button>
+              <input id="filesUploadInput" type="file" multiple class="hidden" />
+            </div>
+            <div id="filesBreadcrumbs" class="files-breadcrumbs" aria-label="Current path breadcrumbs"></div>
+            <div class="toolbar files-tools">
+              <input id="filesSearchInput" type="search" placeholder="Search this folder..." aria-label="Search files in current folder" />
+              <select id="filesSortSelect" aria-label="Sort files">
+                <option value="name">Name</option>
+                <option value="type">Kind</option>
+              </select>
             </div>
             <div class="split-layout">
               <ul id="filesEntries" class="file-list" aria-label="File entries"></ul>
@@ -339,6 +350,50 @@
                 </label>
                 <p class="status-text">Local app data path: <code id="dataDirValue">loading...</code></p>
                 <button id="runSetupAgainButton" type="button" class="secondary">Run setup assistant again</button>
+              </section>
+
+              <section class="control-group">
+                <p class="group-title">System controls</p>
+                <label class="checkbox-row" for="settingsSystemVolumeToggle">
+                  <input id="settingsSystemVolumeToggle" type="checkbox" />
+                  Sync menu bar volume with macOS system volume
+                </label>
+                <label class="checkbox-row" for="settingsNotificationsToggle">
+                  <input id="settingsNotificationsToggle" type="checkbox" />
+                  Show toast banners for notifications
+                </label>
+                <label for="settingsDefaultSpaceSelect">Default Space for new windows</label>
+                <select id="settingsDefaultSpaceSelect">
+                  <option value="current">Current Space</option>
+                  <option value="1">Space 1</option>
+                  <option value="2">Space 2</option>
+                  <option value="3">Space 3</option>
+                </select>
+                <label for="settingsStartupApps">Startup apps</label>
+                <select id="settingsStartupApps" multiple size="7" aria-label="Startup apps">
+                  <option value="chat">AI Chat</option>
+                  <option value="browser">Browser</option>
+                  <option value="files">Files</option>
+                  <option value="terminal">Terminal</option>
+                  <option value="editor">Editor</option>
+                  <option value="calendar">Calendar</option>
+                  <option value="monitor">Activity Monitor</option>
+                </select>
+                <button id="settingsSaveStartupButton" type="button" class="secondary">Save startup apps</button>
+                <div class="toolbar">
+                  <button id="settingsOpenMissionControlButton" type="button" class="secondary">Open Mission Control</button>
+                  <button id="settingsResetLockButton" type="button" class="secondary">Reset lock PIN</button>
+                </div>
+                <p id="settingsStatus" class="status-text"></p>
+              </section>
+
+              <section class="control-group">
+                <p class="group-title">Window management</p>
+                <label class="checkbox-row" for="settingsSnapToggle">
+                  <input id="settingsSnapToggle" type="checkbox" />
+                  Snap windows when dragged to screen edges
+                </label>
+                <p class="status-text">Keyboard: <kbd>Ctrl</kbd> + <kbd>⌘</kbd> + <kbd>←</kbd>/<kbd>→</kbd> snaps the focused window. <kbd>Ctrl</kbd> + <kbd>⌘</kbd> + <kbd>F</kbd> toggles fullscreen. <kbd>Ctrl</kbd> + <kbd>↑</kbd> opens Mission Control.</p>
               </section>
 
               <section class="control-group">
@@ -614,17 +669,23 @@
                     <span class="tips-card-title">Make AIOS yours</span>
                     <span class="tips-card-subtitle">Switch themes, accents, and wallpapers.</span>
                   </button>
+                  <button type="button" class="tips-card" data-tip="settingscenter">
+                    <span class="tips-card-glyph">⚙️</span>
+                    <span class="tips-card-category">Settings</span>
+                    <span class="tips-card-title">Tune AIOS from one place</span>
+                    <span class="tips-card-subtitle">Startup apps, Spaces, window snapping, notifications, lock, and volume.</span>
+                  </button>
                   <button type="button" class="tips-card" data-tip="windows">
                     <span class="tips-card-glyph">🪟</span>
                     <span class="tips-card-category">Desktop</span>
                     <span class="tips-card-title">Master window shortcuts</span>
-                    <span class="tips-card-subtitle">Move, minimize, zoom, and focus with the keyboard.</span>
+                    <span class="tips-card-subtitle">Snap, fullscreen, move, minimize, and focus with keyboard or menus.</span>
                   </button>
                   <button type="button" class="tips-card" data-tip="files">
                     <span class="tips-card-glyph">📁</span>
                     <span class="tips-card-category">Organize</span>
                     <span class="tips-card-title">Manage files & downloads</span>
-                    <span class="tips-card-subtitle">Browse workspace files and find downloads fast.</span>
+                    <span class="tips-card-subtitle">Browse, search, upload, rename, copy, move, and preview files.</span>
                   </button>
                   <button type="button" class="tips-card" data-tip="menubar">
                     <span class="tips-card-glyph">🎚️</span>
