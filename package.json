@@ -1,7 +1,7 @@
 {
   "name": "aios",
   "version": "1.0.0",
-  "description": "Zack and Richard have made an operating system called AI OS. Built for AI users and nerds.",
+  "description": "Zack made an operating system called AI OS. Built for AI users and nerds.",
   "main": "server/index.js",
   "scripts": {
     "start": "electron desktop/main.js",
