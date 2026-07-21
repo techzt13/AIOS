@@ -1,5 +1,5 @@
 # AIOS
-Zack and Richard have made an operating system called AIOS. Built for AI users and nerds.
+Zack has made an operating system called AIOS. Built for AI users and nerds.
 
 AIOS runs as a local **AI-native OS runtime** with a macOS-inspired desktop. Use desktop mode when you want AIOS to own native app windows instead of being trapped inside a normal browser tab.
 
