@@ -8,6 +8,7 @@ AIOS runs as a local **AI-native OS runtime** with a macOS-inspired desktop. Use
 ```bash
 git clone https://github.com/techzt13/AIOS.git
 cd AIOS
+npm install electron -D
 npm install
 npm start
 ```
