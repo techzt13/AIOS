@@ -1972,7 +1972,7 @@ function renderProviderSetupList() {
 function renderChatModelSelect() {
   const currentSelection = chatModelSelect.value;
   chatModelSelect.innerHTML = '';
-  
+
   const groups = new Map();
   let hasUsable = false;
 
@@ -2004,25 +2004,17 @@ function renderChatModelSelect() {
     updateProviderStatusBadge();
     return;
   }
-  
-  if (currentSelection && chatModelSelect.querySelector(`option[value="${currentSelection}"]`)) {
-    chatModelSelect.value = currentSelection;
-  } else {
-    const prefProvider = shellState.preferences?.providerId;
-    if (prefProvider) {
-       const p = providers.find(p => p.id === prefProvider);
-       const prefModel = preferredModelForProvider(p);
-       if (p && prefModel) {
-          const val = `${prefProvider}|${prefModel}`;
-          if (chatModelSelect.querySelector(`option[value="${val}"]`)) {
-             chatModelSelect.value = val;
-             updateProviderStatusBadge();
-             return;
-          }
-       }
-    }
-    chatModelSelect.value = chatModelSelect.querySelector('option:not([value=""])').value;
-  }
+
+  const preferredProvider = providers.find((provider) => provider.id === shellState.preferences?.providerId);
+  const preferredModel = preferredModelForProvider(preferredProvider);
+  const preferredSelection = preferredProvider && preferredModel
+    ? `${preferredProvider.id}|${preferredModel}`
+    : '';
+  const availableSelections = Array.from(chatModelSelect.options, (option) => option.value);
+  chatModelSelect.value = [preferredSelection, currentSelection]
+    .find((selection) => selection && availableSelections.includes(selection))
+    || availableSelections.find(Boolean)
+    || '';
   updateProviderStatusBadge();
 }
 
@@ -3505,11 +3497,16 @@ function tickClock() {
   });
 }
 
-providerSelect.addEventListener('change', updateModelOptions);
-modelSelect.addEventListener('change', () => {
-  updateChatStatusPill(selectedProvider(), modelSelect.value);
+function syncDefaultChatModel() {
   persistProviderChoice(selectedProvider(), modelSelect.value);
+  renderChatModelSelect();
+}
+
+providerSelect.addEventListener('change', () => {
+  updateModelOptions();
+  syncDefaultChatModel();
 });
+modelSelect.addEventListener('change', syncDefaultChatModel);
 
 copilotStartButton.addEventListener('click', () => {
   startCopilotLogin().catch((error) => renderMessage('system', `GitHub Copilot sign-in error: ${error.message}`));

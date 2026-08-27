@@ -120,6 +120,23 @@ test('wizard frontend uses existing first-run and provider test endpoints', asyn
   assert.match(appJs, /await loadWizardProviders\(wizardProviderId\)/);
 });
 
+test('chat model selector follows the persisted default model', async () => {
+  const appJs = await fs.readFile(path.join(repoRoot, 'public', 'app.js'), 'utf8');
+  const renderStart = appJs.indexOf('function renderChatModelSelect()');
+  const renderEnd = appJs.indexOf('function updateProviderStatusBadge()', renderStart);
+  const handlersStart = appJs.indexOf('function syncDefaultChatModel()');
+  const handlersEnd = appJs.indexOf("copilotStartButton.addEventListener('click'", handlersStart);
+  const renderSource = appJs.slice(renderStart, renderEnd);
+  const handlerSource = appJs.slice(handlersStart, handlersEnd);
+
+  assert.match(renderSource, /\[preferredSelection, currentSelection\]/);
+  assert.match(handlerSource, /persistProviderChoice\(selectedProvider\(\), modelSelect\.value\)/);
+  assert.match(handlerSource, /renderChatModelSelect\(\)/);
+  assert.match(handlerSource, /providerSelect\.addEventListener\('change'/);
+  assert.match(handlerSource, /modelSelect\.addEventListener\('change', syncDefaultChatModel\)/);
+  assert.doesNotMatch(appJs, /updateChatStatusPill/);
+});
+
 test('native desktop runtime exposes Electron browser windows', async () => {
   const packageJson = await fs.readFile(path.join(repoRoot, 'package.json'), 'utf8');
   const desktopMain = await fs.readFile(path.join(repoRoot, 'desktop', 'main.js'), 'utf8');
