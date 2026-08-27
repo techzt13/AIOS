@@ -1636,7 +1636,9 @@ function applyPreferences() {
       option.selected = startupApps.includes(option.value);
     });
   }
-  if (themeToggleButton) themeToggleButton.textContent = theme === 'light' ? '☀️' : '🌙';
+  if (themeToggleButton) {
+    themeToggleButton.innerHTML = menuIconSvg(theme === 'light' ? 'sun' : 'moon');
+  }
   applyCustomWallpaper();
 }
 
@@ -1711,41 +1713,7 @@ function initWindowDrag(windowEl) {
   let dragFrame = 0;
   let dragging = false;
 
-  titlebar.addEventListener('mousedown', (event) => {
-    if (event.target.closest('button, input, select, textarea, a')) return;
-    
-    // If we drag a maximized or snapped window, unsnap it
-    if (windowEl.classList.contains('maximized') || windowEl.classList.contains('snapped-left') || windowEl.classList.contains('snapped-right')) {
-      windowEl.classList.remove('maximized', 'snapped-left', 'snapped-right');
-      const rect = windowEl.getBoundingClientRect();
-      const canvasRect = desktopCanvas.getBoundingClientRect();
-      
-      // Attempt to center the window under the mouse when dragging out of snap
-      windowEl.style.left = `${Math.round(event.clientX - canvasRect.left - (rect.width / 2))}px`;
-    }
-    
-    dragging = true;
-    focusWindow(windowEl.dataset.app);
-    startX = event.clientX;
-    startY = event.clientY;
-    const rect = windowEl.getBoundingClientRect();
-    const canvasRect = desktopCanvas.getBoundingClientRect();
-    originX = rect.left;
-    originY = rect.top;
-    initialLeft = Math.round(originX - canvasRect.left);
-    initialTop = Math.round(originY - canvasRect.top);
-    lastX = initialLeft;
-    lastY = initialTop;
-    windowEl.classList.add('dragging');
-    event.preventDefault();
-  });
-
-  titlebar.addEventListener('dblclick', (event) => {
-    if (event.target.closest('button, input, select, textarea, a')) return;
-    windowEl.classList.toggle('maximized');
-  });
-
-  window.addEventListener('mousemove', (event) => {
+  function moveWindow(event) {
     if (!dragging) return;
     const canvasRect = desktopCanvas.getBoundingClientRect();
     const bounds = safeWindowBounds(windowEl);
@@ -1762,31 +1730,68 @@ function initWindowDrag(windowEl) {
         dragFrame = 0;
       });
     }
+    event.preventDefault();
+  }
+
+  function finishDrag(event) {
+    if (!dragging) return;
+    dragging = false;
+    if (dragFrame) {
+      cancelAnimationFrame(dragFrame);
+      dragFrame = 0;
+    }
+    windowEl.style.transform = '';
+    windowEl.style.left = `${lastX}px`;
+    windowEl.style.top = `${lastY}px`;
+    windowEl.classList.remove('dragging');
+
+    if (event.type === 'mouseup' && shellState.preferences.edgeSnapping !== false) {
+      windowEl.classList.remove('snapped-left', 'snapped-right', 'maximized');
+      if (event.clientX < 20) {
+        windowEl.classList.add('snapped-left');
+      } else if (event.clientX > window.innerWidth - 20) {
+        windowEl.classList.add('snapped-right');
+      }
+    }
+
+    recordWindowState(windowEl.dataset.app, { left: lastX, top: lastY });
+    window.removeEventListener('mousemove', moveWindow);
+    window.removeEventListener('mouseup', finishDrag);
+    window.removeEventListener('blur', finishDrag);
+  }
+
+  titlebar.addEventListener('mousedown', (event) => {
+    if (event.button !== 0 || event.target.closest('button, input, select, textarea, a')) return;
+
+    if (windowEl.classList.contains('maximized') || windowEl.classList.contains('snapped-left') || windowEl.classList.contains('snapped-right')) {
+      windowEl.classList.remove('maximized', 'snapped-left', 'snapped-right');
+      const rect = windowEl.getBoundingClientRect();
+      const canvasRect = desktopCanvas.getBoundingClientRect();
+      windowEl.style.left = `${Math.round(event.clientX - canvasRect.left - (rect.width / 2))}px`;
+    }
+
+    dragging = true;
+    focusWindow(windowEl.dataset.app);
+    startX = event.clientX;
+    startY = event.clientY;
+    const rect = windowEl.getBoundingClientRect();
+    const canvasRect = desktopCanvas.getBoundingClientRect();
+    originX = rect.left;
+    originY = rect.top;
+    initialLeft = Math.round(originX - canvasRect.left);
+    initialTop = Math.round(originY - canvasRect.top);
+    lastX = initialLeft;
+    lastY = initialTop;
+    windowEl.classList.add('dragging');
+    window.addEventListener('mousemove', moveWindow);
+    window.addEventListener('mouseup', finishDrag);
+    window.addEventListener('blur', finishDrag, { once: true });
+    event.preventDefault();
   });
 
-  window.addEventListener('mouseup', (event) => {
-    if (dragging) {
-      if (dragFrame) {
-        cancelAnimationFrame(dragFrame);
-        dragFrame = 0;
-      }
-      windowEl.style.transform = '';
-      windowEl.style.left = `${lastX}px`;
-      windowEl.style.top = `${lastY}px`;
-      windowEl.classList.remove('dragging');
-      
-      if (shellState.preferences.edgeSnapping !== false) {
-        windowEl.classList.remove('snapped-left', 'snapped-right', 'maximized');
-        if (event.clientX < 20) {
-          windowEl.classList.add('snapped-left');
-        } else if (event.clientX > window.innerWidth - 20) {
-          windowEl.classList.add('snapped-right');
-        }
-      }
-      
-      recordWindowState(windowEl.dataset.app, { left: lastX, top: lastY });
-    }
-    dragging = false;
+  titlebar.addEventListener('dblclick', (event) => {
+    if (event.target.closest('button, input, select, textarea, a')) return;
+    toggleWindowFullscreen(windowEl.dataset.app);
   });
 }
 
@@ -4965,6 +4970,21 @@ notificationsClearButton.addEventListener('click', () => {
 
 // ---------- Menu bar extras ----------
 
+function menuIconSvg(name) {
+  const paths = {
+    wifi: '<path d="M5 12.6a11 11 0 0 1 14 0M8.5 16.1a6 6 0 0 1 7 0M12 20h.01" />',
+    wifiOff: '<path d="M3 3l18 18M8.5 16.1a6 6 0 0 1 4.7-1.1M5 12.6a11 11 0 0 1 3.6-1.8M15.5 11a11 11 0 0 1 3.5 1.6M12 20h.01" />',
+    battery: '<rect x="3" y="7" width="17" height="10" rx="2" /><path d="M22 10v4" />',
+    charging: '<rect x="3" y="7" width="17" height="10" rx="2" /><path d="M22 10v4M11 9l-2 3h3l-2 3" />',
+    volumeMuted: '<path d="M11 5 6 9H3v6h3l5 4V5ZM16 10l5 5M21 10l-5 5" />',
+    volumeLow: '<path d="M11 5 6 9H3v6h3l5 4V5ZM15.5 9.5a4 4 0 0 1 0 5" />',
+    volumeHigh: '<path d="M11 5 6 9H3v6h3l5 4V5ZM15.5 9.5a4 4 0 0 1 0 5M18 7a7.5 7.5 0 0 1 0 10" />',
+    moon: '<path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5 8.5 8.5 0 1 0 20.5 14.3Z" />',
+    sun: '<circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />'
+  };
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name] || ''}</svg>`;
+}
+
 function hideMenuPopovers() {
   volumePopover.classList.add('hidden');
   calendarPopover.classList.add('hidden');
@@ -4972,8 +4992,9 @@ function hideMenuPopovers() {
 
 function updateWifiStatus() {
   const online = navigator.onLine !== false;
-  wifiStatus.textContent = online ? '📶' : '📵';
+  wifiStatus.innerHTML = menuIconSvg(online ? 'wifi' : 'wifiOff');
   wifiStatus.title = online ? 'Network: online' : 'Network: offline';
+  wifiStatus.setAttribute('aria-label', wifiStatus.title);
 }
 
 window.addEventListener('online', () => {
@@ -4987,9 +5008,9 @@ window.addEventListener('offline', () => {
 
 function renderBatteryStatus(battery) {
   const percent = Math.round(battery.level * 100);
-  const glyph = battery.charging ? '⚡️' : (percent <= 20 ? '🪫' : '🔋');
-  batteryStatus.textContent = `${glyph} ${percent}%`;
+  batteryStatus.innerHTML = `${menuIconSvg(battery.charging ? 'charging' : 'battery')}<span>${percent}%</span>`;
   batteryStatus.title = battery.charging ? `Battery: ${percent}% (charging)` : `Battery: ${percent}%`;
+  batteryStatus.setAttribute('aria-label', batteryStatus.title);
   batteryStatus.classList.remove('hidden');
 }
 
@@ -5004,14 +5025,14 @@ function initBatteryStatus() {
 }
 
 function volumeGlyph() {
-  if (globalVolume === 0) return '🔇';
-  if (globalVolume < 0.5) return '🔈';
-  return '🔊';
+  if (globalVolume === 0) return 'volumeMuted';
+  if (globalVolume < 0.5) return 'volumeLow';
+  return 'volumeHigh';
 }
 
 function applyVolume() {
   musicAudio.volume = globalVolume;
-  volumeButton.textContent = volumeGlyph();
+  volumeButton.innerHTML = menuIconSvg(volumeGlyph());
   volumeSlider.value = String(Math.round(globalVolume * 100));
   volumeValue.textContent = `${Math.round(globalVolume * 100)}%`;
 }

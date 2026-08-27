@@ -22,13 +22,13 @@
           <span id="runtimeBadge">Local runtime</span>
           <div id="spacesSwitcher" class="spaces-switcher" role="group" aria-label="Spaces"></div>
           <button type="button" id="missionControlButton" class="menu-extra-button" title="Mission Control (Ctrl+Up)" aria-label="Mission Control"><svg width="13" height="11" viewBox="0 0 13 11" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="5.6" height="4.6" rx="1.2"/><rect x="7.4" y="0" width="5.6" height="4.6" rx="1.2"/><rect x="0" y="6.4" width="5.6" height="4.6" rx="1.2"/><rect x="7.4" y="6.4" width="5.6" height="4.6" rx="1.2"/></svg></button>
-          <span id="wifiStatus" class="menu-extra" title="Network status">📶</span>
+          <span id="wifiStatus" class="menu-extra" title="Network status" aria-label="Network status"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.6a11 11 0 0 1 14 0M8.5 16.1a6 6 0 0 1 7 0M12 20h.01" /></svg></span>
           <span id="batteryStatus" class="menu-extra hidden" title="Battery"></span>
-          <button type="button" id="volumeButton" class="menu-extra-button" title="Volume" aria-label="Volume">🔊</button>
-          <button type="button" id="notificationsButton" class="menu-extra-button" title="Notifications" aria-label="Notifications">🔔<span id="notificationsBadge" class="notifications-badge hidden">0</span></button>
-          <button type="button" id="lockButton" class="menu-extra-button" title="Lock screen (Ctrl+⌘Q)" aria-label="Lock screen">🔒</button>
-          <button type="button" id="themeToggleButton" class="theme-toggle-button" title="Toggle theme" aria-label="Toggle theme">🌙</button>
-          <button type="button" id="spotlightButton" class="spotlight-button" title="Search (⌘Space)" aria-label="Search">🔍</button>
+          <button type="button" id="volumeButton" class="menu-extra-button" title="Volume" aria-label="Volume"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5ZM15.5 9.5a4 4 0 0 1 0 5M18 7a7.5 7.5 0 0 1 0 10" /></svg></button>
+          <button type="button" id="notificationsButton" class="menu-extra-button" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><span id="notificationsBadge" class="notifications-badge hidden">0</span></button>
+          <button type="button" id="lockButton" class="menu-extra-button" title="Lock screen (Ctrl+⌘Q)" aria-label="Lock screen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg></button>
+          <button type="button" id="themeToggleButton" class="theme-toggle-button" title="Toggle theme" aria-label="Toggle theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5 8.5 8.5 0 1 0 20.5 14.3Z" /></svg></button>
+          <button type="button" id="spotlightButton" class="spotlight-button" title="Search (⌘Space)" aria-label="Search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg></button>
           <button type="button" id="clockLabel" class="menu-clock" title="Open calendar" aria-label="Clock and calendar"></button>
         </div>
         <div id="volumePopover" class="menu-popover hidden" aria-label="Volume control">
@@ -891,21 +891,21 @@
       </main>
 
       <nav class="dock" aria-label="AIOS dock">
-        <button type="button" class="dock-item" data-open-app="chat">AI Chat</button>
-        <button type="button" class="dock-item" data-open-app="browser">Browser</button>
-        <button type="button" class="dock-item" data-open-app="notes">Notes</button>
-        <button type="button" class="dock-item" data-open-app="files">Files</button>
-        <button type="button" class="dock-item" data-open-app="terminal">Terminal</button>
-        <button type="button" class="dock-item" data-open-app="calculator">Calculator</button>
-        <button type="button" class="dock-item" data-open-app="editor">Editor</button>
-        <button type="button" class="dock-item" data-open-app="settings">Settings</button>
-        <button type="button" class="dock-item" id="openSetupAssistant">Setup</button>
-        <button type="button" class="dock-item" data-open-app="apps">Apps</button>
-        <button type="button" class="dock-item" data-open-app="calendar">Calendar</button>
-        <button type="button" class="dock-item" data-open-app="monitor">Monitor</button>
-        <button type="button" class="dock-item" data-open-app="music">Music</button>
-        <button type="button" class="dock-item" data-open-app="instructions">Tips</button>
-        <button type="button" class="dock-item dock-trash" data-open-app="trash">Trash</button>
+        <button type="button" class="dock-item" data-open-app="chat" aria-label="AI Chat">AI Chat</button>
+        <button type="button" class="dock-item" data-open-app="browser" aria-label="Browser">Browser</button>
+        <button type="button" class="dock-item" data-open-app="notes" aria-label="Notes">Notes</button>
+        <button type="button" class="dock-item" data-open-app="files" aria-label="Files">Files</button>
+        <button type="button" class="dock-item" data-open-app="terminal" aria-label="Terminal">Terminal</button>
+        <button type="button" class="dock-item" data-open-app="calculator" aria-label="Calculator">Calculator</button>
+        <button type="button" class="dock-item" data-open-app="editor" aria-label="Editor">Editor</button>
+        <button type="button" class="dock-item" data-open-app="settings" aria-label="Settings">Settings</button>
+        <button type="button" class="dock-item" id="openSetupAssistant" aria-label="Setup">Setup</button>
+        <button type="button" class="dock-item" data-open-app="apps" aria-label="Apps">Apps</button>
+        <button type="button" class="dock-item" data-open-app="calendar" aria-label="Calendar">Calendar</button>
+        <button type="button" class="dock-item" data-open-app="monitor" aria-label="Activity Monitor">Monitor</button>
+        <button type="button" class="dock-item" data-open-app="music" aria-label="Music">Music</button>
+        <button type="button" class="dock-item" data-open-app="instructions" aria-label="Tips">Tips</button>
+        <button type="button" class="dock-item dock-trash" data-open-app="trash" aria-label="Trash">Trash</button>
       </nav>
     </div>
 
