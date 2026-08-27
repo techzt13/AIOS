@@ -5726,13 +5726,13 @@ function showContextMenu(items, x, y) {
 
 document.addEventListener('click', (event) => {
   if (!contextMenu.contains(event.target)) hideContextMenu();
-  if (!volumePopover.contains(event.target) && event.target !== volumeButton) {
+  if (!volumePopover.contains(event.target) && !volumeButton.contains(event.target)) {
     volumePopover.classList.add('hidden');
   }
-  if (!calendarPopover.contains(event.target) && event.target !== clockLabel) {
+  if (!calendarPopover.contains(event.target) && !clockLabel.contains(event.target)) {
     calendarPopover.classList.add('hidden');
   }
-  if (!notificationCenter.contains(event.target) && event.target !== notificationsButton && !notificationsButton.contains(event.target)) {
+  if (!notificationCenter.contains(event.target) && !notificationsButton.contains(event.target)) {
     notificationCenter.classList.add('hidden');
   }
 });

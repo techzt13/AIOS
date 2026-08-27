@@ -137,6 +137,14 @@ test('chat model selector follows the persisted default model', async () => {
   assert.doesNotMatch(appJs, /updateChatStatusPill/);
 });
 
+test('menu popovers accept clicks on nested SVG icons', async () => {
+  const appJs = await fs.readFile(path.join(repoRoot, 'public', 'app.js'), 'utf8');
+
+  assert.match(appJs, /!volumeButton\.contains\(event\.target\)/);
+  assert.match(appJs, /!clockLabel\.contains\(event\.target\)/);
+  assert.match(appJs, /!notificationsButton\.contains\(event\.target\)/);
+});
+
 test('native desktop runtime exposes Electron browser windows', async () => {
   const packageJson = await fs.readFile(path.join(repoRoot, 'package.json'), 'utf8');
   const desktopMain = await fs.readFile(path.join(repoRoot, 'desktop', 'main.js'), 'utf8');
