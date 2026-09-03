@@ -188,6 +188,58 @@ const WINDOW_IDS = {
   music: 'windowMusic'
 };
 
+const APP_ICON_ART = {
+  chat: '<path d="M5 5.5h14v10H9l-4 3v-13Z"/><path d="m12 7 .7 1.8 1.8.7-1.8.7L12 12l-.7-1.8-1.8-.7 1.8-.7L12 7Z"/>',
+  browser: '<circle cx="12" cy="12" r="8.5"/><path d="m15.8 8.2-2.2 5.4-5.4 2.2 2.2-5.4 5.4-2.2Z"/>',
+  notes: '<path d="M6 3.5h12v17H6z"/><path d="M6 7.5h12M9 11h6M9 14h6M9 17h4"/>',
+  files: '<path d="M3.5 7h6l1.7 2H20v9.5H3.5z"/><path d="M3.5 7V5.5h6l1.5 1.5"/>',
+  terminal: '<path d="m6.5 8 3.5 4-3.5 4M12 16h5.5"/>',
+  calculator: '<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8 7h8M8 11h1M12 11h1M16 11h1M8 15h1M12 15h1M16 15h1M8 18h5M16 18h1"/>',
+  editor: '<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v3h3M9 16.5l.5-3 5.8-5.8 2 2-5.8 5.8-2.5 1Z"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.5a7 7 0 0 0-.7-1.7l1-1.8-2.1-2.1-1.8 1a7 7 0 0 0-1.7-.7l-.5-2h-3l-.5 2a7 7 0 0 0-1.7.7l-1.8-1-2.1 2.1 1 1.8a7 7 0 0 0-.7 1.7l-2 .5v3l2 .5a7 7 0 0 0 .7 1.7l-1 1.8 2.1 2.1 1.8-1a7 7 0 0 0 1.7.7l.5 2h3l.5-2a7 7 0 0 0 1.7-.7l1.8 1 2.1-2.1-1-1.8A7 7 0 0 0 17 14l2-.5Z"/>',
+  setup: '<circle cx="12" cy="12" r="8.5"/><path d="m8 12.2 2.6 2.6 5.6-6"/>',
+  apps: '<rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/>',
+  calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4"/><path d="M8.5 12.5h2M13.5 12.5h2M8.5 16h2M13.5 16h2"/>',
+  monitor: '<path d="M3.5 12h3l2-5 3.2 10 2.4-7 1.8 4H21"/><path d="M4 4.5h16v15H4z"/>',
+  music: '<path d="M10 18V6l8-2v12"/><circle cx="7.5" cy="18" r="2.5"/><circle cx="15.5" cy="16" r="2.5"/>',
+  instructions: '<path d="M9.5 18.5h5M10 21h4"/><path d="M8.2 14.5A6 6 0 1 1 15.8 14.5c-1.2.8-1.3 1.6-1.3 2h-5c0-.4-.1-1.2-1.3-2Z"/><path d="M12 5.5v2M8.5 7l1.4 1.4M15.5 7l-1.4 1.4"/>',
+  trash: '<path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 10v7M14 10v7"/>'
+};
+
+function appIconSvg(app) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${APP_ICON_ART[app] || APP_ICON_ART.apps}</svg>`;
+}
+
+function decorateAppIcons() {
+  dockItems.forEach((button) => {
+    const app = button.dataset.openApp || (button.id === 'openSetupAssistant' ? 'setup' : 'apps');
+    const icon = document.createElement('span');
+    icon.className = `app-icon app-icon-${app} app-icon-dock`;
+    icon.innerHTML = appIconSvg(app);
+    button.prepend(icon);
+  });
+
+  document.querySelectorAll('.app-window[data-app]').forEach((windowEl) => {
+    const heading = windowEl.querySelector('.window-titlebar h2');
+    if (!heading) return;
+    const app = windowEl.dataset.app;
+    const icon = document.createElement('span');
+    icon.className = `app-icon app-icon-${app} app-icon-titlebar`;
+    icon.innerHTML = appIconSvg(app);
+    heading.prepend(icon);
+  });
+
+  document.querySelectorAll('.app-launch-card[data-launch-app]').forEach((card) => {
+    const app = card.dataset.launchApp;
+    const icon = card.querySelector('.app-launch-icon');
+    if (!icon) return;
+    icon.className = `app-launch-icon app-icon app-icon-${app} app-icon-launcher`;
+    icon.innerHTML = appIconSvg(app);
+  });
+}
+
+decorateAppIcons();
+
 const WINDOW_LAYOUT = {
   chat: { x: 0.08, y: 0.08 },
   browser: { x: 0.12, y: 0.10 },
@@ -1138,20 +1190,20 @@ function closeSpotlight() {
 
 function spotlightItems() {
   const apps = [
-    { id: 'app-chat', type: 'app', name: 'AI Chat', glyph: 'AI', action: () => openWindow('chat') },
-    { id: 'app-browser', type: 'app', name: 'Browser', glyph: 'BR', action: () => openWindow('browser') },
-    { id: 'app-notes', type: 'app', name: 'Notes', glyph: 'N', action: () => openWindow('notes') },
-    { id: 'app-files', type: 'app', name: 'Files', glyph: 'FS', action: () => { openWindow('files'); refreshFileList().catch(() => {}); } },
-    { id: 'app-terminal', type: 'app', name: 'Terminal', glyph: '$', action: () => openWindow('terminal') },
-    { id: 'app-calculator', type: 'app', name: 'Calculator', glyph: '=', action: () => openWindow('calculator') },
-    { id: 'app-editor', type: 'app', name: 'Text Editor', glyph: 'TE', action: () => openWindow('editor') },
-    { id: 'app-settings', type: 'app', name: 'Settings', glyph: 'ST', action: () => openWindow('settings') },
-    { id: 'app-apps', type: 'app', name: 'Apps', glyph: 'AP', action: () => openWindow('apps') },
-    { id: 'app-instructions', type: 'app', name: 'Tips', glyph: '💡', action: () => openWindow('instructions') },
-    { id: 'app-calendar', type: 'app', name: 'Calendar', glyph: '📅', action: () => openWindow('calendar') },
-    { id: 'app-monitor', type: 'app', name: 'Activity Monitor', glyph: '📊', action: () => openWindow('monitor') },
-    { id: 'app-music', type: 'app', name: 'Music', glyph: '🎵', action: () => openWindow('music') },
-    { id: 'app-trash', type: 'app', name: 'Trash', glyph: '🗑', action: () => openWindow('trash') }
+    { id: 'app-chat', type: 'app', app: 'chat', name: 'AI Chat', action: () => openWindow('chat') },
+    { id: 'app-browser', type: 'app', app: 'browser', name: 'Browser', action: () => openWindow('browser') },
+    { id: 'app-notes', type: 'app', app: 'notes', name: 'Notes', action: () => openWindow('notes') },
+    { id: 'app-files', type: 'app', app: 'files', name: 'Files', action: () => { openWindow('files'); refreshFileList().catch(() => {}); } },
+    { id: 'app-terminal', type: 'app', app: 'terminal', name: 'Terminal', action: () => openWindow('terminal') },
+    { id: 'app-calculator', type: 'app', app: 'calculator', name: 'Calculator', action: () => openWindow('calculator') },
+    { id: 'app-editor', type: 'app', app: 'editor', name: 'Text Editor', action: () => openWindow('editor') },
+    { id: 'app-settings', type: 'app', app: 'settings', name: 'Settings', action: () => openWindow('settings') },
+    { id: 'app-apps', type: 'app', app: 'apps', name: 'Apps', action: () => openWindow('apps') },
+    { id: 'app-instructions', type: 'app', app: 'instructions', name: 'Tips', action: () => openWindow('instructions') },
+    { id: 'app-calendar', type: 'app', app: 'calendar', name: 'Calendar', action: () => openWindow('calendar') },
+    { id: 'app-monitor', type: 'app', app: 'monitor', name: 'Activity Monitor', action: () => openWindow('monitor') },
+    { id: 'app-music', type: 'app', app: 'music', name: 'Music', action: () => openWindow('music') },
+    { id: 'app-trash', type: 'app', app: 'trash', name: 'Trash', action: () => openWindow('trash') }
   ];
   const bookmarks = (shellState.bookmarks || []).map((bookmark) => ({
     id: `bookmark-${bookmark.id}`,
@@ -1227,7 +1279,10 @@ async function renderSpotlightResults(query) {
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'spotlight-result' + (index === 0 ? ' active' : '');
-    row.innerHTML = `<span class="spotlight-result-glyph">${item.glyph}</span><span class="spotlight-result-info"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.detail || item.type)}</small></span>`;
+    const glyph = item.app
+      ? `<span class="app-icon app-icon-${item.app} app-icon-spotlight">${appIconSvg(item.app)}</span>`
+      : escapeHtml(item.glyph);
+    row.innerHTML = `<span class="spotlight-result-glyph">${glyph}</span><span class="spotlight-result-info"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.detail || item.type)}</small></span>`;
     row.addEventListener('click', () => {
       closeSpotlight();
       item.action();

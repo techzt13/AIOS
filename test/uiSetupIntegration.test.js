@@ -145,6 +145,23 @@ test('menu popovers accept clicks on nested SVG icons', async () => {
   assert.match(appJs, /!notificationsButton\.contains\(event\.target\)/);
 });
 
+test('built-in apps use recognizable shared icons', async () => {
+  const appJs = await fs.readFile(path.join(repoRoot, 'public', 'app.js'), 'utf8');
+  const stylesCss = await fs.readFile(path.join(repoRoot, 'public', 'styles.css'), 'utf8');
+
+  assert.match(appJs, /const APP_ICON_ART = \{/);
+  for (const app of ['notes', 'files', 'browser', 'terminal', 'calculator', 'settings', 'calendar', 'music', 'trash']) {
+    assert.match(appJs, new RegExp(`\\b${app}:`));
+    assert.match(stylesCss, new RegExp(`\\.app-icon-${app}`));
+  }
+  assert.match(appJs, /function decorateAppIcons\(\)/);
+  assert.match(appJs, /app-icon-dock/);
+  assert.match(appJs, /app-icon-titlebar/);
+  assert.match(appJs, /app-icon-launcher/);
+  assert.match(appJs, /app-icon-spotlight/);
+  assert.match(stylesCss, /\.window-titlebar h2::before,[\s\S]*\.dock-item::before[\s\S]*display: none !important/);
+});
+
 test('native desktop runtime exposes Electron browser windows', async () => {
   const packageJson = await fs.readFile(path.join(repoRoot, 'package.json'), 'utf8');
   const desktopMain = await fs.readFile(path.join(repoRoot, 'desktop', 'main.js'), 'utf8');

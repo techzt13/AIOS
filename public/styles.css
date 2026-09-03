@@ -5581,3 +5581,119 @@ button:focus-visible {
     transition: none !important;
   }
 }
+
+/* Recognizable Apple-style app icons shared by the dock, title bars, launcher, and Spotlight. */
+.window-titlebar h2::before,
+.dock-item::before {
+  display: none !important;
+  content: none !important;
+}
+
+.app-icon {
+  --icon-top: #778cff;
+  --icon-bottom: #405dcc;
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background:
+    radial-gradient(circle at 28% 12%, rgba(255, 255, 255, 0.38), transparent 38%),
+    linear-gradient(145deg, var(--icon-top), var(--icon-bottom));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 4px 12px color-mix(in srgb, var(--icon-bottom) 34%, transparent);
+  color: #fff;
+}
+
+.app-icon svg {
+  z-index: 1;
+  width: 62%;
+  height: 62%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.app-icon-dock {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+}
+
+.app-icon-titlebar {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 2px 5px color-mix(in srgb, var(--icon-bottom) 24%, transparent);
+}
+
+.app-icon-titlebar svg {
+  width: 68%;
+  height: 68%;
+  stroke-width: 2;
+}
+
+.app-icon-launcher {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+
+.app-icon-spotlight {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 2px 6px color-mix(in srgb, var(--icon-bottom) 24%, transparent);
+}
+
+.app-icon-chat { --icon-top: #8f7cff; --icon-bottom: #4b55d5; }
+.app-icon-browser { --icon-top: #48c7f0; --icon-bottom: #087bc8; }
+.app-icon-notes { --icon-top: #ffd95a; --icon-bottom: #e89a12; color: #fffdf4; }
+.app-icon-files { --icon-top: #63c9ff; --icon-bottom: #2681dd; }
+.app-icon-terminal { --icon-top: #596274; --icon-bottom: #181d27; }
+.app-icon-calculator { --icon-top: #ffad4a; --icon-bottom: #e05a16; }
+.app-icon-editor { --icon-top: #5ba6ff; --icon-bottom: #3157cd; }
+.app-icon-settings { --icon-top: #aeb7c5; --icon-bottom: #596473; }
+.app-icon-setup { --icon-top: #67d58d; --icon-bottom: #159953; }
+.app-icon-apps { --icon-top: #a779f1; --icon-bottom: #6742c6; }
+.app-icon-calendar { --icon-top: #ff756f; --icon-bottom: #d93643; }
+.app-icon-monitor { --icon-top: #4ed68c; --icon-bottom: #087b53; }
+.app-icon-music { --icon-top: #ff6eaa; --icon-bottom: #ce286f; }
+.app-icon-instructions { --icon-top: #ffd85b; --icon-bottom: #dc9413; }
+.app-icon-trash { --icon-top: #aab5c5; --icon-bottom: #586578; }
+
+.app-icon-notes svg,
+.app-icon-terminal svg,
+.app-icon-calculator svg,
+.app-icon-settings svg,
+.app-icon-instructions svg {
+  stroke-width: 2;
+}
+
+.dock-item .app-icon {
+  pointer-events: none;
+}
+
+.app-launch-icon.app-icon {
+  background:
+    radial-gradient(circle at 28% 12%, rgba(255, 255, 255, 0.38), transparent 38%),
+    linear-gradient(145deg, var(--icon-top), var(--icon-bottom));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 6px 14px color-mix(in srgb, var(--icon-bottom) 25%, transparent);
+}
+
+.spotlight-result-glyph:has(.app-icon) {
+  display: grid;
+  place-items: center;
+  background: transparent;
+}
